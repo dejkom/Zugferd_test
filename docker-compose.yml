@@ -6,7 +6,7 @@ services:
     container_name: zugferd-studio
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${HOST_PORT:-3004}:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     volumes:
