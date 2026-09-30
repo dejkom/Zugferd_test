@@ -10,14 +10,14 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="/static/index.css?v=7">
+  <link rel="stylesheet" href="/static/index.css?v=8">
 </head>
 
 <body>
 
   <header>
     <div class="brand">
-      <div class="logo-badge">FX</div>
+      <img src="/static/osmall.png" alt="Logo" class="brand-logo-img">
       <div class="brand-text">
         <h1>ZUGFeRD & Factur-X Studio</h1>
         <span>ISO 19005-3 / PDF/A-3 & CII EN 16931 Compliant Generator</span>
@@ -34,6 +34,9 @@
         </button>
         <button class="nav-tab-btn" id="tab-manual" onclick="switchScenario('manual')">
           <span>✍️ New Invoice (Manual Form)</span>
+        </button>
+        <button class="nav-tab-btn" id="tab-history" onclick="switchScenario('history')">
+          <span>📜 History</span>
         </button>
         <button class="nav-tab-btn" id="tab-config" onclick="switchScenario('config')">
           <span>⚙️ Configuration</span>
@@ -659,6 +662,108 @@
       </div>
     </div>
 
+    <!-- ================= SCENARIO 5: HISTORY ================= -->
+    <div id="scenario-history-container" style="display: none;">
+      <div style="max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem;">
+        <div class="card">
+          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span>📜 Created Invoices History</span>
+              <span class="tag" id="historyCountBadge">0 invoices</span>
+            </div>
+            <button class="btn btn-secondary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;" onclick="loadInvoiceHistory()">
+              <span>🔄 Refresh</span>
+            </button>
+          </div>
+
+          <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem;">
+            List of generated ZUGFeRD / Factur-X electronic invoices. You can re-download, inspect, or load any past invoice directly into the manual editor for adjustments and re-issuance.
+          </div>
+
+          <div id="historyLoading" style="display: none; padding: 2rem; text-align: center; color: var(--text-muted);">
+            <div class="spinner" style="margin: 0 auto 0.75rem auto;"></div>
+            <div>Loading invoice records...</div>
+          </div>
+
+          <div id="historyEmpty" style="display: none; padding: 3rem 1rem; text-align: center; border: 1px dashed var(--bg-card-border); border-radius: 8px;">
+            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📭</div>
+            <div style="font-weight: 600; color: var(--text-main);">No invoices created yet</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Invoices you create using the Manual Form, PDF or DOCX converter will appear here.</div>
+          </div>
+
+          <div class="items-table-wrapper" id="historyTableWrapper" style="display: none;">
+            <table class="items-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th style="width: 130px;">Date & Time</th>
+                  <th>Invoice No.</th>
+                  <th>Buyer</th>
+                  <th style="width: 80px;">Layout</th>
+                  <th style="width: 110px; text-align: right;">Total (€)</th>
+                  <th style="width: 90px; text-align: center;">Status</th>
+                  <th style="width: 190px; text-align: center;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+    </div>
+
+    <!-- PDF In-Browser Preview Modal (Popup) -->
+    <div id="pdfPreviewModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(6px); z-index: 9998; align-items: center; justify-content: center; padding: 1.5rem;">
+      <div style="background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 12px; width: 100%; max-width: 950px; height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--bg-card-border); background: var(--bg-primary);">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 1.2rem;">👁️</span>
+            <div>
+              <strong id="pdfPreviewTitle" style="font-size: 0.95rem; color: var(--text-main);">Invoice Preview</strong>
+              <div id="pdfPreviewSubtitle" style="font-size: 0.75rem; color: var(--text-muted);">ZUGFeRD PDF/A-3</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <a id="pdfPreviewDownloadLink" href="#" download class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.78rem;">
+              <span>⬇️ Download</span>
+            </a>
+            <button type="button" class="btn btn-secondary" onclick="closePdfPreview()" style="padding: 0.35rem 0.75rem; font-size: 0.85rem; font-weight: 700;">
+              <span>✕ Close</span>
+            </button>
+          </div>
+        </div>
+        <div style="flex: 1; width: 100%; height: 100%; background: #525659; position: relative;">
+          <iframe id="pdfPreviewIframe" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIN Protection Modal for Configuration -->
+    <div id="pinModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 9999; align-items: center; justify-content: center;">
+      <div style="background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); text-align: center;">
+        <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🔒</div>
+        <h3 style="margin-bottom: 0.5rem; font-size: 1.15rem; color: var(--text-main);">Authorized Access Only</h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+          Please enter the security PIN to access system configuration:
+        </p>
+
+        <form id="pinForm" onsubmit="handlePinSubmit(event)">
+          <div style="margin-bottom: 1.25rem;">
+            <input type="password" id="pinInput" maxlength="4" placeholder="••••" autocomplete="off"
+              style="font-size: 1.75rem; letter-spacing: 0.4em; text-align: center; width: 160px; padding: 0.5rem; border-radius: 8px; border: 2px solid var(--accent); background: var(--bg-input); color: var(--text-main);"
+              autofocus>
+          </div>
+          <div id="pinError" style="display: none; color: #ef4444; font-size: 0.8rem; margin-bottom: 1rem; font-weight: 600;">
+            ❌ Invalid PIN. Please try again.
+          </div>
+          <div style="display: flex; gap: 0.75rem; justify-content: center;">
+            <button type="button" class="btn btn-secondary" onclick="closePinModal()" style="padding: 0.5rem 1.25rem;">Cancel</button>
+            <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1.25rem;">Unlock</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- ================= SCENARIO 4: CONFIGURATION ================= -->
     <div id="scenario-config-container" style="display: none;">
       <div style="max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem;">
@@ -690,6 +795,121 @@
               <option value="layout2">Layout Option 2: Odelo Corporate Automotive (DIN style, top-right logo, multi-column footer)</option>
             </select>
             <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Choose the visual layout used when synthesizing PDF/A-3 invoices from manual forms.</span>
+          </div>
+
+          <!-- Seller (Your Business) Default Profile Settings -->
+          <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1.25rem; margin-top: 0.5rem;">
+            <div style="margin-bottom: 0.75rem;">
+              <h4 style="font-size: 0.95rem; color: #60a5fa; margin: 0 0 4px 0;">🏢 Seller (Your Business) Details</h4>
+              <span style="font-size: 0.75rem; color: var(--text-dim);">These details will automatically populate the manual form and be used when filling example data.</span>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Company Name *</label>
+                <input type="text" id="cfgSellerName" placeholder="e.g. Acme Solutions Ltd">
+              </div>
+              <div class="form-group">
+                <label>VAT ID</label>
+                <input type="text" id="cfgSellerVat" placeholder="e.g. DE123456789">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 0.5rem;">
+              <div class="form-group">
+                <label>Street Address</label>
+                <input type="text" id="cfgSellerStreet" placeholder="e.g. Bahnhofstrasse 10">
+              </div>
+              <div class="form-group">
+                <label>City & Postcode</label>
+                <input type="text" id="cfgSellerCity" placeholder="e.g. 10115 Berlin">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 0.5rem;">
+              <div class="form-group">
+                <label>Country Code (ISO-2)</label>
+                <input type="text" id="cfgSellerCountry" placeholder="e.g. DE, SI, AT" value="DE">
+              </div>
+              <div class="form-group">
+                <label>Company Website</label>
+                <input type="text" id="cfgSellerWebsite" placeholder="e.g. www.acme-solutions.com">
+              </div>
+            </div>
+          </div>
+
+          <!-- Layout 2 Corporate Multi-Column Footer Configuration -->
+          <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1.25rem; margin-top: 0.5rem;">
+            <div style="margin-bottom: 0.75rem;">
+              <h4 style="font-size: 0.95rem; color: #34d399; margin: 0 0 4px 0;">📑 Layout 2 (Odelo Style) Corporate Footer Details</h4>
+              <span style="font-size: 0.75rem; color: var(--text-dim);">Configures the 4-column footer strip printed at the bottom of Layout 2 PDF invoices.</span>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Commercial Court (Amtsgericht)</label>
+                <input type="text" id="cfgSellerCourt" placeholder="e.g. Amtsgericht Stuttgart">
+              </div>
+              <div class="form-group">
+                <label>Commercial Register (HRB / Tax ID)</label>
+                <input type="text" id="cfgSellerHrb" placeholder="e.g. HRB 736903">
+              </div>
+            </div>
+
+            <div class="form-row" style="margin-top: 0.5rem;">
+              <div class="form-group">
+                <label>UST-ID-Nr. (VAT ID for Footer)</label>
+                <input type="text" id="cfgSellerUstId" placeholder="e.g. DE 347120003 (leave empty to use Seller VAT ID)">
+              </div>
+              <div class="form-group">
+                <label>Managing Directors (Geschäftsführer)</label>
+                <input type="text" id="cfgSellerDirectors" placeholder="e.g. Mürsel Gülen, Sedat Kilic">
+              </div>
+            </div>
+
+            <div class="form-row" style="margin-top: 0.5rem;">
+              <div class="form-group">
+                <label>Phone / Fon (Header Right)</label>
+                <input type="text" id="cfgSellerPhone" placeholder="e.g. +49 (0)711 18563144">
+              </div>
+              <div class="form-group">
+                <label>Fax (Header Right)</label>
+                <input type="text" id="cfgSellerFax" placeholder="e.g. +49 (0)711 185633144">
+              </div>
+            </div>
+
+            <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--bg-card-border);">
+              <h5 style="font-size: 0.82rem; color: #38bdf8; margin: 0 0 0.5rem 0;">Primary Bank Account (Column 3)</h5>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Bank Name</label>
+                  <input type="text" id="cfgBank1Name" placeholder="e.g. Commerzbank AG">
+                </div>
+                <div class="form-group">
+                  <label>SWIFT / BIC</label>
+                  <input type="text" id="cfgBank1Bic" placeholder="e.g. DBBADEFFXXX">
+                </div>
+              </div>
+              <div class="form-group" style="margin-top: 0.5rem;">
+                <label>IBAN</label>
+                <input type="text" id="cfgBank1Iban" placeholder="e.g. DE89370400440532013000">
+              </div>
+            </div>
+
+            <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--bg-card-border);">
+              <h5 style="font-size: 0.82rem; color: #38bdf8; margin: 0 0 0.5rem 0;">Secondary Bank Account (Column 4)</h5>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Bank Name</label>
+                  <input type="text" id="cfgBank2Name" placeholder="e.g. Baden-Württembergische Bank">
+                </div>
+                <div class="form-group">
+                  <label>SWIFT / BIC</label>
+                  <input type="text" id="cfgBank2Bic" placeholder="e.g. SOLA DEST">
+                </div>
+              </div>
+              <div class="form-group" style="margin-top: 0.5rem;">
+                <label>IBAN</label>
+                <input type="text" id="cfgBank2Iban" placeholder="e.g. DE30 6005 0101 7871 5056 72">
+              </div>
+            </div>
           </div>
 
           <!-- Company Logo Upload -->
@@ -729,7 +949,7 @@
 
   </div>
 
-  <script src="/static/app.js?v=11"></script>
+  <script src="/static/app.js?v=16"></script>
 </body>
 
 </html>

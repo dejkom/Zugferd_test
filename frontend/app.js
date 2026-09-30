@@ -42,6 +42,80 @@ function getStoredLayout() {
   return localStorage.getItem("ZUGFERD_LAYOUT") || "layout1";
 }
 
+let cachedCompanySettings = {
+  seller_name: "Acme Solutions Ltd",
+  seller_vat: "DE123456789",
+  seller_street: "Bahnhofstrasse 10",
+  seller_city: "10115 Berlin",
+  seller_country: "DE",
+  seller_website: "www.acme-solutions.com",
+  seller_court: "Amtsgericht Stuttgart",
+  seller_hrb: "HRB 736903",
+  seller_managing_directors: "Mürsel Gülen, Sedat Kilic",
+  seller_bank1_name: "Commerzbank AG",
+  seller_bank1_bic: "DBBADEFFXXX",
+  seller_bank1_iban: "DE89370400440532013000",
+  seller_bank2_name: "Baden-Württembergische Bank",
+  seller_bank2_bic: "SOLA DEST",
+  seller_bank2_iban: "DE30 6005 0101 7871 5056 72"
+};
+
+function getSellerSettings() {
+  const local = localStorage.getItem("ZUGFERD_COMPANY_SETTINGS");
+  if (local) {
+    try {
+      return Object.assign({}, cachedCompanySettings, JSON.parse(local));
+    } catch (e) { }
+  }
+  return cachedCompanySettings;
+}
+
+function applySellerSettingsToInputs(settings) {
+  const mapping = {
+    cfgSellerName: "seller_name",
+    cfgSellerVat: "seller_vat",
+    cfgSellerStreet: "seller_street",
+    cfgSellerCity: "seller_city",
+    cfgSellerCountry: "seller_country",
+    cfgSellerWebsite: "seller_website",
+    cfgSellerCourt: "seller_court",
+    cfgSellerHrb: "seller_hrb",
+    cfgSellerUstId: "seller_ust_id",
+    cfgSellerPhone: "seller_phone",
+    cfgSellerFax: "seller_fax",
+    cfgSellerDirectors: "seller_managing_directors",
+    cfgBank1Name: "seller_bank1_name",
+    cfgBank1Bic: "seller_bank1_bic",
+    cfgBank1Iban: "seller_bank1_iban",
+    cfgBank2Name: "seller_bank2_name",
+    cfgBank2Bic: "seller_bank2_bic",
+    cfgBank2Iban: "seller_bank2_iban"
+  };
+  for (const [elemId, key] of Object.entries(mapping)) {
+    const el = document.getElementById(elemId);
+    if (el && settings[key] !== undefined) {
+      el.value = settings[key];
+    }
+  }
+}
+
+function populateManualSellerDefaults() {
+  const s = getSellerSettings();
+  const nameEl = document.getElementById("manSellerName");
+  const vatEl = document.getElementById("manSellerVat");
+  const streetEl = document.getElementById("manSellerStreet");
+  const cityEl = document.getElementById("manSellerCity");
+  const ibanEl = document.getElementById("manIban");
+  const bicEl = document.getElementById("manBic");
+
+  if (nameEl && !nameEl.value.trim()) nameEl.value = s.seller_name || "";
+  if (vatEl && !vatEl.value.trim()) vatEl.value = s.seller_vat || "";
+  if (streetEl && !streetEl.value.trim()) streetEl.value = s.seller_street || "";
+  if (cityEl && !cityEl.value.trim()) cityEl.value = s.seller_city || "";
+  if (ibanEl && !ibanEl.value.trim()) ibanEl.value = s.seller_bank1_iban || "";
+  if (bicEl && !bicEl.value.trim()) bicEl.value = s.seller_bank1_bic || "";
+}
+
 async function loadPreferences() {
   const storedKey = getStoredApiKey();
   if (configApiKey) configApiKey.value = storedKey;
@@ -54,6 +128,10 @@ async function loadPreferences() {
   const layout = getStoredLayout();
   if (configInvoiceLayout) configInvoiceLayout.value = layout;
   if (manLayoutSelect) manLayoutSelect.value = layout;
+
+  // Apply initial local settings first
+  applySellerSettingsToInputs(getSellerSettings());
+  populateManualSellerDefaults();
 
   try {
     const res = await fetch("/api/config");
@@ -71,6 +149,12 @@ async function loadPreferences() {
           statusEl.innerHTML = `&#9888; No server environment key found. Provide your API key above or set <code>OPENAI_API_KEY</code> in Docker.`;
         }
       }
+
+      if (data.company_settings) {
+        cachedCompanySettings = Object.assign({}, cachedCompanySettings, data.company_settings);
+        applySellerSettingsToInputs(getSellerSettings());
+        populateManualSellerDefaults();
+      }
     }
   } catch (e) {
     console.warn("Could not check server config", e);
@@ -84,7 +168,7 @@ function handleManualLayoutChange(val) {
 }
 window.handleManualLayoutChange = handleManualLayoutChange;
 
-function saveConfiguration() {
+async function saveConfiguration() {
   const key = configApiKey ? configApiKey.value.trim() : "";
   if (key) {
     localStorage.setItem("OPENAI_API_KEY", key);
@@ -100,6 +184,45 @@ function saveConfiguration() {
   const layout = configInvoiceLayout ? configInvoiceLayout.value : "layout1";
   localStorage.setItem("ZUGFERD_LAYOUT", layout);
   if (manLayoutSelect) manLayoutSelect.value = layout;
+
+  // Gather seller & footer settings from configuration form
+  const newSettings = {
+    seller_name: document.getElementById("cfgSellerName")?.value.trim() || "",
+    seller_vat: document.getElementById("cfgSellerVat")?.value.trim() || "",
+    seller_street: document.getElementById("cfgSellerStreet")?.value.trim() || "",
+    seller_city: document.getElementById("cfgSellerCity")?.value.trim() || "",
+    seller_country: document.getElementById("cfgSellerCountry")?.value.trim() || "DE",
+    seller_website: document.getElementById("cfgSellerWebsite")?.value.trim() || "",
+    seller_court: document.getElementById("cfgSellerCourt")?.value.trim() || "",
+    seller_hrb: document.getElementById("cfgSellerHrb")?.value.trim() || "",
+    seller_ust_id: document.getElementById("cfgSellerUstId")?.value.trim() || "",
+    seller_phone: document.getElementById("cfgSellerPhone")?.value.trim() || "",
+    seller_fax: document.getElementById("cfgSellerFax")?.value.trim() || "",
+    seller_managing_directors: document.getElementById("cfgSellerDirectors")?.value.trim() || "",
+    seller_bank1_name: document.getElementById("cfgBank1Name")?.value.trim() || "",
+    seller_bank1_bic: document.getElementById("cfgBank1Bic")?.value.trim() || "",
+    seller_bank1_iban: document.getElementById("cfgBank1Iban")?.value.trim() || "",
+    seller_bank2_name: document.getElementById("cfgBank2Name")?.value.trim() || "",
+    seller_bank2_bic: document.getElementById("cfgBank2Bic")?.value.trim() || "",
+    seller_bank2_iban: document.getElementById("cfgBank2Iban")?.value.trim() || ""
+  };
+
+  cachedCompanySettings = Object.assign({}, cachedCompanySettings, newSettings);
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(newSettings));
+
+  // Sync to server so Docker container stores it persistently
+  try {
+    await fetch("/api/config/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: newSettings })
+    });
+  } catch (err) {
+    console.warn("Could not persist settings to server:", err);
+  }
+
+  // Update manual form fields if they match previous default or are empty
+  populateManualSellerDefaults();
 
   alert("Configuration saved successfully!");
 }
@@ -172,9 +295,67 @@ async function removeLogo() {
 }
 window.removeLogo = removeLogo;
 
+// ================= PIN PROTECTION FOR CONFIGURATION =================
+let isConfigUnlocked = false;
+
+function getCurrentTimePin() {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  return `${hours}${minutes}`;
+}
+
+function openPinModal() {
+  const modal = document.getElementById("pinModal");
+  const input = document.getElementById("pinInput");
+  const err = document.getElementById("pinError");
+  if (modal) modal.style.display = "flex";
+  if (err) err.style.display = "none";
+  if (input) {
+    input.value = "";
+    setTimeout(() => input.focus(), 50);
+  }
+}
+
+function closePinModal() {
+  const modal = document.getElementById("pinModal");
+  if (modal) modal.style.display = "none";
+}
+window.closePinModal = closePinModal;
+
+function handlePinSubmit(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById("pinInput");
+  const err = document.getElementById("pinError");
+  const val = input ? input.value.trim() : "";
+  const expectedPin = getCurrentTimePin();
+
+  if (val === expectedPin) {
+    isConfigUnlocked = true;
+    closePinModal();
+    executeSwitchScenario("config");
+  } else {
+    if (err) err.style.display = "block";
+    if (input) {
+      input.value = "";
+      input.focus();
+    }
+  }
+}
+window.handlePinSubmit = handlePinSubmit;
+
 // ================= NAVIGATION / SCENARIO SWITCHING =================
 function switchScenario(scenario) {
-  const scenarios = ["pdf", "docx", "manual", "config"];
+  if (scenario === "config" && !isConfigUnlocked) {
+    openPinModal();
+    return;
+  }
+  executeSwitchScenario(scenario);
+}
+window.switchScenario = switchScenario;
+
+function executeSwitchScenario(scenario) {
+  const scenarios = ["pdf", "docx", "manual", "history", "config"];
   scenarios.forEach((s) => {
     const container = document.getElementById(`scenario-${s}-container`);
     const btn = document.getElementById(`tab-${s}`);
@@ -189,8 +370,11 @@ function switchScenario(scenario) {
       }
     }
   });
+
+  if (scenario === "history") {
+    loadInvoiceHistory();
+  }
 }
-window.switchScenario = switchScenario;
 
 // Helper: Escape HTML
 function escapeHtml(string) {
@@ -1043,6 +1227,7 @@ function initManualLineItems() {
 }
 
 function fillManualExampleData() {
+  const s = getSellerSettings();
   document.getElementById("manInvNumber").value = "INV-" + new Date().getFullYear() + "-042";
   const today = new Date();
   document.getElementById("manIssueDate").value = today.toISOString().split("T")[0];
@@ -1051,10 +1236,10 @@ function fillManualExampleData() {
   document.getElementById("manDueDate").value = due.toISOString().split("T")[0];
   document.getElementById("manCurrency").value = "EUR";
 
-  document.getElementById("manSellerName").value = "Acme Solutions GmbH";
-  document.getElementById("manSellerVat").value = "DE123456789";
-  document.getElementById("manSellerStreet").value = "Bahnhofstrasse 10";
-  document.getElementById("manSellerCity").value = "10115 Berlin";
+  document.getElementById("manSellerName").value = s.seller_name || "Acme Solutions GmbH";
+  document.getElementById("manSellerVat").value = s.seller_vat || "DE123456789";
+  document.getElementById("manSellerStreet").value = s.seller_street || "Bahnhofstrasse 10";
+  document.getElementById("manSellerCity").value = s.seller_city || "10115 Berlin";
 
   document.getElementById("manBuyerName").value = "Global Logistics AG";
   const buyerVatEl = document.getElementById("manBuyerVat");
@@ -1063,8 +1248,8 @@ function fillManualExampleData() {
   document.getElementById("manBuyerStreet").value = "Industriestrasse 42";
   document.getElementById("manBuyerCity").value = "80331 Munich";
 
-  document.getElementById("manIban").value = "DE89370400440532013000";
-  document.getElementById("manBic").value = "DBBADEFFXXX";
+  document.getElementById("manIban").value = s.seller_bank1_iban || "DE89370400440532013000";
+  document.getElementById("manBic").value = s.seller_bank1_bic || "DBBADEFFXXX";
 
   const tbody = document.getElementById("manItemsTableBody");
   if (tbody) {
@@ -1114,6 +1299,8 @@ function clearManualForm() {
   document.getElementById("manIban").value = "";
   document.getElementById("manBic").value = "";
 
+  // Restore seller default values
+  populateManualSellerDefaults();
   initManualLineItems();
 }
 window.clearManualForm = clearManualForm;
@@ -1261,7 +1448,7 @@ if (generateManualPdfBtn) {
           name: document.getElementById("manSellerName").value || "Seller",
           street: document.getElementById("manSellerStreet").value || "",
           city: document.getElementById("manSellerCity").value || "",
-          country: "DE",
+          country: getSellerSettings().seller_country || "DE",
           vat_id: document.getElementById("manSellerVat").value || ""
         },
         buyer: {
@@ -1353,3 +1540,212 @@ if (generateManualPdfBtn) {
 
 // Initialize manual line items on page load
 initManualLineItems();
+
+// ================= INVOICE HISTORY MANAGEMENT =================
+let cachedHistoryRecords = [];
+
+async function loadInvoiceHistory() {
+  const loading = document.getElementById("historyLoading");
+  const empty = document.getElementById("historyEmpty");
+  const wrapper = document.getElementById("historyTableWrapper");
+  const tbody = document.getElementById("historyTableBody");
+  const badge = document.getElementById("historyCountBadge");
+
+  if (loading) loading.style.display = "block";
+  if (empty) empty.style.display = "none";
+  if (wrapper) wrapper.style.display = "none";
+
+  try {
+    const res = await fetch("/api/history");
+    const data = await res.json();
+    cachedHistoryRecords = data.history || [];
+
+    if (badge) badge.textContent = `${cachedHistoryRecords.length} invoices`;
+
+    if (loading) loading.style.display = "none";
+
+    if (!cachedHistoryRecords || cachedHistoryRecords.length === 0) {
+      if (empty) empty.style.display = "block";
+      if (wrapper) wrapper.style.display = "none";
+      return;
+    }
+
+    if (tbody) {
+      tbody.innerHTML = "";
+      cachedHistoryRecords.forEach((item, index) => {
+        const tr = document.createElement("tr");
+        const statusBadge = item.is_valid
+          ? `<span class="conf-tag high" style="padding: 2px 6px; font-size: 0.72rem;">VALID</span>`
+          : `<span class="conf-tag low" style="padding: 2px 6px; font-size: 0.72rem;">ISSUE</span>`;
+
+        tr.innerHTML = `
+          <td style="font-size: 0.78rem; color: var(--text-muted);">${item.created_at || "N/A"}</td>
+          <td><strong style="color: var(--text-main);">${escapeHtml(item.invoice_number)}</strong></td>
+          <td style="font-size: 0.82rem;">${escapeHtml(item.buyer_name || "N/A")}</td>
+          <td style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(item.layout || "layout1")}</td>
+          <td style="text-align: right; font-weight: 700; color: #10b981;">€${(Number(item.grand_total) || 0).toFixed(2)}</td>
+          <td style="text-align: center;">${statusBadge}</td>
+          <td style="text-align: center;">
+            <div style="display: flex; gap: 0.4rem; justify-content: center;">
+              <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;" onclick="openPdfPreview('${item.output_filename}', '${escapeHtml(item.invoice_number)}')" title="Preview PDF">
+                <span>👁️View</span>
+              </button>
+              <a href="/api/download/${item.output_filename}" target="_blank" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" title="Download PDF/A-3">
+                <span>⬇️ Download</span>
+              </a>
+              <button type="button" class="btn btn-primary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" onclick="editHistoryInvoice(${index})" title="Load into editor to edit and regenerate">
+                <span>✏️ Edit</span>
+              </button>
+              <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; color: #ef4444;" onclick="deleteHistoryInvoice('${item.id}')" title="Delete record">
+                <span>🗑️</span>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    if (wrapper) wrapper.style.display = "block";
+  } catch (err) {
+    if (loading) loading.style.display = "none";
+    console.error("Could not load history:", err);
+  }
+}
+window.loadInvoiceHistory = loadInvoiceHistory;
+
+function openPdfPreview(filename, invoiceNumber) {
+  const modal = document.getElementById("pdfPreviewModal");
+  const iframe = document.getElementById("pdfPreviewIframe");
+  const title = document.getElementById("pdfPreviewTitle");
+  const subtitle = document.getElementById("pdfPreviewSubtitle");
+  const downloadLink = document.getElementById("pdfPreviewDownloadLink");
+
+  if (!modal || !iframe) return;
+
+  if (title) title.textContent = `Invoice ${invoiceNumber || filename}`;
+  if (subtitle) subtitle.textContent = filename;
+  if (downloadLink) downloadLink.href = `/api/download/${filename}`;
+
+  // Use inline preview endpoint
+  iframe.src = `/api/preview/${filename}#toolbar=1&navpanes=0`;
+  modal.style.display = "flex";
+}
+window.openPdfPreview = openPdfPreview;
+
+function closePdfPreview() {
+  const modal = document.getElementById("pdfPreviewModal");
+  const iframe = document.getElementById("pdfPreviewIframe");
+  if (iframe) iframe.src = "";
+  if (modal) modal.style.display = "none";
+}
+window.closePdfPreview = closePdfPreview;
+
+function editHistoryInvoice(index) {
+  const item = cachedHistoryRecords[index];
+  if (!item || !item.invoice_data) {
+    alert("Invoice data not found for this entry.");
+    return;
+  }
+
+  const inv = item.invoice_data;
+
+  // Switch to Manual Form tab
+  switchScenario("manual");
+
+  // Populate Header Data
+  const numEl = document.getElementById("manInvNumber");
+  if (numEl) numEl.value = inv.invoice_number || "";
+
+  const issueDateEl = document.getElementById("manIssueDate");
+  if (issueDateEl) issueDateEl.value = inv.issue_date || "";
+
+  const dueDateEl = document.getElementById("manDueDate");
+  if (dueDateEl) dueDateEl.value = inv.due_date || "";
+
+  const currEl = document.getElementById("manCurrency");
+  if (currEl) currEl.value = inv.currency || "EUR";
+
+  // Layout choice
+  const layoutSelect = document.getElementById("manLayoutSelect");
+  if (layoutSelect && item.layout) {
+    layoutSelect.value = item.layout;
+  }
+
+  // Populate Seller
+  const seller = inv.seller || {};
+  const sName = document.getElementById("manSellerName");
+  if (sName) sName.value = seller.name || "";
+  const sVat = document.getElementById("manSellerVat");
+  if (sVat) sVat.value = seller.vat_id || "";
+  const sStreet = document.getElementById("manSellerStreet");
+  if (sStreet) sStreet.value = seller.street || "";
+  const sCity = document.getElementById("manSellerCity");
+  if (sCity) sCity.value = seller.city || "";
+
+  // Populate Buyer
+  const buyer = inv.buyer || {};
+  const bName = document.getElementById("manBuyerName");
+  if (bName) bName.value = buyer.name || "";
+  const bVat = document.getElementById("manBuyerVat");
+  if (bVat) bVat.value = buyer.vat_id || "";
+  const bRef = document.getElementById("manBuyerRef");
+  if (bRef) bRef.value = inv.buyer_reference || "";
+  const bStreet = document.getElementById("manBuyerStreet");
+  if (bStreet) bStreet.value = buyer.street || "";
+  const bCity = document.getElementById("manBuyerCity");
+  if (bCity) bCity.value = buyer.city || "";
+
+  // Populate Payment
+  const pay = inv.payment || {};
+  const ibanEl = document.getElementById("manIban");
+  if (ibanEl) ibanEl.value = pay.iban || "";
+  const bicEl = document.getElementById("manBic");
+  if (bicEl) bicEl.value = pay.bic || "";
+
+  // Populate Line Items
+  const items = inv.items || inv.line_items || [];
+  const tbody = document.getElementById("manItemsTableBody");
+  if (tbody) {
+    tbody.innerHTML = "";
+    items.forEach((it, i) => {
+      const name = it.name || it.item_name || "";
+      const qty = it.quantity || 1;
+      const price = it.unit_price || 0;
+      const tax = it.tax_percent || it.tax_rate || 19.0;
+      const net = (qty * price);
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input type="text" class="man-item-name" value="${escapeHtml(name)}" oninput="recalcManualLineNet(${i})"></td>
+        <td><input type="number" step="1" min="1" class="man-item-qty" value="${qty}" oninput="recalcManualLineNet(${i})"></td>
+        <td><input type="number" step="0.01" class="man-item-price" value="${Number(price).toFixed(2)}" oninput="recalcManualLineNet(${i})"></td>
+        <td><input type="number" step="0.1" class="man-item-tax" value="${tax}" oninput="recalcManualLineNet(${i})"></td>
+        <td><input type="number" step="0.01" class="man-item-net" value="${net.toFixed(2)}" readonly style="opacity: 0.85;"></td>
+        <td style="text-align: center;"><button type="button" class="btn-remove-item" onclick="removeManualLineItem(${i})" title="Remove item">🗑️</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+    const countEl = document.getElementById("manItemCount");
+    if (countEl) countEl.textContent = items.length;
+  }
+
+  recalcManualTotals();
+
+  // Scroll to manual form top
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+window.editHistoryInvoice = editHistoryInvoice;
+
+async function deleteHistoryInvoice(id) {
+  if (!confirm("Are you sure you want to remove this invoice from history?")) return;
+  try {
+    const res = await fetch(`/api/history/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      loadInvoiceHistory();
+    }
+  } catch (err) {
+    alert("Could not delete record: " + err.message);
+  }
+}
+window.deleteHistoryInvoice = deleteHistoryInvoice;

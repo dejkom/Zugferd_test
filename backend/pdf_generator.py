@@ -6,7 +6,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from backend.models import InvoiceData
 
-def generate_invoice_pdf_from_data(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, layout: str = "layout1") -> str:
+def generate_invoice_pdf_from_data(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, layout: str = "layout1", footer_config: dict = None) -> str:
     """
     Renders a print-ready PDF invoice from structured InvoiceData.
     Supports:
@@ -15,7 +15,7 @@ def generate_invoice_pdf_from_data(inv: InvoiceData, output_pdf_path: str, logo_
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_pdf_path)), exist_ok=True)
     if layout == "layout2":
-        return _generate_odelo_layout(inv, output_pdf_path, logo_path)
+        return _generate_odelo_layout(inv, output_pdf_path, logo_path, footer_config=footer_config)
     else:
         return _generate_standard_layout(inv, output_pdf_path, logo_path)
 
@@ -206,7 +206,7 @@ def _generate_standard_layout(inv: InvoiceData, output_pdf_path: str, logo_path:
     doc.build(story)
     return output_pdf_path
 
-def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: str = None) -> str:
+def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, footer_config: dict = None) -> str:
     """
     Option 2: Odelo Corporate Automotive Layout
     Features:
@@ -288,8 +288,19 @@ def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: st
     {inv.buyer.postcode or ''} {inv.buyer.city or ''}<br/>
     {inv.buyer.country_code or 'Slowenien'}
     """
+    cfg = footer_config or {}
+    fon_val = cfg.get("seller_phone") or "+49 (0)711 18563144"
+    fax_val = cfg.get("seller_fax") or "+49 (0)711 185633144"
+
+    tel_lines = []
+    if fon_val:
+        tel_lines.append(f"Fon: {fon_val}")
+    if fax_val:
+        tel_lines.append(f"Fax: {fax_val}")
+    contact_body = "<br/>".join(tel_lines) if tel_lines else "Fon: +49 (0)711 18563144<br/>Fax: +49 (0)711 185633144"
+
     contact_html = f"""
-    <font size=7 color='#475569'>Fon: +49 (0)711 18563144<br/>Fax: +49 (0)711 185633144</font>
+    <font size=7 color='#475569'>{contact_body}</font>
     """
     t_parties = Table([
         [Paragraph(left_party_html, normal_style), Paragraph(contact_html, ParagraphStyle("RightTel", alignment=2, fontName="Helvetica", fontSize=7, leading=10))]
@@ -446,22 +457,37 @@ def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: st
     story.append(Spacer(1, 12 * mm))
 
     # 9. Multi-column corporate footer strip (as in Odelo template)
-    s_name = inv.seller.name or "odelo GmbH"
-    s_street = inv.seller.street or "Hedelfinger Strasse 137"
-    s_city = f"{inv.seller.postcode or '70329'} {inv.seller.city or 'Stuttgart'}"
-    s_country = inv.seller.country_code or "Deutschland"
-    s_vat = inv.seller.vat_id or "DE 347120003"
-    s_iban = inv.payment.iban or "DE44 6004 0071 0556 7060 00"
-    s_bic = inv.payment.bic or "COBADEFFXXX"
+    cfg = footer_config or {}
+    s_name = inv.seller.name or cfg.get("seller_name") or "odelo GmbH"
+    s_street = inv.seller.street or cfg.get("seller_street") or "Hedelfinger Strasse 137"
+    s_city = f"{inv.seller.postcode or ''} {inv.seller.city or ''}".strip() or cfg.get("seller_city") or "70329 Stuttgart"
+    s_country = inv.seller.country_code or cfg.get("seller_country") or "Deutschland"
+    s_vat = inv.seller.vat_id or cfg.get("seller_vat") or "DE 347120003"
+    s_iban = inv.payment.iban or cfg.get("seller_bank1_iban") or "DE44 6004 0071 0556 7060 00"
+    s_bic = inv.payment.bic or cfg.get("seller_bank1_bic") or "COBADEFFXXX"
+
+    website = cfg.get("seller_website") or "www.odelo.de"
+    court = cfg.get("seller_court") or "Amtsgericht Stuttgart"
+    hrb = cfg.get("seller_hrb") or "HRB 736903"
+    ust_id_val = cfg.get("seller_ust_id") or s_vat
+    directors = cfg.get("seller_managing_directors") or "Mürsel Gülen, Sedat Kilic"
+
+    bank1_name = cfg.get("seller_bank1_name") or "Commerzbank AG"
+    bank1_bic = s_bic
+    bank1_iban = s_iban
+
+    bank2_name = cfg.get("seller_bank2_name") or "Baden-Württembergische Bank"
+    bank2_bic = cfg.get("seller_bank2_bic") or "SOLA DEST"
+    bank2_iban = cfg.get("seller_bank2_iban") or "DE30 6005 0101 7871 5056 72"
 
     # Row 1 and Row 2 matching the Odelo 4-column 2-row layout exactly
-    r1c1 = f"<b>{s_name}</b><br/>Sitz Stuttgart<br/>www.odelo.de"
-    r1c2 = f"Amtsgericht Stuttgart<br/>HRB 736903<br/>UST-ID-Nr.: {s_vat}"
-    r1c3 = f"Commerzbank AG<br/>S.W.I.F.T/BIC: {s_bic}<br/>IBAN: {s_iban}"
-    r1c4 = f"Baden-Württembergische Bank<br/>S.W.I.F.T/BIC: SOLA DEST<br/>IBAN: DE30 6005 0101 7871 5056 72"
+    r1c1 = f"<b>{s_name}</b><br/>Sitz {inv.seller.city or 'Stuttgart'}<br/>{website}"
+    r1c2 = f"{court}<br/>{hrb}<br/>UST-ID-Nr.: {ust_id_val}"
+    r1c3 = f"{bank1_name}<br/>S.W.I.F.T/BIC: {bank1_bic}<br/>IBAN: {bank1_iban}"
+    r1c4 = f"{bank2_name}<br/>S.W.I.F.T/BIC: {bank2_bic}<br/>IBAN: {bank2_iban}"
 
     r2c1 = f"{s_street}<br/>{s_city}<br/>{s_country}"
-    r2c2 = f"Geschäftsführer:<br/>Mürsel Gülen, Sedat Kilic"
+    r2c2 = f"Geschäftsführer:<br/>{directors}"
     r2c3 = ""
     r2c4 = ""
 

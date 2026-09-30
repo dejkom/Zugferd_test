@@ -79,6 +79,15 @@ header {
   gap: 0.75rem;
 }
 
+.brand-logo-img {
+  height: 38px;
+  width: auto;
+  max-width: 48px;
+  object-fit: contain;
+  border-radius: 6px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.15));
+}
+
 .logo-badge {
   background: linear-gradient(135deg, #3b82f6, #8b5cf6);
   color: white;

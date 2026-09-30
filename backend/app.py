@@ -225,7 +225,8 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
 
     # 1. Generate visual PDF (incorporating company logo if uploaded and layout choice)
     logo_file = LOGO_PATH if os.path.exists(LOGO_PATH) else None
-    generate_invoice_pdf_from_data(req.invoice_data, visual_pdf_path, logo_path=logo_file, layout=chosen_layout)
+    sys_settings = load_system_settings()
+    generate_invoice_pdf_from_data(req.invoice_data, visual_pdf_path, logo_path=logo_file, layout=chosen_layout, footer_config=sys_settings)
 
     # 2. Generate Factur-X XML
     xml_content = generate_facturx_xml(req.invoice_data, profile=req.profile or "EN16931")
@@ -257,6 +258,19 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
     # 5. Validate with Mustang
     val_res = validate_zugferd_pdf(final_pdf_path)
 
+    # 6. Record in history
+    try:
+        record_invoice_history(
+            invoice_data=req.invoice_data.model_dump(),
+            output_filename=final_pdf_name,
+            source_type="manual",
+            layout=chosen_layout,
+            xml_content=xml_content,
+            is_valid=val_res.get("isValid", True)
+        )
+    except Exception as e:
+        print("Could not record history:", e)
+
     return {
         "success": True,
         "output_filename": final_pdf_name,
@@ -280,6 +294,63 @@ async def download_file(filename: str):
         }
     )
 
+@app.get("/api/preview/{filename}")
+async def preview_file(filename: str):
+    file_path = os.path.join(OUTPUT_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(
+        file_path,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
+
+SETTINGS_FILE = os.path.join(UPLOAD_DIR, "system_settings.json")
+
+DEFAULT_SETTINGS = {
+    "seller_name": "Acme Solutions Ltd",
+    "seller_vat": "DE123456789",
+    "seller_street": "Bahnhofstrasse 10",
+    "seller_city": "10115 Berlin",
+    "seller_country": "DE",
+    "seller_website": "www.acme-solutions.com",
+    "seller_court": "Amtsgericht Stuttgart",
+    "seller_hrb": "HRB 736903",
+    "seller_ust_id": "DE 347120003",
+    "seller_phone": "+49 (0)711 18563144",
+    "seller_fax": "+49 (0)711 185633144",
+    "seller_managing_directors": "Mürsel Gülen, Sedat Kilic",
+    "seller_bank1_name": "Commerzbank AG",
+    "seller_bank1_bic": "DBBADEFFXXX",
+    "seller_bank1_iban": "DE89370400440532013000",
+    "seller_bank2_name": "Baden-Württembergische Bank",
+    "seller_bank2_bic": "SOLA DEST",
+    "seller_bank2_iban": "DE30 6005 0101 7871 5056 72"
+}
+
+def load_system_settings() -> dict:
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            import json
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                res = DEFAULT_SETTINGS.copy()
+                res.update(data)
+                return res
+        except Exception:
+            pass
+    return DEFAULT_SETTINGS.copy()
+
+def save_system_settings(settings: dict):
+    import json
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+
 @app.get("/api/config")
 async def get_server_config():
     env_key = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -290,10 +361,76 @@ async def get_server_config():
             masked_key = f"{env_key[:4]}...{env_key[-4:]}"
         else:
             masked_key = "***"
+    
+    settings = load_system_settings()
     return {
         "server_api_key_configured": is_configured,
-        "masked_key": masked_key
+        "masked_key": masked_key,
+        "company_settings": settings
     }
+
+class SaveSettingsRequest(BaseModel):
+    settings: dict
+
+HISTORY_FILE = os.path.join(UPLOAD_DIR, "invoice_history.json")
+
+def load_history() -> list:
+    if os.path.exists(HISTORY_FILE):
+        try:
+            import json
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def save_history(history: list):
+    import json
+    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
+
+def record_invoice_history(invoice_data: dict, output_filename: str, source_type: str = "manual", layout: str = "layout1", xml_content: str = "", is_valid: bool = True):
+    from datetime import datetime
+    history = load_history()
+    entry = {
+        "id": uuid.uuid4().hex[:8],
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "invoice_number": invoice_data.get("invoice_number") or "N/A",
+        "issue_date": invoice_data.get("issue_date") or "",
+        "due_date": invoice_data.get("due_date") or "",
+        "currency": invoice_data.get("currency") or "EUR",
+        "seller_name": invoice_data.get("seller", {}).get("name") if isinstance(invoice_data.get("seller"), dict) else "",
+        "buyer_name": invoice_data.get("buyer", {}).get("name") if isinstance(invoice_data.get("buyer"), dict) else "",
+        "grand_total": invoice_data.get("grand_total") or invoice_data.get("due_payable_amount") or 0.0,
+        "output_filename": output_filename,
+        "source_type": source_type,
+        "layout": layout,
+        "is_valid": is_valid,
+        "invoice_data": invoice_data,
+        "xml_content": xml_content
+    }
+    # Prepend newest first
+    history.insert(0, entry)
+    # Keep up to 200 items in history
+    history = history[:200]
+    save_history(history)
+    return entry
+
+@app.get("/api/history")
+def get_invoice_history():
+    return {"history": load_history()}
+
+@app.delete("/api/history/{entry_id}")
+def delete_history_item(entry_id: str):
+    history = load_history()
+    history = [h for h in history if h.get("id") != entry_id]
+    save_history(history)
+    return {"success": True}
+
+@app.post("/api/config/settings")
+async def save_server_settings(req: SaveSettingsRequest):
+    save_system_settings(req.settings)
+    return {"success": True, "settings": req.settings}
 
 # Mount frontend static files
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
