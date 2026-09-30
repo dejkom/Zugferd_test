@@ -42,7 +42,7 @@ function getStoredLayout() {
   return localStorage.getItem("ZUGFERD_LAYOUT") || "layout1";
 }
 
-function loadPreferences() {
+async function loadPreferences() {
   const storedKey = getStoredApiKey();
   if (configApiKey) configApiKey.value = storedKey;
 
@@ -54,6 +54,27 @@ function loadPreferences() {
   const layout = getStoredLayout();
   if (configInvoiceLayout) configInvoiceLayout.value = layout;
   if (manLayoutSelect) manLayoutSelect.value = layout;
+
+  try {
+    const res = await fetch("/api/config");
+    if (res.ok) {
+      const data = await res.json();
+      const statusEl = document.getElementById("serverApiKeyStatus");
+      if (statusEl) {
+        if (data.server_api_key_configured) {
+          statusEl.style.display = "block";
+          statusEl.style.color = "#10b981";
+          statusEl.innerHTML = `&#10003; Server environment key active (<code>${data.masked_key}</code>). Local key is optional.`;
+        } else {
+          statusEl.style.display = "block";
+          statusEl.style.color = "#f59e0b";
+          statusEl.innerHTML = `&#9888; No server environment key found. Provide your API key above or set <code>OPENAI_API_KEY</code> in Docker.`;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Could not check server config", e);
+  }
 }
 loadPreferences();
 

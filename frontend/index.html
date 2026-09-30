@@ -671,7 +671,8 @@
           <div class="form-group">
             <label>OpenAI API Key</label>
             <input type="password" id="configApiKey" placeholder="sk-...">
-            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Used for AI document extraction from PDF & DOCX invoices.</span>
+            <div id="serverApiKeyStatus" style="font-size: 0.78rem; margin-top: 5px; color: #10b981; display: none;"></div>
+            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Used for AI document extraction. Leave empty to use the server environment variable.</span>
           </div>
 
           <div class="form-group" style="margin-top: 0.5rem;">
@@ -728,7 +729,7 @@
 
   </div>
 
-  <script src="/static/app.js?v=10"></script>
+  <script src="/static/app.js?v=11"></script>
 </body>
 
 </html>

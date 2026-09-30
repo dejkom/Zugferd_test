@@ -280,6 +280,21 @@ async def download_file(filename: str):
         }
     )
 
+@app.get("/api/config")
+async def get_server_config():
+    env_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    is_configured = bool(env_key)
+    masked_key = ""
+    if is_configured:
+        if len(env_key) > 8:
+            masked_key = f"{env_key[:4]}...{env_key[-4:]}"
+        else:
+            masked_key = "***"
+    return {
+        "server_api_key_configured": is_configured,
+        "masked_key": masked_key
+    }
+
 # Mount frontend static files
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
 if os.path.exists(FRONTEND_DIR):
