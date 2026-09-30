@@ -42,6 +42,10 @@ class CombineRequest(BaseModel):
     file_id: str
     xml_content: str
     profile: Optional[str] = "EN16931"
+    invoice_data: Optional[dict] = None
+    token_usage: Optional[dict] = None
+    source_type: Optional[str] = "pdf"
+    layout: Optional[str] = "layout1"
 
 class CreateFromManualRequest(BaseModel):
     invoice_data: InvoiceData
@@ -169,6 +173,21 @@ def combine_and_validate(req: CombineRequest):
         
     validation_res = validate_zugferd_pdf(out_pdf_path)
     
+    # Record history if invoice_data was supplied
+    if req.invoice_data:
+        try:
+            record_invoice_history(
+                invoice_data=req.invoice_data,
+                output_filename=out_pdf_filename,
+                source_type=req.source_type or "pdf",
+                layout=req.layout or "layout1",
+                xml_content=req.xml_content,
+                is_valid=validation_res.get("isValid", True),
+                token_usage=req.token_usage
+            )
+        except Exception as e:
+            print("Could not record history in combine:", e)
+
     return {
         "success": True,
         "output_filename": out_pdf_filename,
@@ -389,9 +408,23 @@ def save_history(history: list):
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
-def record_invoice_history(invoice_data: dict, output_filename: str, source_type: str = "manual", layout: str = "layout1", xml_content: str = "", is_valid: bool = True):
+def record_invoice_history(invoice_data: dict, output_filename: str, source_type: str = "manual", layout: str = "layout1", xml_content: str = "", is_valid: bool = True, token_usage: dict = None):
     from datetime import datetime
     history = load_history()
+    
+    total_tokens = 0
+    prompt_tokens = 0
+    completion_tokens = 0
+    cost_usd = 0.0
+    cost_formatted = "$0.0000"
+    
+    if token_usage and isinstance(token_usage, dict):
+        total_tokens = token_usage.get("total_tokens", 0) or 0
+        prompt_tokens = token_usage.get("prompt_tokens", 0) or 0
+        completion_tokens = token_usage.get("completion_tokens", 0) or 0
+        cost_usd = token_usage.get("estimated_cost_usd", 0.0) or 0.0
+        cost_formatted = token_usage.get("formatted_cost") or f"${cost_usd:.4f}"
+
     entry = {
         "id": uuid.uuid4().hex[:8],
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -407,7 +440,14 @@ def record_invoice_history(invoice_data: dict, output_filename: str, source_type
         "layout": layout,
         "is_valid": is_valid,
         "invoice_data": invoice_data,
-        "xml_content": xml_content
+        "xml_content": xml_content,
+        "tokens": {
+            "total_tokens": total_tokens,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "cost_usd": cost_usd,
+            "formatted_cost": cost_formatted
+        }
     }
     # Prepend newest first
     history.insert(0, entry)

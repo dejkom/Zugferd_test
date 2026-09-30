@@ -10,7 +10,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="/static/index.css?v=8">
+  <link rel="stylesheet" href="/static/index.css?v=9">
 </head>
 
 <body>
@@ -45,7 +45,7 @@
 
       <button class="btn btn-secondary" id="themeToggleBtn" title="Switch Light / Dark Theme"
         style="padding: 0.5rem 0.8rem; font-size: 1rem;">
-        <span id="themeIcon">☀️</span>
+        <span id="themeIcon">🌙</span>
       </button>
     </div>
   </header>
@@ -680,6 +680,53 @@
             List of generated ZUGFeRD / Factur-X electronic invoices. You can re-download, inspect, or load any past invoice directly into the manual editor for adjustments and re-issuance.
           </div>
 
+          <!-- History Filter & Column Toggler Toolbar -->
+          <div class="history-toolbar" style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; background: var(--bg-input); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--bg-card-border); margin-bottom: 1rem;">
+            <div style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; flex: 1; min-width: 280px;">
+              <div style="position: relative; flex: 1; min-width: 140px; max-width: 220px;">
+                <input type="text" id="historyFilterInv" placeholder="🔍 Filter Invoice No..." style="width: 100%; padding: 0.35rem 0.6rem 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-secondary); color: var(--text-main);" oninput="handleHistoryFilterChange()">
+              </div>
+              <div style="position: relative; flex: 1; min-width: 140px; max-width: 220px;">
+                <input type="text" id="historyFilterBuyer" placeholder="🔍 Filter Buyer..." style="width: 100%; padding: 0.35rem 0.6rem 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-secondary); color: var(--text-main);" oninput="handleHistoryFilterChange()">
+              </div>
+              <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;" onclick="resetHistoryFilters()" title="Clear search filters">
+                <span>✕ Clear</span>
+              </button>
+            </div>
+
+            <!-- Column Toggler Dropdown -->
+            <div style="position: relative;" id="colTogglerContainer">
+              <button type="button" class="btn btn-secondary" id="colTogglerBtn" onclick="toggleColumnMenu(event)" style="padding: 0.35rem 0.8rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
+                <span>⚙️ Columns</span>
+                <span style="font-size: 0.65rem;">▼</span>
+              </button>
+              <div id="colTogglerMenu" style="display: none; position: absolute; right: 0; top: 115%; background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); padding: 0.6rem; z-index: 100; min-width: 180px; backdrop-filter: blur(12px);">
+                <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.4rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--bg-card-border);">Toggle Columns</div>
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                  <input type="checkbox" checked onchange="toggleColumnVisibility('col-date', this.checked)"> Date & Time
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                  <input type="checkbox" checked onchange="toggleColumnVisibility('col-inv', this.checked)"> Invoice No.
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                  <input type="checkbox" checked onchange="toggleColumnVisibility('col-buyer', this.checked)"> Buyer
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                  <input type="checkbox" checked onchange="toggleColumnVisibility('col-layout', this.checked)"> Layout
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                  <input type="checkbox" checked onchange="toggleColumnVisibility('col-cost', this.checked)"> AI Cost / Tokens
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                  <input type="checkbox" checked onchange="toggleColumnVisibility('col-total', this.checked)"> Total (€)
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                  <input type="checkbox" checked onchange="toggleColumnVisibility('col-status', this.checked)"> Status
+                </label>
+              </div>
+            </div>
+          </div>
+
           <div id="historyLoading" style="display: none; padding: 2rem; text-align: center; color: var(--text-muted);">
             <div class="spinner" style="margin: 0 auto 0.75rem auto;"></div>
             <div>Loading invoice records...</div>
@@ -687,21 +734,26 @@
 
           <div id="historyEmpty" style="display: none; padding: 3rem 1rem; text-align: center; border: 1px dashed var(--bg-card-border); border-radius: 8px;">
             <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📭</div>
-            <div style="font-weight: 600; color: var(--text-main);">No invoices created yet</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Invoices you create using the Manual Form, PDF or DOCX converter will appear here.</div>
+            <div style="font-weight: 600; color: var(--text-main);">No invoices found</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;" id="historyEmptySubtitle">Invoices you create using the Manual Form, PDF or DOCX converter will appear here.</div>
           </div>
 
           <div class="items-table-wrapper" id="historyTableWrapper" style="display: none;">
             <table class="items-table" style="width: 100%;">
               <thead>
                 <tr>
-                  <th style="width: 130px;">Date & Time</th>
-                  <th>Invoice No.</th>
-                  <th>Buyer</th>
-                  <th style="width: 80px;">Layout</th>
-                  <th style="width: 110px; text-align: right;">Total (€)</th>
-                  <th style="width: 90px; text-align: center;">Status</th>
-                  <th style="width: 190px; text-align: center;">Actions</th>
+                  <th class="col-date" style="width: 140px; cursor: pointer; user-select: none;" onclick="toggleHistoryDateSort()" title="Click to sort by Date & Time">
+                    <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                      Date & Time <span id="sortDateIcon" style="color: var(--accent); font-weight: 800;">▼</span>
+                    </span>
+                  </th>
+                  <th class="col-inv">Invoice No.</th>
+                  <th class="col-buyer">Buyer</th>
+                  <th class="col-layout" style="width: 80px;">Layout</th>
+                  <th class="col-cost" style="width: 140px;">AI Cost (Tokens)</th>
+                  <th class="col-total" style="width: 105px; text-align: right;">Total (€)</th>
+                  <th class="col-status" style="width: 85px; text-align: center;">Status</th>
+                  <th class="col-actions" style="width: 195px; text-align: center;">Actions</th>
                 </tr>
               </thead>
               <tbody id="historyTableBody">
@@ -951,7 +1003,7 @@
 
   </div>
 
-  <script src="/static/app.js?v=18"></script>
+  <script src="/static/app.js?v=19"></script>
 </body>
 
 </html>

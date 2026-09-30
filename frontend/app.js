@@ -1,31 +1,33 @@
 // Global State for Scenarios
 let currentPdfFileId = null;
 let currentPdfInvoiceData = null;
+let currentPdfUsage = null;
 
 let currentDocxFileId = null;
 let currentDocxInvoiceData = null;
+let currentDocxUsage = null;
 
 // ================= THEME (Dark / Light) =================
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const themeIcon = document.getElementById("themeIcon");
-const storedTheme = localStorage.getItem("ZUGFERD_THEME") || "dark";
+const storedTheme = localStorage.getItem("ZUGFERD_THEME") || "light";
 applyTheme(storedTheme);
 
 function applyTheme(theme) {
-  if (theme === "light") {
-    document.documentElement.setAttribute("data-theme", "light");
-    if (themeIcon) themeIcon.textContent = "🌙";
+  if (theme === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+    if (themeIcon) themeIcon.textContent = "☀️";
   } else {
     document.documentElement.removeAttribute("data-theme");
-    if (themeIcon) themeIcon.textContent = "☀️";
+    if (themeIcon) themeIcon.textContent = "🌙";
   }
   localStorage.setItem("ZUGFERD_THEME", theme);
 }
 
 if (themeToggleBtn) {
   themeToggleBtn.addEventListener("click", () => {
-    const isLight = document.documentElement.getAttribute("data-theme") === "light";
-    applyTheme(isLight ? "dark" : "light");
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    applyTheme(isDark ? "light" : "dark");
   });
 }
 
@@ -499,6 +501,7 @@ if (extractBtn) {
       if (!res.ok) throw new Error(result.detail || "Extraction failed");
 
       currentPdfInvoiceData = result.invoice_data;
+      currentPdfUsage = result.usage || null;
       populatePdfForm(currentPdfInvoiceData);
       xmlCodeViewer.textContent = result.xml_preview;
 
@@ -816,7 +819,11 @@ if (embedBtn) {
         body: JSON.stringify({
           file_id: currentPdfFileId,
           xml_content: xml,
-          profile: profileSelect ? profileSelect.value : "EN16931"
+          profile: profileSelect ? profileSelect.value : "EN16931",
+          invoice_data: harvestPdfForm() || currentPdfInvoiceData,
+          token_usage: currentPdfUsage,
+          source_type: "pdf",
+          layout: "pdf_original"
         })
       });
       const result = await res.json();
@@ -1068,6 +1075,7 @@ if (docxExtractBtn) {
       if (!res.ok) throw new Error(result.detail || "DOCX extraction failed");
 
       currentDocxInvoiceData = result.invoice_data;
+      currentDocxUsage = result.usage || null;
       populateDocxForm(currentDocxInvoiceData);
       docxXmlViewer.textContent = result.xml_preview;
 
@@ -1162,7 +1170,11 @@ if (docxEmbedBtn) {
         body: JSON.stringify({
           file_id: currentDocxFileId,
           xml_content: xml,
-          profile: "EN16931"
+          profile: "EN16931",
+          invoice_data: currentDocxInvoiceData,
+          token_usage: currentDocxUsage,
+          source_type: "docx",
+          layout: "docx_layout"
         })
       });
       const result = await res.json();
@@ -1552,12 +1564,75 @@ initManualLineItems();
 
 // ================= INVOICE HISTORY MANAGEMENT =================
 let cachedHistoryRecords = [];
+let historySortDirection = "desc"; // 'asc' or 'desc'
+const hiddenHistoryColumns = new Set();
+
+function toggleColumnMenu(event) {
+  if (event) event.stopPropagation();
+  const menu = document.getElementById("colTogglerMenu");
+  if (!menu) return;
+  menu.style.display = menu.style.display === "none" ? "block" : "none";
+}
+window.toggleColumnMenu = toggleColumnMenu;
+
+// Close menu when clicking outside
+document.addEventListener("click", (e) => {
+  const container = document.getElementById("colTogglerContainer");
+  const menu = document.getElementById("colTogglerMenu");
+  if (menu && container && !container.contains(e.target)) {
+    menu.style.display = "none";
+  }
+});
+
+function toggleColumnVisibility(colClass, isVisible) {
+  if (isVisible) {
+    hiddenHistoryColumns.delete(colClass);
+  } else {
+    hiddenHistoryColumns.add(colClass);
+  }
+  applyColumnVisibility();
+}
+window.toggleColumnVisibility = toggleColumnVisibility;
+
+function applyColumnVisibility() {
+  const allCols = ["col-date", "col-inv", "col-buyer", "col-layout", "col-cost", "col-total", "col-status", "col-actions"];
+  allCols.forEach(colClass => {
+    const isHidden = hiddenHistoryColumns.has(colClass);
+    document.querySelectorAll(`.${colClass}`).forEach(el => {
+      el.style.display = isHidden ? "none" : "";
+    });
+  });
+}
+window.applyColumnVisibility = applyColumnVisibility;
+
+function toggleHistoryDateSort() {
+  historySortDirection = historySortDirection === "desc" ? "asc" : "desc";
+  const icon = document.getElementById("sortDateIcon");
+  if (icon) {
+    icon.textContent = historySortDirection === "desc" ? "▼" : "▲";
+  }
+  renderHistoryTable();
+}
+window.toggleHistoryDateSort = toggleHistoryDateSort;
+
+function handleHistoryFilterChange() {
+  renderHistoryTable();
+}
+window.handleHistoryFilterChange = handleHistoryFilterChange;
+
+function resetHistoryFilters() {
+  const invFilter = document.getElementById("historyFilterInv");
+  const buyerFilter = document.getElementById("historyFilterBuyer");
+  if (invFilter) invFilter.value = "";
+  if (buyerFilter) buyerFilter.value = "";
+  renderHistoryTable();
+}
+window.resetHistoryFilters = resetHistoryFilters;
 
 async function loadInvoiceHistory() {
   const loading = document.getElementById("historyLoading");
   const empty = document.getElementById("historyEmpty");
   const wrapper = document.getElementById("historyTableWrapper");
-  const tbody = document.getElementById("historyTableBody");
   const badge = document.getElementById("historyCountBadge");
 
   if (loading) loading.style.display = "block";
@@ -1570,58 +1645,126 @@ async function loadInvoiceHistory() {
     cachedHistoryRecords = data.history || [];
 
     if (badge) badge.textContent = `${cachedHistoryRecords.length} invoices`;
-
     if (loading) loading.style.display = "none";
 
-    if (!cachedHistoryRecords || cachedHistoryRecords.length === 0) {
-      if (empty) empty.style.display = "block";
-      if (wrapper) wrapper.style.display = "none";
-      return;
-    }
-
-    if (tbody) {
-      tbody.innerHTML = "";
-      cachedHistoryRecords.forEach((item, index) => {
-        const tr = document.createElement("tr");
-        const statusBadge = item.is_valid
-          ? `<span class="conf-tag high" style="padding: 2px 6px; font-size: 0.72rem;">VALID</span>`
-          : `<span class="conf-tag low" style="padding: 2px 6px; font-size: 0.72rem;">ISSUE</span>`;
-
-        tr.innerHTML = `
-          <td style="font-size: 0.78rem; color: var(--text-muted);">${item.created_at || "N/A"}</td>
-          <td><strong style="color: var(--text-main);">${escapeHtml(item.invoice_number)}</strong></td>
-          <td style="font-size: 0.82rem;">${escapeHtml(item.buyer_name || "N/A")}</td>
-          <td style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(item.layout || "layout1")}</td>
-          <td style="text-align: right; font-weight: 700; color: #10b981;">€${(Number(item.grand_total) || 0).toFixed(2)}</td>
-          <td style="text-align: center;">${statusBadge}</td>
-          <td style="text-align: center;">
-            <div style="display: flex; gap: 0.4rem; justify-content: center;">
-              <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;" onclick="openPdfPreview('${item.output_filename}', '${escapeHtml(item.invoice_number)}')" title="Preview PDF">
-                <span>👁️View</span>
-              </button>
-              <a href="/api/download/${item.output_filename}" target="_blank" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" title="Download PDF/A-3">
-                <span>⬇️ Download</span>
-              </a>
-              <button type="button" class="btn btn-primary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" onclick="editHistoryInvoice(${index})" title="Load into editor to edit and regenerate">
-                <span>✏️ Edit</span>
-              </button>
-              <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; color: #ef4444;" onclick="deleteHistoryInvoice('${item.id}')" title="Delete record">
-                <span>🗑️</span>
-              </button>
-            </div>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    if (wrapper) wrapper.style.display = "block";
+    renderHistoryTable();
   } catch (err) {
     if (loading) loading.style.display = "none";
     console.error("Could not load history:", err);
   }
 }
 window.loadInvoiceHistory = loadInvoiceHistory;
+
+function renderHistoryTable() {
+  const empty = document.getElementById("historyEmpty");
+  const emptySubtitle = document.getElementById("historyEmptySubtitle");
+  const wrapper = document.getElementById("historyTableWrapper");
+  const tbody = document.getElementById("historyTableBody");
+  const badge = document.getElementById("historyCountBadge");
+
+  const filterInv = (document.getElementById("historyFilterInv")?.value || "").toLowerCase().trim();
+  const filterBuyer = (document.getElementById("historyFilterBuyer")?.value || "").toLowerCase().trim();
+
+  // 1. Filter
+  let records = cachedHistoryRecords.filter(item => {
+    const invNo = String(item.invoice_number || "").toLowerCase();
+    const buyer = String(item.buyer_name || "").toLowerCase();
+    if (filterInv && !invNo.includes(filterInv)) return false;
+    if (filterBuyer && !buyer.includes(filterBuyer)) return false;
+    return true;
+  });
+
+  // 2. Sort by date & time
+  records.sort((a, b) => {
+    const timeA = new Date(a.created_at || 0).getTime() || 0;
+    const timeB = new Date(b.created_at || 0).getTime() || 0;
+    return historySortDirection === "desc" ? timeB - timeA : timeA - timeB;
+  });
+
+  if (badge) {
+    if (filterInv || filterBuyer) {
+      badge.textContent = `${records.length} of ${cachedHistoryRecords.length} filtered`;
+    } else {
+      badge.textContent = `${cachedHistoryRecords.length} invoices`;
+    }
+  }
+
+  if (records.length === 0) {
+    if (empty) {
+      empty.style.display = "block";
+      if (emptySubtitle) {
+        if (filterInv || filterBuyer) {
+          emptySubtitle.textContent = "No invoices match your current search filters. Try clearing your search inputs.";
+        } else {
+          emptySubtitle.textContent = "Invoices you create using the Manual Form, PDF or DOCX converter will appear here.";
+        }
+      }
+    }
+    if (wrapper) wrapper.style.display = "none";
+    return;
+  }
+
+  if (empty) empty.style.display = "none";
+  if (wrapper) wrapper.style.display = "block";
+
+  if (tbody) {
+    tbody.innerHTML = "";
+    records.forEach((item) => {
+      // Find index in original cachedHistoryRecords for edit
+      const originalIndex = cachedHistoryRecords.findIndex(r => r.id === item.id);
+      const tr = document.createElement("tr");
+      const statusBadge = item.is_valid
+        ? `<span class="conf-tag high" style="padding: 2px 6px; font-size: 0.72rem;">VALID</span>`
+        : `<span class="conf-tag low" style="padding: 2px 6px; font-size: 0.72rem;">ISSUE</span>`;
+
+      // Token and Cost display
+      let costDisplay = `<span style="color: var(--text-muted); font-size: 0.75rem;">$0.00 (manual)</span>`;
+      if (item.tokens && item.tokens.total_tokens > 0) {
+        const costStr = item.tokens.formatted_cost || `$${Number(item.tokens.cost_usd || 0).toFixed(4)}`;
+        const tokCount = Number(item.tokens.total_tokens || 0).toLocaleString();
+        costDisplay = `
+          <div style="font-size: 0.78rem; line-height: 1.2;">
+            <strong style="color: #60a5fa;">${costStr}</strong>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">${tokCount} tok</div>
+          </div>
+        `;
+      } else if (item.source_type && item.source_type !== "manual") {
+        costDisplay = `<span style="color: var(--text-muted); font-size: 0.75rem;">N/A</span>`;
+      }
+
+      tr.innerHTML = `
+        <td class="col-date" style="font-size: 0.78rem; color: var(--text-muted); white-space: nowrap;">${item.created_at || "N/A"}</td>
+        <td class="col-inv"><strong style="color: var(--text-main); font-size: 0.85rem;">${escapeHtml(item.invoice_number)}</strong></td>
+        <td class="col-buyer" style="font-size: 0.82rem;">${escapeHtml(item.buyer_name || "N/A")}</td>
+        <td class="col-layout" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(item.layout || "layout1")}</td>
+        <td class="col-cost">${costDisplay}</td>
+        <td class="col-total" style="text-align: right; font-weight: 700; color: #10b981;">€${(Number(item.grand_total) || 0).toFixed(2)}</td>
+        <td class="col-status" style="text-align: center;">${statusBadge}</td>
+        <td class="col-actions" style="text-align: center;">
+          <div style="display: flex; gap: 0.35rem; justify-content: center; flex-wrap: nowrap;">
+            <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="openPdfPreview('${item.output_filename}', '${escapeHtml(item.invoice_number)}')" title="Preview PDF in modal">
+              <span>👁️ View</span>
+            </button>
+            <a href="/api/download/${item.output_filename}" target="_blank" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" title="Download PDF/A-3">
+              <span>⬇️ Download</span>
+            </a>
+            <button type="button" class="btn btn-primary" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;" onclick="editHistoryInvoice(${originalIndex})" title="Load into editor to edit and regenerate">
+              <span>✏️ Edit</span>
+            </button>
+            <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; color: #ef4444;" onclick="deleteHistoryInvoice('${item.id}')" title="Delete record">
+              <span>🗑️</span>
+            </button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Apply hidden columns setting to newly rendered DOM elements
+  applyColumnVisibility();
+}
+window.renderHistoryTable = renderHistoryTable;
 
 function openPdfPreview(filename, invoiceNumber) {
   const modal = document.getElementById("pdfPreviewModal");

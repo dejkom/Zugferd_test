@@ -1,7 +1,29 @@
 :root {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.88);
+  --bg-card-border: rgba(203, 213, 225, 0.7);
+  --bg-input: #ffffff;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-glow: rgba(37, 99, 235, 0.2);
+  --emerald: #059669;
+  --emerald-glow: rgba(5, 150, 105, 0.2);
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-dim: #94a3b8;
+  --danger: #ef4444;
+  --code-bg: #f1f5f9;
+  --code-color: #0f172a;
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --border-radius: 12px;
+  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
   --bg-primary: #0b0f19;
   --bg-secondary: #111827;
-  --bg-card: rgba(17, 24, 39, 0.7);
+  --bg-card: rgba(17, 24, 39, 0.75);
   --bg-card-border: rgba(255, 255, 255, 0.08);
   --bg-input: #1a2234;
   --accent: #3b82f6;
@@ -15,28 +37,7 @@
   --danger: #ef4444;
   --code-bg: #080c14;
   --code-color: #93c5fd;
-  --header-bg: rgba(11, 15, 25, 0.85);
-  --border-radius: 12px;
-  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-[data-theme="light"] {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #ffffff;
-  --bg-card: rgba(255, 255, 255, 0.85);
-  --bg-card-border: rgba(203, 213, 225, 0.6);
-  --bg-input: #ffffff;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-glow: rgba(37, 99, 235, 0.2);
-  --emerald: #059669;
-  --emerald-glow: rgba(5, 150, 105, 0.2);
-  --text-main: #0f172a;
-  --text-muted: #475569;
-  --text-dim: #94a3b8;
-  --code-bg: #f1f5f9;
-  --code-color: #0f172a;
-  --header-bg: rgba(255, 255, 255, 0.88);
+  --header-bg: rgba(11, 15, 25, 0.88);
 }
 
 * {
@@ -413,14 +414,14 @@ header {
 /* Datepicker calendar icon color adjustment */
 input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
-  filter: invert(0.8) brightness(1.2);
-  opacity: 0.8;
+  filter: none;
+  opacity: 0.7;
   transition: opacity 0.2s ease;
 }
 
-[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: none;
-  opacity: 0.7;
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8) brightness(1.2);
+  opacity: 0.8;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator:hover {
