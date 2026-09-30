@@ -93,10 +93,11 @@ def build_pdfa3_zugferd(
     input_pdf_path: str,
     facturx_xml_path: str,
     output_pdf_path: str,
-    profile: str = "EN16931"
+    profile: str = "EN16931",
+    attachment_filename: str = "factur-x.xml"
 ) -> bool:
     """
-    Creates a compliant PDF/A-3 document with factur-x.xml embedded as /AF /Alternative
+    Creates a compliant PDF/A-3 document with factur-x.xml or order-x.xml embedded as /AF /Alternative
     and compliant XMP metadata.
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_pdf_path)), exist_ok=True)
@@ -109,15 +110,16 @@ def build_pdfa3_zugferd(
         with open(facturx_xml_path, "rb") as f:
             xml_bytes = f.read()
 
-        # 1. Create file specification for factur-x.xml
+        # 1. Create file specification for embedded XML
+        desc_text = "Order-X Purchase Order XML" if "order-x" in attachment_filename.lower() else "Factur-X / ZUGFeRD Invoice XML"
         filespec = pikepdf.AttachedFileSpec(
             pdf,
             xml_bytes,
-            filename="factur-x.xml",
-            description="Factur-X / ZUGFeRD Invoice XML",
+            filename=attachment_filename,
+            description=desc_text,
             mime_type="text/xml"
         )
-        pdf.attachments["factur-x.xml"] = filespec
+        pdf.attachments[attachment_filename] = filespec
 
         # Explicitly set /AFRelationship key as Name object in the file specification dictionary
         ef_obj = pdf.Root.Names.EmbeddedFiles.Names[1]

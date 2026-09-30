@@ -154,8 +154,13 @@ async function loadPreferences() {
 
       if (data.company_settings) {
         cachedCompanySettings = Object.assign({}, cachedCompanySettings, data.company_settings);
-        applySellerSettingsToInputs(getSellerSettings());
+        localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(cachedCompanySettings));
+        applySellerSettingsToInputs(cachedCompanySettings);
         populateManualSellerDefaults();
+        renderSavedPartiesConfig();
+        if (typeof loadV2SavedPartiesDropdowns === "function") {
+          loadV2SavedPartiesDropdowns();
+        }
       }
     }
   } catch (e) {
@@ -187,6 +192,20 @@ async function saveConfiguration() {
   localStorage.setItem("ZUGFERD_LAYOUT", layout);
   if (manLayoutSelect) manLayoutSelect.value = layout;
 
+  // Fetch the latest config from server first to ensure saved_parties are 100% fresh and never clobbered
+  let currentParties = (window.cachedCompanySettings && window.cachedCompanySettings.saved_parties) || { sellers: [], buyers: [] };
+  try {
+    const res = await fetch("/api/config");
+    if (res.ok) {
+      const data = await res.json();
+      if (data.company_settings && data.company_settings.saved_parties) {
+        currentParties = data.company_settings.saved_parties;
+      }
+    }
+  } catch (e) {
+    console.warn("Could not fetch latest server config before saving:", e);
+  }
+
   // Gather seller & footer settings from configuration form
   const newSettings = {
     seller_name: document.getElementById("cfgSellerName")?.value.trim() || "",
@@ -206,29 +225,300 @@ async function saveConfiguration() {
     seller_bank1_iban: document.getElementById("cfgBank1Iban")?.value.trim() || "",
     seller_bank2_name: document.getElementById("cfgBank2Name")?.value.trim() || "",
     seller_bank2_bic: document.getElementById("cfgBank2Bic")?.value.trim() || "",
-    seller_bank2_iban: document.getElementById("cfgBank2Iban")?.value.trim() || ""
+    seller_bank2_iban: document.getElementById("cfgBank2Iban")?.value.trim() || "",
+    saved_parties: currentParties
   };
 
-  cachedCompanySettings = Object.assign({}, cachedCompanySettings, newSettings);
-  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(newSettings));
+  window.cachedCompanySettings = Object.assign({}, window.cachedCompanySettings, newSettings);
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(window.cachedCompanySettings));
 
   // Sync to server so Docker container stores it persistently
   try {
-    await fetch("/api/config/settings", {
+    const postRes = await fetch("/api/config/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings: newSettings })
     });
+    if (postRes.ok) {
+      const postData = await postRes.json();
+      if (postData.settings) {
+        window.cachedCompanySettings = postData.settings;
+        localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(postData.settings));
+      }
+    }
   } catch (err) {
     console.warn("Could not persist settings to server:", err);
   }
 
-  // Update manual form fields if they match previous default or are empty
+  // Update manual and v2 forms
   populateManualSellerDefaults();
+  renderSavedPartiesConfig();
+  if (typeof loadV2SavedPartiesDropdowns === "function") {
+    loadV2SavedPartiesDropdowns();
+  }
 
   alert("Configuration saved successfully!");
 }
 window.saveConfiguration = saveConfiguration;
+
+// ================= SAVED PARTIES MANAGEMENT (CONFIG VIEW) =================
+async function renderSavedPartiesConfig() {
+  // If not yet populated or on demand, attempt to refresh settings from server
+  try {
+    const res = await fetch("/api/config");
+    if (res.ok) {
+      const data = await res.json();
+      if (data.company_settings) {
+        window.cachedCompanySettings = Object.assign({}, window.cachedCompanySettings, data.company_settings);
+      }
+    }
+  } catch (e) {
+    // fallback to local storage
+    try {
+      const local = localStorage.getItem("ZUGFERD_COMPANY_SETTINGS");
+      if (local) {
+        window.cachedCompanySettings = Object.assign({}, window.cachedCompanySettings, JSON.parse(local));
+      }
+    } catch (_) {}
+  }
+
+  const settings = window.cachedCompanySettings || {};
+  const parties = settings.saved_parties || { sellers: [], buyers: [] };
+  const sellers = parties.sellers || [];
+  const buyers = parties.buyers || [];
+
+  const sellersCountEl = document.getElementById("cfgSavedSellersCount");
+  const buyersCountEl = document.getElementById("cfgSavedBuyersCount");
+  if (sellersCountEl) sellersCountEl.textContent = sellers.length;
+  if (buyersCountEl) buyersCountEl.textContent = buyers.length;
+
+  const sellersListEl = document.getElementById("cfgSavedSellersList");
+  if (sellersListEl) {
+    if (sellers.length === 0) {
+      sellersListEl.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No saved sellers yet. Click "Save for later" on the Seller card in Studio v2.</div>`;
+    } else {
+      sellersListEl.innerHTML = "";
+      sellers.forEach((s, idx) => {
+        const partyId = s.id || `seller_${idx}`;
+        const row = document.createElement("div");
+        row.className = "v2-saved-party-row";
+        row.innerHTML = `
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">${escapeHtml(s.name)}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(s.city || "")} &bull; ${escapeHtml(s.vat_id || "No VAT")}</div>
+          </div>
+          <div style="display: flex; gap: 0.35rem; align-items: center;">
+            <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 0.72rem;" onclick="openEditPartyModal('seller', '${partyId}')" title="Edit seller details">✏️</button>
+            <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 0.72rem; color: #ef4444;" onclick="deleteSavedParty('seller', '${partyId}')" title="Delete saved seller">🗑️</button>
+          </div>
+        `;
+        sellersListEl.appendChild(row);
+      });
+    }
+  }
+
+  const buyersListEl = document.getElementById("cfgSavedBuyersList");
+  if (buyersListEl) {
+    if (buyers.length === 0) {
+      buyersListEl.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No saved buyers yet. Click "Save for later" on the Buyer card in Studio v2.</div>`;
+    } else {
+      buyersListEl.innerHTML = "";
+      buyers.forEach((b, idx) => {
+        const partyId = b.id || `buyer_${idx}`;
+        const row = document.createElement("div");
+        row.className = "v2-saved-party-row";
+        row.innerHTML = `
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">${escapeHtml(b.name)}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(b.city || "")} &bull; ${escapeHtml(b.vat_id || "No VAT")}</div>
+          </div>
+          <div style="display: flex; gap: 0.35rem; align-items: center;">
+            <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 0.72rem;" onclick="openEditPartyModal('buyer', '${partyId}')" title="Edit buyer details">✏️</button>
+            <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 0.72rem; color: #ef4444;" onclick="deleteSavedParty('buyer', '${partyId}')" title="Delete saved buyer">🗑️</button>
+          </div>
+        `;
+        buyersListEl.appendChild(row);
+      });
+    }
+  }
+}
+window.renderSavedPartiesConfig = renderSavedPartiesConfig;
+
+let currentEditingPartyType = null;
+let currentEditingPartyId = null;
+
+function openEditPartyModal(type, id) {
+  const settings = window.cachedCompanySettings || {};
+  const parties = settings.saved_parties || { sellers: [], buyers: [] };
+  const list = type === "seller" ? (parties.sellers || []) : (parties.buyers || []);
+  const party = list.find((p, idx) => (p.id === id || String(idx) === String(id) || `seller_${idx}` === id || `buyer_${idx}` === id));
+
+  if (!party) {
+    alert("Party details not found.");
+    return;
+  }
+
+  currentEditingPartyType = type;
+  currentEditingPartyId = party.id || id;
+
+  const modal = document.getElementById("editPartyModal");
+  const title = document.getElementById("editPartyModalTitle");
+  if (title) title.textContent = `Edit Saved ${type === "seller" ? "Seller (Supplier)" : "Buyer (Customer)"}`;
+
+  const setVal = (elId, val) => {
+    const el = document.getElementById(elId);
+    if (el) el.value = val || "";
+  };
+
+  setVal("editPartyName", party.name);
+  setVal("editPartyVat", party.vat_id);
+  setVal("editPartyStreet", party.street);
+  setVal("editPartyCity", party.city);
+  setVal("editPartyPostcode", party.postcode);
+  setVal("editPartyCountry", party.country_code || "DE");
+
+  const extraSellerFields = document.getElementById("editPartySellerExtra");
+  if (extraSellerFields) {
+    extraSellerFields.style.display = type === "seller" ? "block" : "none";
+  }
+  if (type === "seller") {
+    setVal("editPartyPhone", party.phone);
+    setVal("editPartyEmail", party.email);
+    setVal("editPartyIban", party.iban);
+    setVal("editPartyBic", party.bic);
+  }
+
+  if (modal) modal.style.display = "flex";
+}
+window.openEditPartyModal = openEditPartyModal;
+
+function closeEditPartyModal() {
+  const modal = document.getElementById("editPartyModal");
+  if (modal) modal.style.display = "none";
+  currentEditingPartyType = null;
+  currentEditingPartyId = null;
+}
+window.closeEditPartyModal = closeEditPartyModal;
+
+async function saveEditedParty() {
+  const name = document.getElementById("editPartyName")?.value.trim();
+  if (!name) {
+    alert("Company / Party Name is required.");
+    return;
+  }
+
+  const type = currentEditingPartyType;
+  const id = currentEditingPartyId;
+  const settings = window.cachedCompanySettings || {};
+  if (!settings.saved_parties) settings.saved_parties = { sellers: [], buyers: [] };
+
+  const listKey = type === "seller" ? "sellers" : "buyers";
+  const list = settings.saved_parties[listKey] || [];
+  const partyIdx = list.findIndex((p, idx) => (p.id === id || String(idx) === String(id) || `seller_${idx}` === id || `buyer_${idx}` === id));
+
+  const updatedData = {
+    id: id.startsWith("party_") ? id : ("party_" + Date.now().toString(36)),
+    name: name,
+    vat_id: document.getElementById("editPartyVat")?.value.trim() || "",
+    street: document.getElementById("editPartyStreet")?.value.trim() || "",
+    city: document.getElementById("editPartyCity")?.value.trim() || "",
+    postcode: document.getElementById("editPartyPostcode")?.value.trim() || "",
+    country_code: document.getElementById("editPartyCountry")?.value || "DE"
+  };
+
+  if (type === "seller") {
+    updatedData.phone = document.getElementById("editPartyPhone")?.value.trim() || "";
+    updatedData.email = document.getElementById("editPartyEmail")?.value.trim() || "";
+    updatedData.iban = document.getElementById("editPartyIban")?.value.trim() || "";
+    updatedData.bic = document.getElementById("editPartyBic")?.value.trim() || "";
+  }
+
+  if (partyIdx >= 0) {
+    settings.saved_parties[listKey][partyIdx] = updatedData;
+  } else {
+    settings.saved_parties[listKey].push(updatedData);
+  }
+
+  if (type === "seller") {
+    // If the edited seller is the primary/current seller or matches it, also keep company seller inputs in sync
+    const currentCfgName = document.getElementById("cfgSellerName")?.value.trim() || "";
+    if (!currentCfgName || currentCfgName.toLowerCase() === name.toLowerCase() || partyIdx === 0) {
+      settings.seller_name = name;
+      if (updatedData.vat_id) settings.seller_vat = updatedData.vat_id;
+      if (updatedData.street) settings.seller_street = updatedData.street;
+      if (updatedData.city) settings.seller_city = updatedData.city;
+      if (updatedData.country_code) settings.seller_country = updatedData.country_code;
+      if (updatedData.phone) settings.seller_phone = updatedData.phone;
+      if (updatedData.iban) settings.seller_bank1_iban = updatedData.iban;
+      if (updatedData.bic) settings.seller_bank1_bic = updatedData.bic;
+
+      // Update the input fields in the Configuration tab directly
+      applySellerSettingsToInputs(settings);
+    }
+  }
+
+  window.cachedCompanySettings = settings;
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(settings));
+
+  try {
+    const postRes = await fetch("/api/config/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: settings })
+    });
+    if (postRes.ok) {
+      const data = await postRes.json();
+      if (data.settings) {
+        window.cachedCompanySettings = data.settings;
+        localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(data.settings));
+      }
+    }
+  } catch (err) {
+    console.warn("Could not sync edited party to server:", err);
+  }
+
+  closeEditPartyModal();
+  renderSavedPartiesConfig();
+  if (typeof loadV2SavedPartiesDropdowns === "function") {
+    loadV2SavedPartiesDropdowns();
+  }
+}
+window.saveEditedParty = saveEditedParty;
+
+
+async function deleteSavedParty(type, id) {
+  if (!confirm(`Are you sure you want to delete this saved ${type}?`)) return;
+  const settings = window.cachedCompanySettings || {};
+  if (!settings.saved_parties) settings.saved_parties = { sellers: [], buyers: [] };
+
+  const listKey = type === "seller" ? "sellers" : "buyers";
+  settings.saved_parties[listKey] = (settings.saved_parties[listKey] || []).filter((item, idx) => {
+    if (item.id && item.id === id) return false;
+    if (String(idx) === String(id)) return false;
+    if (`${type}_${idx}` === id) return false;
+    return true;
+  });
+
+  window.cachedCompanySettings = settings;
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(settings));
+
+  try {
+    await fetch("/api/config/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: settings })
+    });
+  } catch (err) {
+    console.warn("Could not sync deletion:", err);
+  }
+
+  renderSavedPartiesConfig();
+  if (typeof loadV2SavedPartiesDropdowns === "function") {
+    loadV2SavedPartiesDropdowns();
+  }
+}
+window.deleteSavedParty = deleteSavedParty;
+
 
 // ================= LOGO MANAGEMENT =================
 async function checkLogoStatus() {
@@ -366,7 +656,7 @@ function switchScenario(scenario) {
 window.switchScenario = switchScenario;
 
 function executeSwitchScenario(scenario) {
-  const scenarios = ["pdf", "docx", "manual", "history", "config"];
+  const scenarios = ["pdf", "docx", "manual", "history", "v2", "config"];
   scenarios.forEach((s) => {
     const container = document.getElementById(`scenario-${s}-container`);
     const btn = document.getElementById(`tab-${s}`);
@@ -384,6 +674,15 @@ function executeSwitchScenario(scenario) {
 
   if (scenario === "history") {
     loadInvoiceHistory();
+  }
+  if (scenario === "config") {
+    applySellerSettingsToInputs(getSellerSettings());
+    renderSavedPartiesConfig();
+    checkLogoStatus();
+  }
+  if (scenario === "v2") {
+    if (typeof populateV2SellerDefaults === "function") populateV2SellerDefaults();
+    if (typeof loadV2SavedPartiesDropdowns === "function") loadV2SavedPartiesDropdowns();
   }
 }
 
@@ -1732,11 +2031,22 @@ function renderHistoryTable() {
         costDisplay = `<span style="color: var(--text-muted); font-size: 0.75rem;">N/A</span>`;
       }
 
+      // Generator & Layout display badge
+      const genType = (item.generator === "v2" || item.source_type === "v2" || item.source_type === "v2_manual") ? "v2" : "v1";
+      const genBadge = genType === "v2"
+        ? `<span class="tag" style="background: rgba(147, 51, 234, 0.15); color: #a855f7; border: 1px solid rgba(147, 51, 234, 0.3); font-weight: 700; font-size: 0.7rem; padding: 2px 6px;">Studio v2</span>`
+        : `<span class="tag" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 700; font-size: 0.7rem; padding: 2px 6px;">Classic v1</span>`;
+
       tr.innerHTML = `
         <td class="col-date" style="font-size: 0.78rem; color: var(--text-muted); white-space: nowrap;">${item.created_at || "N/A"}</td>
         <td class="col-inv"><strong style="color: var(--text-main); font-size: 0.85rem;">${escapeHtml(item.invoice_number)}</strong></td>
         <td class="col-buyer" style="font-size: 0.82rem;">${escapeHtml(item.buyer_name || "N/A")}</td>
-        <td class="col-layout" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(item.layout || "layout1")}</td>
+        <td class="col-layout" style="font-size: 0.75rem; white-space: nowrap;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div>${genBadge}</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;">${escapeHtml(item.layout || "layout1")}</div>
+          </div>
+        </td>
         <td class="col-cost">${costDisplay}</td>
         <td class="col-total" style="text-align: right; font-weight: 700; color: #10b981;">€${(Number(item.grand_total) || 0).toFixed(2)}</td>
         <td class="col-status" style="text-align: center;">${statusBadge}</td>
@@ -1801,9 +2111,23 @@ function editHistoryInvoice(index) {
   }
 
   const inv = item.invoice_data;
+  const isV2 = item.generator === "v2" || item.source_type === "v2" || item.source_type === "v2_manual";
 
-  // Switch to Manual Form tab
+  if (isV2) {
+    // Switch to Studio v2 tab
+    switchScenario("v2");
+    if (typeof populateV2FromHistory === "function") {
+      populateV2FromHistory(inv, item.layout);
+    }
+    // Scroll smoothly to top of form
+    const v2Container = document.getElementById("scenario-v2-container");
+    if (v2Container) v2Container.scrollIntoView({ behavior: "smooth" });
+    return;
+  }
+
+  // Otherwise switch to Classic Manual Form tab
   switchScenario("manual");
+
 
   // Populate Header Data
   const numEl = document.getElementById("manInvNumber");

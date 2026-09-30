@@ -1,0 +1,411 @@
+/* =========================================================================
+   ZUGFeRD Studio v2 Stylesheet (GetZUGFeRD.com aesthetic)
+   ========================================================================= */
+
+.v2-container {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem 1rem;
+}
+
+/* Header title area */
+.v2-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.v2-header h2 {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.025em;
+  margin-bottom: 0.5rem;
+}
+
+.v2-header p {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  max-width: 650px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* Prefill Dropzone Banner */
+.v2-prefill-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(37, 99, 235, 0.04);
+  border: 1.5px dashed rgba(37, 99, 235, 0.35);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.v2-prefill-banner:hover {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.v2-prefill-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.v2-prefill-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.v2-prefill-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 2px;
+}
+
+.v2-prefill-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.v2-prefill-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+/* v2 Card standard */
+.v2-card {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 14px;
+  padding: 1.4rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.2s ease;
+}
+
+.v2-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.v2-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Grid systems */
+.v2-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.v2-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.v2-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .v2-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Form fields */
+.v2-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.v2-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.v2-label-link {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.v2-label-link:hover {
+  text-decoration: underline;
+}
+
+.v2-input,
+.v2-select {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-input);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.v2-input:focus,
+.v2-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.v2-input-readonly {
+  background: var(--code-bg);
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+/* Accordion toggles */
+.v2-accordion-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem 0;
+  transition: color 0.2s;
+  user-select: none;
+}
+
+.v2-accordion-btn:hover {
+  color: var(--accent);
+}
+
+/* Line Item Rows (GetZUGFeRD card design) */
+.v2-item-card {
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  position: relative;
+  transition: all 0.2s;
+}
+
+[data-theme="dark"] .v2-item-card {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.v2-item-card:hover {
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+.v2-item-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.v2-item-number {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.v2-item-trash {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  transition: color 0.15s, background 0.15s;
+}
+
+.v2-item-trash:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Tax Breakdown Matrix */
+.v2-tax-matrix {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.v2-tax-tile {
+  background: var(--bg-input);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.v2-tax-tile-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.v2-tax-tile-val {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+/* Totals Strip */
+.v2-totals-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-around;
+  padding: 1.25rem 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 12px;
+  margin-top: 1rem;
+  text-align: center;
+  gap: 1rem;
+}
+
+.v2-total-item-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+.v2-total-item-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.v2-total-item-value.accent {
+  color: var(--accent);
+}
+
+/* Action Footer */
+.v2-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Validation Alert Banner */
+.v2-alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  color: #ef4444;
+}
+
+.v2-alert-banner.success {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #10b981;
+}
+
+/* Discount cards in Studio v2 */
+.v2-discount-card {
+  background: var(--bg-input);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: all 0.2s ease;
+}
+
+.v2-discount-card:hover {
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.v2-discount-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.v2-discount-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Saved Party Card list in Configuration */
+.v2-saved-party-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  gap: 0.5rem;
+}
+
+.v2-saved-party-row:hover {
+  border-color: var(--accent);
+}

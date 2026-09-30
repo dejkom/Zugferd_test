@@ -10,6 +10,21 @@ class TaxSummaryItem(BaseModel):
     tax_amount: float = Field(default=0.0, description="Calculated tax amount for this category")
     exemption_reason: Optional[str] = Field(None, description="Reason for tax exemption or reverse charge if applicable")
 
+class DocumentDiscount(BaseModel):
+    reason: Optional[str] = Field(default="", description="Reason for discount, e.g. Early payment discount")
+    percentage: Optional[float] = Field(default=None, description="Discount percentage")
+    amount: float = Field(default=0.0, description="Discount amount")
+
+class DeliveryDetails(BaseModel):
+    recipient_name: Optional[str] = Field(None, description="Delivery recipient name")
+    delivery_date: Optional[str] = Field(None, description="Actual delivery date YYYY-MM-DD")
+    location_id: Optional[str] = Field(None, description="GLN or location identifier")
+    location_scheme: Optional[str] = Field(default="0088", description="Location scheme e.g. 0088 (GLN)")
+    street: Optional[str] = Field(None, description="Delivery street")
+    city: Optional[str] = Field(None, description="Delivery city")
+    postcode: Optional[str] = Field(None, description="Delivery postal code")
+    country_code: Optional[str] = Field(default="DE", description="Delivery ISO country code")
+
 class InvoiceLineItem(BaseModel):
     line_id: str = Field(default="1", description="Line number / identifier")
     name: str = Field(..., description="Item or service description")
@@ -17,8 +32,10 @@ class InvoiceLineItem(BaseModel):
     unit_code: str = Field(default="C62", description="UN/ECE Rec 20 unit code (e.g. C62 for piece/one, HUR for hour, DAY for day)")
     unit_price: float = Field(..., description="Net unit price")
     line_total_amount: float = Field(..., description="Line net total amount (quantity * unit_price)")
-    tax_category_code: str = Field(default="S", description="Tax category code: S, Z, E, AE")
+    tax_category_code: str = Field(default="S", description="Tax category code: S, Z, E, AE, K")
     tax_percent: float = Field(default=0.0, description="Tax rate percentage")
+    discount_amount: float = Field(default=0.0, description="Line item discount amount")
+    discount_percent: Optional[float] = Field(None, description="Line item discount percent")
 
 class TradeParty(BaseModel):
     name: str = Field(..., description="Company or individual legal name")
@@ -64,12 +81,28 @@ class InvoiceData(BaseModel):
     issue_date: str = Field(..., description="Issue date in YYYY-MM-DD or YYYYMMDD format")
     due_date: Optional[str] = Field(None, description="Due date in YYYY-MM-DD or YYYYMMDD format")
     currency: str = Field(default="EUR", description="ISO 4217 Currency code, e.g. EUR, USD")
-    invoice_type_code: str = Field(default="380", description="380 for standard commercial invoice, 381 for credit note")
+    invoice_type_code: str = Field(default="380", description="380: Invoice, 381: Credit Note, 384: Corrected, 326: Partial, 386: Prepayment, 220: Order-X")
+    document_format: Optional[str] = Field(default="zugferd", description="'zugferd' or 'orderx'")
     buyer_reference: Optional[str] = Field(None, description="Buyer reference or order number or Leitweg-ID")
+    purchase_order_number: Optional[str] = Field(None, description="Purchase order reference ID")
     notes: List[str] = Field(default_factory=list, description="General document notes or remarks")
+    
+    # Preceding invoice for Credit Notes (381) and Corrected Invoices (384)
+    preceding_invoice_number: Optional[str] = Field(None, description="Reference to preceding invoice being credited/corrected")
+    preceding_invoice_date: Optional[str] = Field(None, description="Issue date of preceding invoice")
+    
+    # Service / Invoicing period
+    service_period_start: Optional[str] = Field(None, description="Service / billing period start date")
+    service_period_end: Optional[str] = Field(None, description="Service / billing period end date")
+    
+    # Prepayment / paid amounts & Document discounts
+    prepaid_amount: float = Field(default=0.0, description="Amount already settled/paid")
+    discounts: List[DocumentDiscount] = Field(default_factory=list, description="Document-level discounts/rebates")
+    vat_exemption_reason: Optional[str] = Field(None, description="Exemption reason text for tax category E")
     
     seller: TradeParty = Field(..., description="Supplier / Seller details")
     buyer: TradeParty = Field(..., description="Customer / Buyer details")
+    delivery: Optional[DeliveryDetails] = Field(default=None, description="Delivery / Shipping destination details")
     payment: PaymentDetails = Field(default_factory=PaymentDetails, description="Payment details")
     
     items: List[InvoiceLineItem] = Field(default_factory=list, description="List of line items")

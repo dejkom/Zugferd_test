@@ -162,6 +162,105 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
           {name_x}{phone_x}{email_x}
         </ram:DefinedTradeContact>\n"""
 
+    # Buyer order / Purchase Order reference
+    buyer_order_xml = ""
+    if inv.purchase_order_number:
+        buyer_order_xml = f"""      <ram:BuyerOrderReferencedDocument>
+        <ram:IssuerAssignedID>{escape(inv.purchase_order_number)}</ram:IssuerAssignedID>
+      </ram:BuyerOrderReferencedDocument>\n"""
+
+    # Preceding invoice reference (Required for Credit Notes 381 and Corrected Invoices 384)
+    preceding_doc_xml = ""
+    if inv.preceding_invoice_number:
+        prec_date_xml = ""
+        if inv.preceding_invoice_date:
+            clean_prec_date = clean_date(inv.preceding_invoice_date)
+            prec_date_xml = f"""        <ram:FormattedIssueDateTime>
+          <qdt:DateTimeString format="102">{clean_prec_date}</qdt:DateTimeString>
+        </ram:FormattedIssueDateTime>\n"""
+        preceding_doc_xml = f"""      <ram:InvoiceReferencedDocument>
+        <ram:IssuerAssignedID>{escape(inv.preceding_invoice_number)}</ram:IssuerAssignedID>
+{prec_date_xml}      </ram:InvoiceReferencedDocument>\n"""
+
+    # Delivery Party XML
+    delivery_xml = "<ram:ApplicableHeaderTradeDelivery />"
+    if inv.delivery and (inv.delivery.recipient_name or inv.delivery.street or inv.delivery.city or inv.delivery.delivery_date):
+        deliv_date_xml = ""
+        if inv.delivery.delivery_date:
+            deliv_d_clean = clean_date(inv.delivery.delivery_date)
+            deliv_date_xml = f"""        <ram:ActualDeliverySupplyChainEvent>
+          <ram:OccurrenceDateTime>
+            <udt:DateTimeString format="102">{deliv_d_clean}</udt:DateTimeString>
+          </ram:OccurrenceDateTime>
+        </ram:ActualDeliverySupplyChainEvent>\n"""
+        
+        deliv_party_xml = ""
+        if inv.delivery.recipient_name or inv.delivery.street:
+            deliv_name = f"<ram:Name>{escape(inv.delivery.recipient_name)}</ram:Name>\n" if inv.delivery.recipient_name else ""
+            deliv_party_xml = f"""        <ram:ShipToTradeParty>
+          {deliv_name}          <ram:PostalTradeAddress>
+            <ram:PostcodeCode>{escape(inv.delivery.postcode or "")}</ram:PostcodeCode>
+            <ram:LineOne>{escape(inv.delivery.street or "")}</ram:LineOne>
+            <ram:CityName>{escape(inv.delivery.city or "")}</ram:CityName>
+            <ram:CountryID>{escape(inv.delivery.country_code or "DE")}</ram:CountryID>
+          </ram:PostalTradeAddress>
+        </ram:ShipToTradeParty>\n"""
+        
+        delivery_xml = f"""    <ram:ApplicableHeaderTradeDelivery>
+{deliv_party_xml}{deliv_date_xml}    </ram:ApplicableHeaderTradeDelivery>"""
+
+    # Billing period XML
+    billing_period_xml = ""
+    if inv.service_period_start or inv.service_period_end:
+        start_xml = f"""        <ram:StartDateTime>
+          <udt:DateTimeString format="102">{clean_date(inv.service_period_start)}</udt:DateTimeString>
+        </ram:StartDateTime>\n""" if inv.service_period_start else ""
+        end_xml = f"""        <ram:EndDateTime>
+          <udt:DateTimeString format="102">{clean_date(inv.service_period_end)}</udt:DateTimeString>
+        </ram:EndDateTime>\n""" if inv.service_period_end else ""
+        billing_period_xml = f"""      <ram:BillingSpecifiedPeriod>
+{start_xml}{end_xml}      </ram:BillingSpecifiedPeriod>\n"""
+
+    # Monetary summation (includes Prepaid amount if provided)
+    prepaid_xml = ""
+    if inv.prepaid_amount and inv.prepaid_amount > 0:
+        prepaid_xml = f"        <ram:TotalPrepaidAmount>{inv.prepaid_amount:.2f}</ram:TotalPrepaidAmount>\n"
+
+    # Document Discounts (SpecifiedTradeAllowanceCharge)
+    allowance_charges_xml = ""
+    total_allowance_amt = 0.0
+    if inv.discounts:
+        # Determine dominant tax category & percent from items or default to 19% S
+        dom_tax_cat = "S"
+        dom_tax_pct = 19.0
+        if inv.items and len(inv.items) > 0:
+            dom_tax_cat = inv.items[0].tax_category_code or "S"
+            dom_tax_pct = inv.items[0].tax_percent if inv.items[0].tax_percent is not None else 19.0
+
+        for disc in inv.discounts:
+            amt = float(disc.amount or 0.0)
+            if amt <= 0.0:
+                continue
+            total_allowance_amt += amt
+            reason_txt = escape(disc.reason or "Discount / Rebate")
+            pct_xml = f"        <ram:CalculationPercent>{disc.percentage:.2f}</ram:CalculationPercent>\n" if disc.percentage is not None and disc.percentage > 0 else ""
+            allowance_charges_xml += f"""      <ram:SpecifiedTradeAllowanceCharge>
+        <ram:ChargeIndicator>
+          <udt:Indicator>false</udt:Indicator>
+        </ram:ChargeIndicator>
+{pct_xml}        <ram:ActualAmount>{amt:.2f}</ram:ActualAmount>
+        <ram:Reason>{reason_txt}</ram:Reason>
+        <ram:CategoryTradeTax>
+          <ram:TypeCode>VAT</ram:TypeCode>
+          <ram:CategoryCode>{dom_tax_cat}</ram:CategoryCode>
+          <ram:RateApplicablePercent>{dom_tax_pct:.2f}</ram:RateApplicablePercent>
+        </ram:CategoryTradeTax>
+      </ram:SpecifiedTradeAllowanceCharge>\n"""
+
+    allowance_total_xml = ""
+    if total_allowance_amt > 0:
+        allowance_total_xml = f"        <ram:AllowanceTotalAmount>{total_allowance_amt:.2f}</ram:AllowanceTotalAmount>\n"
+
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice xmlns:a="urn:un:unece:uncefact:data:standard:QualifiedDataType:100" xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:10" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
   <rsm:ExchangedDocumentContext>
@@ -197,19 +296,126 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
           <ram:CountryID>{inv.buyer.country_code or "DE"}</ram:CountryID>
         </ram:PostalTradeAddress>
 {buyer_tax_xml}      </ram:BuyerTradeParty>
-    </ram:ApplicableHeaderTradeAgreement>
-    <ram:ApplicableHeaderTradeDelivery />
+{buyer_order_xml}{preceding_doc_xml}    </ram:ApplicableHeaderTradeAgreement>
+{delivery_xml}
     <ram:ApplicableHeaderTradeSettlement>
       <ram:InvoiceCurrencyCode>{inv.currency or "EUR"}</ram:InvoiceCurrencyCode>
-{payment_means_xml}{tax_breakdown_xml}{payment_terms_xml}      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+{billing_period_xml}{payment_means_xml}{tax_breakdown_xml}{allowance_charges_xml}{payment_terms_xml}      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
         <ram:LineTotalAmount>{inv.line_net_total:.2f}</ram:LineTotalAmount>
-        <ram:TaxBasisTotalAmount>{inv.line_net_total:.2f}</ram:TaxBasisTotalAmount>
+{allowance_total_xml}        <ram:TaxBasisTotalAmount>{(inv.line_net_total - total_allowance_amt):.2f}</ram:TaxBasisTotalAmount>
         <ram:TaxTotalAmount currencyID="{inv.currency or "EUR"}">{inv.tax_total:.2f}</ram:TaxTotalAmount>
         <ram:GrandTotalAmount>{inv.grand_total:.2f}</ram:GrandTotalAmount>
-        <ram:DuePayableAmount>{inv.due_payable_amount:.2f}</ram:DuePayableAmount>
+{prepaid_xml}        <ram:DuePayableAmount>{inv.due_payable_amount:.2f}</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>
+"""
+    return xml
+
+def generate_orderx_xml(inv: InvoiceData, profile: str = "BASIC") -> str:
+    """
+    Generate Order-X XML (SCRDM / order-x.xml) for Purchase Orders.
+    Guideline: urn:order-x.eu:1p0:basic
+    """
+    issue_date_formatted = clean_date(inv.issue_date)
+    guideline_id = "urn:order-x.eu:1p0:basic" if profile == "BASIC" else "urn:order-x.eu:1p0:comfort"
+    order_id = inv.invoice_number or inv.purchase_order_number or "ORDER-001"
+    
+    # Seller cleanups
+    s_vat = inv.seller.vat_id.replace(" ", "").upper() if inv.seller.vat_id else ""
+    b_vat = inv.buyer.vat_id.replace(" ", "").upper() if inv.buyer.vat_id else ""
+    buyer_ref = inv.buyer_reference or "N/A"
+
+    line_items_xml = ""
+    for idx, item in enumerate(inv.items, start=1):
+        line_num = item.line_id or str(idx)
+        line_items_xml += f"""    <ram:IncludedSupplyChainTradeLineItem>
+      <ram:AssociatedDocumentLineDocument>
+        <ram:LineID>{line_num}</ram:LineID>
+      </ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct>
+        <ram:Name>{escape(item.name)}</ram:Name>
+      </ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeAgreement>
+        <ram:NetPriceProductTradePrice>
+          <ram:ChargeAmount>{item.unit_price:.2f}</ram:ChargeAmount>
+        </ram:NetPriceProductTradePrice>
+      </ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedLineTradeDelivery>
+        <ram:RequestedQuantity unitCode="{item.unit_code}">{item.quantity:.4f}</ram:RequestedQuantity>
+      </ram:SpecifiedLineTradeDelivery>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:ApplicableTradeTax>
+          <ram:TypeCode>VAT</ram:TypeCode>
+          <ram:CategoryCode>{item.tax_category_code}</ram:CategoryCode>
+          <ram:RateApplicablePercent>{item.tax_percent:.2f}</ram:RateApplicablePercent>
+        </ram:ApplicableTradeTax>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation>
+          <ram:LineTotalAmount>{item.line_total_amount:.2f}</ram:LineTotalAmount>
+        </ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>
+    </ram:IncludedSupplyChainTradeLineItem>\n"""
+
+    seller_tax_xml = ""
+    if s_vat:
+        seller_tax_xml = f"""        <ram:SpecifiedTaxRegistration>
+          <ram:ID schemeID="VA">{s_vat}</ram:ID>
+        </ram:SpecifiedTaxRegistration>\n"""
+    
+    buyer_tax_xml = ""
+    if b_vat:
+        buyer_tax_xml = f"""        <ram:SpecifiedTaxRegistration>
+          <ram:ID schemeID="VA">{b_vat}</ram:ID>
+        </ram:SpecifiedTaxRegistration>\n"""
+
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rsm:SCRDMCCBDACIOMessageStructure xmlns:a="urn:un:unece:uncefact:data:standard:QualifiedDataType:128" xmlns:rsm="urn:un:unece:uncefact:data:SCRDMCCBDACIOMessageStructure:100" xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:10" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:128" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:128">
+  <rsm:ExchangedDocumentContext>
+    <ram:GuidelineSpecifiedDocumentContextParameter>
+      <ram:ID>{guideline_id}</ram:ID>
+    </ram:GuidelineSpecifiedDocumentContextParameter>
+  </rsm:ExchangedDocumentContext>
+  <rsm:ExchangedDocument>
+    <ram:ID>{escape(order_id)}</ram:ID>
+    <ram:TypeCode>220</ram:TypeCode>
+    <ram:IssueDateTime>
+      <udt:DateTimeString format="102">{issue_date_formatted}</udt:DateTimeString>
+    </ram:IssueDateTime>
+  </rsm:ExchangedDocument>
+  <rsm:SupplyChainTradeTransaction>
+{line_items_xml}    <ram:ApplicableHeaderTradeAgreement>
+      <ram:BuyerReference>{escape(buyer_ref)}</ram:BuyerReference>
+      <ram:SellerTradeParty>
+        <ram:Name>{escape(inv.seller.name)}</ram:Name>
+        <ram:PostalTradeAddress>
+          <ram:PostcodeCode>{escape(inv.seller.postcode or "")}</ram:PostcodeCode>
+          <ram:LineOne>{escape(inv.seller.street or "")}</ram:LineOne>
+          <ram:CityName>{escape(inv.seller.city or "")}</ram:CityName>
+          <ram:CountryID>{inv.seller.country_code or "DE"}</ram:CountryID>
+        </ram:PostalTradeAddress>
+{seller_tax_xml}      </ram:SellerTradeParty>
+      <ram:BuyerTradeParty>
+        <ram:Name>{escape(inv.buyer.name)}</ram:Name>
+        <ram:PostalTradeAddress>
+          <ram:PostcodeCode>{escape(inv.buyer.postcode or "")}</ram:PostcodeCode>
+          <ram:LineOne>{escape(inv.buyer.street or "")}</ram:LineOne>
+          <ram:CityName>{escape(inv.buyer.city or "")}</ram:CityName>
+          <ram:CountryID>{inv.buyer.country_code or "DE"}</ram:CountryID>
+        </ram:PostalTradeAddress>
+{buyer_tax_xml}      </ram:BuyerTradeParty>
+    </ram:ApplicableHeaderTradeAgreement>
+    <ram:ApplicableHeaderTradeDelivery />
+    <ram:ApplicableHeaderTradeSettlement>
+      <ram:OrderCurrencyCode>{inv.currency or "EUR"}</ram:OrderCurrencyCode>
+      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+        <ram:LineTotalAmount>{inv.line_net_total:.2f}</ram:LineTotalAmount>
+        <ram:TaxBasisTotalAmount>{inv.line_net_total:.2f}</ram:TaxBasisTotalAmount>
+        <ram:TaxTotalAmount currencyID="{inv.currency or "EUR"}">{inv.tax_total:.2f}</ram:TaxTotalAmount>
+        <ram:GrandTotalAmount>{inv.grand_total:.2f}</ram:GrandTotalAmount>
+      </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+    </ram:ApplicableHeaderTradeSettlement>
+  </rsm:SupplyChainTradeTransaction>
+</rsm:SCRDMCCBDACIOMessageStructure>
 """
     return xml

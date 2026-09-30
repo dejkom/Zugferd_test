@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from backend.models import InvoiceData
 from backend.extractor import extract_invoice_data, extract_raw_text_from_doc
-from backend.xml_builder import generate_facturx_xml
+from backend.xml_builder import generate_facturx_xml, generate_orderx_xml
 from backend.pdf_embedder import build_pdfa3_zugferd
 from backend.pdf_generator import generate_invoice_pdf_from_data
 from backend.mustang_wrapper import validate_zugferd_pdf
@@ -51,6 +51,9 @@ class CreateFromManualRequest(BaseModel):
     invoice_data: InvoiceData
     profile: Optional[str] = "EN16931"
     layout: Optional[str] = "layout1"
+    token_usage: Optional[dict] = None
+    generator: Optional[str] = "v1"
+    source_type: Optional[str] = "manual"
 
 @app.post("/api/upload")
 async def upload_document(file: UploadFile = File(...)):
@@ -247,8 +250,15 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
     sys_settings = load_system_settings()
     generate_invoice_pdf_from_data(req.invoice_data, visual_pdf_path, logo_path=logo_file, layout=chosen_layout, footer_config=sys_settings)
 
-    # 2. Generate Factur-X XML
-    xml_content = generate_facturx_xml(req.invoice_data, profile=req.profile or "EN16931")
+    # 2. Generate XML (Factur-X or Order-X)
+    is_orderx = getattr(req.invoice_data, "document_format", "zugferd") == "orderx" or req.invoice_data.invoice_type_code == "220"
+    if is_orderx:
+        xml_content = generate_orderx_xml(req.invoice_data, profile=req.profile or "BASIC")
+        attachment_name = "order-x.xml"
+    else:
+        xml_content = generate_facturx_xml(req.invoice_data, profile=req.profile or "EN16931")
+        attachment_name = "factur-x.xml"
+
     with open(xml_path, "w", encoding="utf-8") as f:
         f.write(xml_content)
 
@@ -258,7 +268,8 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
             input_pdf_path=visual_pdf_path,
             facturx_xml_path=xml_path,
             output_pdf_path=final_pdf_path,
-            profile=req.profile or "EN16931"
+            profile=req.profile or ("BASIC" if is_orderx else "EN16931"),
+            attachment_filename=attachment_name
         )
     except Exception as e:
         return {
@@ -282,10 +293,12 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
         record_invoice_history(
             invoice_data=req.invoice_data.model_dump(),
             output_filename=final_pdf_name,
-            source_type="manual",
+            source_type=req.source_type or ("v2" if req.generator == "v2" else "manual"),
+            generator=req.generator or ("v2" if req.source_type == "v2" else "v1"),
             layout=chosen_layout,
             xml_content=xml_content,
-            is_valid=val_res.get("isValid", True)
+            is_valid=val_res.get("isValid", True),
+            token_usage=req.token_usage
         )
     except Exception as e:
         print("Could not record history:", e)
@@ -349,7 +362,11 @@ DEFAULT_SETTINGS = {
     "seller_bank1_iban": "DE89370400440532013000",
     "seller_bank2_name": "Baden-Württembergische Bank",
     "seller_bank2_bic": "SOLA DEST",
-    "seller_bank2_iban": "DE30 6005 0101 7871 5056 72"
+    "seller_bank2_iban": "DE30 6005 0101 7871 5056 72",
+    "saved_parties": {
+        "sellers": [],
+        "buyers": []
+    }
 }
 
 def load_system_settings() -> dict:
@@ -391,6 +408,27 @@ async def get_server_config():
 class SaveSettingsRequest(BaseModel):
     settings: dict
 
+@app.post("/api/config/settings")
+async def update_company_settings(req: SaveSettingsRequest):
+    current = load_system_settings()
+    incoming = req.settings or {}
+    
+    # Safely merge saved_parties if present in both
+    if "saved_parties" in incoming:
+        cur_parties = current.get("saved_parties", {})
+        inc_parties = incoming.get("saved_parties", {})
+        # If incoming has sellers or buyers, merge them; never wipe existing with empty list if caller omitted or sent empty accidentally
+        merged_sellers = inc_parties.get("sellers") if "sellers" in inc_parties else cur_parties.get("sellers", [])
+        merged_buyers = inc_parties.get("buyers") if "buyers" in inc_parties else cur_parties.get("buyers", [])
+        incoming["saved_parties"] = {
+            "sellers": merged_sellers,
+            "buyers": merged_buyers
+        }
+
+    current.update(incoming)
+    save_system_settings(current)
+    return {"success": True, "settings": current}
+
 HISTORY_FILE = os.path.join(UPLOAD_DIR, "invoice_history.json")
 
 def load_history() -> list:
@@ -408,7 +446,7 @@ def save_history(history: list):
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
-def record_invoice_history(invoice_data: dict, output_filename: str, source_type: str = "manual", layout: str = "layout1", xml_content: str = "", is_valid: bool = True, token_usage: dict = None):
+def record_invoice_history(invoice_data: dict, output_filename: str, source_type: str = "manual", generator: str = "v1", layout: str = "layout1", xml_content: str = "", is_valid: bool = True, token_usage: dict = None):
     from datetime import datetime
     history = load_history()
     
@@ -437,6 +475,7 @@ def record_invoice_history(invoice_data: dict, output_filename: str, source_type
         "grand_total": invoice_data.get("grand_total") or invoice_data.get("due_payable_amount") or 0.0,
         "output_filename": output_filename,
         "source_type": source_type,
+        "generator": generator,
         "layout": layout,
         "is_valid": is_valid,
         "invoice_data": invoice_data,

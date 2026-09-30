@@ -11,6 +11,7 @@
     href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="/static/index.css?v=9">
+  <link rel="stylesheet" href="/static/v2.css?v=1">
 </head>
 
 <body>
@@ -37,6 +38,9 @@
         </button>
         <button class="nav-tab-btn" id="tab-history" onclick="switchScenario('history')">
           <span>📜 History</span>
+        </button>
+        <button class="nav-tab-btn" id="tab-v2" onclick="switchScenario('v2')" style="background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.3); color: #2563eb; font-weight: 700;">
+          <span>⚡ Studio v2 <span style="font-size:0.65rem; background:#2563eb; color:white; padding:1px 5px; border-radius:4px; margin-left:2px;">NEW</span></span>
         </button>
         <button class="nav-tab-btn" id="tab-config" onclick="switchScenario('config')">
           <span>⚙️ Configuration</span>
@@ -662,6 +666,425 @@
       </div>
     </div>
 
+    <!-- ================= SCENARIO V2: GETZUGFERD GUIDED STUDIO ================= -->
+    <div id="scenario-v2-container" style="display: none;">
+      <div class="v2-container">
+        <!-- Title & Subtitle -->
+        <div class="v2-header">
+          <h2>Create ZUGFeRD, Credit Notes & Order-X</h2>
+          <p>Guided, compliant e-document creator adhering to EN 16931, ZUGFeRD / Factur-X 2.x and Order-X specifications with live calculations and PDF/A-3 compilation.</p>
+        </div>
+
+        <!-- AI Auto-Fill Dropzone Banner -->
+        <div class="v2-prefill-banner" id="v2PrefillBanner" onclick="document.getElementById('v2PrefillFileInput').click()">
+          <div class="v2-prefill-icon">⚡</div>
+          <div class="v2-prefill-text">
+            <div class="v2-prefill-title" id="v2PrefillTitle">Have an existing invoice or document?</div>
+            <div class="v2-prefill-desc" id="v2PrefillDesc">Upload a PDF or Word (DOCX) file and our AI will prefill the form automatically.</div>
+          </div>
+          <div class="v2-prefill-badge">
+            <span>✨ Auto-Fill</span>
+          </div>
+        </div>
+        <input type="file" id="v2PrefillFileInput" accept=".pdf,.docx" style="display: none;" onchange="if(this.files.length) handleV2PrefillUpload(this.files[0])">
+
+        <!-- Validation Alert Banner -->
+        <div class="v2-alert-banner" id="v2AlertBanner" style="display: none;">
+          <div style="font-size: 1.25rem;">⚠️</div>
+          <div id="v2AlertMessage" style="flex: 1; font-size: 0.82rem; line-height: 1.4;"></div>
+        </div>
+
+        <!-- 1. Document Details Card -->
+        <div class="v2-card">
+          <div class="v2-card-header">
+            <div class="v2-card-title">
+              <span>📄 Document Details</span>
+              <span class="tag" id="v2DocTypeLabel" style="font-size: 0.72rem; text-transform: uppercase;">Commercial Invoice</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <select id="v2LayoutSelect" class="v2-select" style="padding: 0.3rem 0.6rem; font-size: 0.78rem; width: auto;" title="Visual PDF invoice template">
+                <option value="layout1">Layout 1: Modern Studio</option>
+                <option value="layout2">Layout 2: Odelo Corporate</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="v2-grid-4">
+            <div class="v2-field">
+              <label class="v2-label">Document Type *</label>
+              <select id="v2DocTypeSelect" class="v2-select" onchange="handleV2DocTypeChange(this.value)">
+                <option value="380" selected>Commercial Invoice (380)</option>
+                <option value="381">Credit Note / Gutschrift (381)</option>
+                <option value="384">Corrected Invoice (384)</option>
+                <option value="326">Partial Invoice (326)</option>
+                <option value="386">Prepayment Invoice (386)</option>
+                <option value="orderx">Order-X Purchase Order (220)</option>
+              </select>
+            </div>
+            <div class="v2-field">
+              <label class="v2-label">Document Number *</label>
+              <input type="text" id="v2InvNumber" class="v2-input" placeholder="e.g. INV-2026-001">
+            </div>
+            <div class="v2-field">
+              <label class="v2-label">Issue Date *</label>
+              <input type="date" id="v2IssueDate" class="v2-input">
+            </div>
+            <div class="v2-field">
+              <label class="v2-label">Currency</label>
+              <select id="v2Currency" class="v2-select">
+                <option value="EUR" selected>EUR (€)</option>
+                <option value="USD">USD ($)</option>
+                <option value="CHF">CHF (Fr.)</option>
+                <option value="GBP">GBP (£)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="v2-grid-3" style="margin-top: 1rem;">
+            <div class="v2-field">
+              <label class="v2-label">Payment Due Date</label>
+              <input type="date" id="v2DueDate" class="v2-input">
+            </div>
+            <div class="v2-field">
+              <label class="v2-label">Payment Method</label>
+              <select id="v2PayMethod" class="v2-select">
+                <option value="58" selected>SEPA Credit Transfer (58)</option>
+                <option value="30">Credit Transfer (30)</option>
+                <option value="48">Bank Card (48)</option>
+                <option value="10">Cash (10)</option>
+              </select>
+            </div>
+            <div class="v2-field">
+              <label class="v2-label">
+                <span>IBAN</span>
+                <button type="button" class="v2-label-link" onclick="toggleV2Section('v2BicFieldWrapper', null)">+ Add BIC</button>
+              </label>
+              <input type="text" id="v2PayIban" class="v2-input" placeholder="e.g. DE89370400440532013000">
+            </div>
+          </div>
+
+          <div id="v2BicFieldWrapper" style="display: none; margin-top: 0.75rem;">
+            <div class="v2-grid-3">
+              <div class="v2-field">
+                <label class="v2-label">BIC / SWIFT</label>
+                <input type="text" id="v2PayBic" class="v2-input" placeholder="e.g. DBBADEFFXXX">
+              </div>
+            </div>
+          </div>
+
+          <!-- Advanced Collapsible Section (PO, Prepaid, Payment Terms) -->
+          <div style="margin-top: 1rem; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem;">
+            <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2AdvancedDocSection', 'v2AdvChevron')">
+              <span id="v2AdvChevron">▼</span>
+              <span>Advanced Details (Purchase Order, Pre-paid Amount, Payment Terms)</span>
+            </button>
+            <div id="v2AdvancedDocSection" style="display: none; margin-top: 0.75rem;">
+              <div class="v2-grid-3">
+                <div class="v2-field">
+                  <label class="v2-label">Purchase Order (PO) / Order #</label>
+                  <input type="text" id="v2PurchaseOrder" class="v2-input" placeholder="e.g. PO-98421">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Buyer Reference / Leitweg-ID</label>
+                  <input type="text" id="v2BuyerRef" class="v2-input" placeholder="e.g. 04011000-12345-67">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Already Paid / Prepayment (€)</label>
+                  <input type="number" step="0.01" id="v2PrepaidAmount" class="v2-input" placeholder="0.00" oninput="recalcV2Totals()">
+                </div>
+              </div>
+              <div class="v2-field" style="margin-top: 0.75rem;">
+                <label class="v2-label">Payment Terms Note</label>
+                <input type="text" id="v2PayTerms" class="v2-input" placeholder="e.g. Payable within 30 days without deductions">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preceding Document Reference Card (Visible for Credit Note 381 & Corrected 384) -->
+        <div class="v2-card" id="v2CreditNoteCard" style="display: none; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.02);">
+          <div class="v2-card-header">
+            <div class="v2-card-title">
+              <span style="color: #ef4444;">↩️ Preceding Invoice Reference</span>
+              <span class="tag" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">Required for Credit Notes</span>
+            </div>
+          </div>
+          <div class="v2-grid-4">
+            <div class="v2-field">
+              <label class="v2-label">Preceding Invoice Number *</label>
+              <input type="text" id="v2PrecedingInvNumber" class="v2-input" placeholder="e.g. INV-2025-089">
+            </div>
+            <div class="v2-field">
+              <label class="v2-label">Preceding Invoice Date</label>
+              <input type="date" id="v2PrecedingInvDate" class="v2-input">
+            </div>
+            <div class="v2-field">
+              <label class="v2-label">Service Period Start</label>
+              <input type="date" id="v2ServiceStart" class="v2-input">
+            </div>
+            <div class="v2-field">
+              <label class="v2-label">Service Period End</label>
+              <input type="date" id="v2ServiceEnd" class="v2-input">
+            </div>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
+            The original commercial invoice identifier this credit note or correction rectifies.
+          </div>
+        </div>
+
+        <!-- 2. Seller and Buyer Side-by-Side Cards -->
+        <div class="v2-grid-2">
+          <!-- Seller Card -->
+          <div class="v2-card" style="margin-bottom: 0;">
+            <div class="v2-card-header">
+              <div class="v2-card-title">
+                <span>🏢 Seller (From)</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.74rem;" onclick="saveV2Party('seller')" title="Save this seller to configuration for future reuse">💾 Save for later</button>
+                <button type="button" class="v2-label-link" onclick="populateV2SellerDefaults()">Reset</button>
+              </div>
+            </div>
+            <!-- Saved Sellers Dropdown -->
+            <div style="margin-bottom: 0.75rem; background: var(--bg-input); padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px dashed var(--bg-card-border); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+              <span style="font-size: 0.74rem; color: var(--text-muted); white-space: nowrap;">📁 Saved Sellers:</span>
+              <select id="v2SavedSellerSelect" class="v2-select" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; width: 100%;" onchange="selectV2SavedParty('seller', this.value)">
+                <option value="">-- Select saved company --</option>
+              </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+              <div class="v2-field">
+                <label class="v2-label">Company Name *</label>
+                <input type="text" id="v2SellerName" class="v2-input" placeholder="e.g. Acme Solutions Ltd">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">VAT ID / Tax ID</label>
+                <input type="text" id="v2SellerVat" class="v2-input" placeholder="e.g. DE123456789">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">Street Address</label>
+                <input type="text" id="v2SellerStreet" class="v2-input" placeholder="e.g. Bahnhofstrasse 10">
+              </div>
+              <div class="v2-grid-3">
+                <div class="v2-field">
+                  <label class="v2-label">Postcode</label>
+                  <input type="text" id="v2SellerPostcode" class="v2-input" placeholder="e.g. 10115">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">City</label>
+                  <input type="text" id="v2SellerCity" class="v2-input" placeholder="e.g. Berlin">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Country</label>
+                  <select id="v2SellerCountry" class="v2-select">
+                    <option value="DE" selected>Germany (DE)</option>
+                    <option value="AT">Austria (AT)</option>
+                    <option value="CH">Switzerland (CH)</option>
+                    <option value="SI">Slovenia (SI)</option>
+                    <option value="FR">France (FR)</option>
+                    <option value="IT">Italy (IT)</option>
+                    <option value="US">United States (US)</option>
+                  </select>
+                </div>
+              </div>
+              <!-- Contact details toggle -->
+              <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2SellerContactSec', 'v2SellerContactChev')">
+                <span id="v2SellerContactChev">▼</span>
+                <span>Contact Details (Phone, Email)</span>
+              </button>
+              <div id="v2SellerContactSec" style="display: none;">
+                <div class="v2-grid-2">
+                  <div class="v2-field">
+                    <label class="v2-label">Phone</label>
+                    <input type="text" id="v2SellerPhone" class="v2-input" placeholder="+49 (0)711 18563144">
+                  </div>
+                  <div class="v2-field">
+                    <label class="v2-label">Email</label>
+                    <input type="email" id="v2SellerEmail" class="v2-input" placeholder="invoices@acme-solutions.com">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Buyer Card -->
+          <div class="v2-card" style="margin-bottom: 0;">
+            <div class="v2-card-header">
+              <div class="v2-card-title">
+                <span>👤 Buyer (To)</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.74rem;" onclick="saveV2Party('buyer')" title="Save this buyer to configuration for future reuse">💾 Save for later</button>
+              </div>
+            </div>
+            <!-- Saved Buyers Dropdown -->
+            <div style="margin-bottom: 0.75rem; background: var(--bg-input); padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px dashed var(--bg-card-border); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+              <span style="font-size: 0.74rem; color: var(--text-muted); white-space: nowrap;">📁 Saved Buyers:</span>
+              <select id="v2SavedBuyerSelect" class="v2-select" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; width: 100%;" onchange="selectV2SavedParty('buyer', this.value)">
+                <option value="">-- Select saved customer --</option>
+              </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+              <div class="v2-field">
+                <label class="v2-label">Company / Client Name *</label>
+                <input type="text" id="v2BuyerName" class="v2-input" placeholder="e.g. Client Corp Inc">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">VAT ID / Tax Number</label>
+                <input type="text" id="v2BuyerVat" class="v2-input" placeholder="e.g. SI52093808 or DE987654321">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">Street Address</label>
+                <input type="text" id="v2BuyerStreet" class="v2-input" placeholder="e.g. Market Street 42">
+              </div>
+              <div class="v2-grid-3">
+                <div class="v2-field">
+                  <label class="v2-label">Postcode</label>
+                  <input type="text" id="v2BuyerPostcode" class="v2-input" placeholder="e.g. 80331">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">City</label>
+                  <input type="text" id="v2BuyerCity" class="v2-input" placeholder="e.g. Munich">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Country</label>
+                  <select id="v2BuyerCountry" class="v2-select">
+                    <option value="DE" selected>Germany (DE)</option>
+                    <option value="AT">Austria (AT)</option>
+                    <option value="CH">Switzerland (CH)</option>
+                    <option value="SI">Slovenia (SI)</option>
+                    <option value="FR">France (FR)</option>
+                    <option value="IT">Italy (IT)</option>
+                    <option value="US">United States (US)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Delivery Details Card (Collapsible) -->
+        <div class="v2-card" style="margin-top: 1.5rem;">
+          <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2DeliverySection', 'v2DelivChev')" style="width: 100%; justify-content: space-between;">
+            <span class="v2-card-title">
+              <span>🚚 Delivery & Shipping Information</span>
+              <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">(optional)</span>
+            </span>
+            <span id="v2DelivChev">▼</span>
+          </button>
+          <div id="v2DeliverySection" style="display: none; margin-top: 1rem;">
+            <div class="v2-grid-4">
+              <div class="v2-field">
+                <label class="v2-label">Recipient Name</label>
+                <input type="text" id="v2DelivName" class="v2-input" placeholder="e.g. Warehouse 42">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">Delivery Date</label>
+                <input type="date" id="v2DelivDate" class="v2-input">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">Street</label>
+                <input type="text" id="v2DelivStreet" class="v2-input" placeholder="Delivery street">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">City & Postcode</label>
+                <input type="text" id="v2DelivCity" class="v2-input" placeholder="City">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Line Items Card -->
+        <div class="v2-card">
+          <div class="v2-card-header">
+            <div class="v2-card-title">
+              <span>📦 Line Items</span>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="addV2LineItem()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
+              <span>+ Add Line</span>
+            </button>
+          </div>
+
+          <div id="v2LineItemsContainer">
+            <!-- Dynamically populated line items -->
+          </div>
+        </div>
+
+        <!-- 5. Invoice Discounts (Document-Level Allowances & Rebates) -->
+        <div class="v2-card">
+          <div class="v2-card-header">
+            <div class="v2-card-title">
+              <span>🏷️ Document Discounts & Rebates</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(optional whole-invoice discounts e.g. early payment, loyalty)</span>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="addV2DocumentDiscount()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
+              <span>+ Add Discount</span>
+            </button>
+          </div>
+
+          <div id="v2DiscountsContainer">
+            <div id="v2NoDiscountsMsg" style="font-size: 0.8rem; color: var(--text-muted); font-style: italic; padding: 0.5rem 0;">
+              No document-level discounts applied. Click "+ Add Discount" to add an early payment rebate or percentage discount.
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Tax Breakdown & Exemption Card -->
+        <div class="v2-card">
+          <div class="v2-card-header">
+            <div class="v2-card-title">
+              <span>📊 Tax Breakdown</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(auto-calculated)</span>
+            </div>
+          </div>
+          <div id="v2TaxMatrixContainer" class="v2-tax-matrix">
+            <!-- Dynamically rendered per tax group -->
+          </div>
+
+          <div id="v2ExemptionCard" style="display: none; margin-top: 1rem; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem;">
+            <div class="v2-field">
+              <label class="v2-label">VAT Exemption Reason (Mandatory for Category E)</label>
+              <input type="text" id="v2ExemptionReason" class="v2-input" placeholder="e.g. Small business exemption under § 19 UStG">
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. Totals Strip -->
+        <div class="v2-totals-strip">
+          <div>
+            <div class="v2-total-item-label">Total (Net)</div>
+            <div class="v2-total-item-value" id="v2TotalNet">€0.00</div>
+          </div>
+          <div id="v2TotalDiscountWrapper" style="display: none;">
+            <div class="v2-total-item-label">Discount</div>
+            <div class="v2-total-item-value" id="v2TotalDiscount" style="color: #ef4444;">-€0.00</div>
+          </div>
+          <div>
+            <div class="v2-total-item-label">Total (VAT)</div>
+            <div class="v2-total-item-value" id="v2TotalVat">€0.00</div>
+          </div>
+          <div>
+            <div class="v2-total-item-label">Grand Total</div>
+            <div class="v2-total-item-value accent" id="v2GrandTotal">€0.00</div>
+          </div>
+          <div>
+            <div class="v2-total-item-label">Amount Due</div>
+            <div class="v2-total-item-value accent" id="v2DuePayable">€0.00</div>
+          </div>
+        </div>
+
+        <!-- 7. Actions Bar -->
+        <div class="v2-actions-bar">
+          <button type="button" class="btn btn-secondary" onclick="validateV2Invoice()" style="padding: 0.75rem 1.5rem; font-size: 0.95rem;">
+            <span>🛡️ Validate Document</span>
+          </button>
+          <button type="button" class="btn btn-primary" id="v2GenerateBtn" onclick="handleV2GenerateSubmit()" style="padding: 0.75rem 2rem; font-size: 0.98rem; font-weight: 700;">
+            <span>⚡ Generate & Download PDF/A-3</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ================= SCENARIO 5: HISTORY ================= -->
     <div id="scenario-history-container" style="display: none;">
       <div style="max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem;">
@@ -994,6 +1417,39 @@
             </div>
           </div>
 
+          <!-- Saved Parties Management Section (Buyers & Sellers) -->
+          <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1.25rem; margin-top: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <div>
+                <h4 style="font-size: 0.95rem; color: #a78bfa; margin: 0 0 4px 0;">👥 Saved Parties Directory (Sellers & Buyers)</h4>
+                <span style="font-size: 0.75rem; color: var(--text-dim);">Parties saved using "Save for later" in Studio v2 or manually stored here. Easily reusable in forms.</span>
+              </div>
+            </div>
+
+            <!-- Tabbed or 2-column view of saved sellers and buyers -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <!-- Saved Sellers Column -->
+              <div style="background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px; padding: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                  <strong style="font-size: 0.82rem; color: #60a5fa;">🏢 Saved Sellers (<span id="cfgSavedSellersCount">0</span>)</strong>
+                </div>
+                <div id="cfgSavedSellersList" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
+                  <div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No saved sellers yet. Click "Save for later" on the Seller card in Studio v2.</div>
+                </div>
+              </div>
+
+              <!-- Saved Buyers Column -->
+              <div style="background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px; padding: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                  <strong style="font-size: 0.82rem; color: #34d399;">👤 Saved Buyers (<span id="cfgSavedBuyersCount">0</span>)</strong>
+                </div>
+                <div id="cfgSavedBuyersList" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
+                  <div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No saved buyers yet. Click "Save for later" on the Buyer card in Studio v2.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
             <button class="btn btn-primary" onclick="saveConfiguration()">Save Configuration</button>
           </div>
@@ -1003,7 +1459,85 @@
 
   </div>
 
-  <script src="/static/app.js?v=19"></script>
+  <!-- Edit Saved Party Modal -->
+  <div id="editPartyModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78); backdrop-filter: blur(5px); z-index: 9999; align-items: center; justify-content: center; padding: 1.5rem;">
+    <div style="background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 12px; width: 100%; max-width: 580px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); overflow: hidden; display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--bg-card-border); background: var(--bg-secondary);">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 1.1rem;">✏️</span>
+          <h4 id="editPartyModalTitle" style="margin: 0; font-size: 0.95rem; color: var(--text-main);">Edit Saved Party</h4>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="closeEditPartyModal()" style="padding: 0.25rem 0.6rem; font-size: 0.8rem;">✕</button>
+      </div>
+
+      <div style="padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; max-height: 75vh; overflow-y: auto;">
+        <div class="form-group">
+          <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">Company / Party Legal Name *</label>
+          <input type="text" id="editPartyName" placeholder="e.g. odelo GmbH" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">VAT ID / Tax Number</label>
+            <input type="text" id="editPartyVat" placeholder="e.g. DE123456789 or SI12345678" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+          </div>
+          <div class="form-group">
+            <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">Country Code</label>
+            <input type="text" id="editPartyCountry" placeholder="e.g. DE, SI, AT" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">Street Address</label>
+          <input type="text" id="editPartyStreet" placeholder="e.g. Bahnhofstrasse 10" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">City</label>
+            <input type="text" id="editPartyCity" placeholder="e.g. Berlin" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+          </div>
+          <div class="form-group">
+            <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">Postcode</label>
+            <input type="text" id="editPartyPostcode" placeholder="e.g. 10115" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+          </div>
+        </div>
+
+        <!-- Extra Seller Specific fields (Bank / Contact) -->
+        <div id="editPartySellerExtra" style="display: none; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem; margin-top: 0.25rem;">
+          <div style="font-size: 0.75rem; font-weight: 700; color: #60a5fa; margin-bottom: 0.5rem;">Seller Payment & Contact Information</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label style="font-size: 0.75rem; color: var(--text-muted);">IBAN</label>
+              <input type="text" id="editPartyIban" placeholder="DE..." style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 0.75rem; color: var(--text-muted);">BIC / SWIFT</label>
+              <input type="text" id="editPartyBic" placeholder="COBA..." style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
+            </div>
+          </div>
+          <div class="form-row" style="margin-top: 0.4rem;">
+            <div class="form-group">
+              <label style="font-size: 0.75rem; color: var(--text-muted);">Contact Phone</label>
+              <input type="text" id="editPartyPhone" placeholder="+49..." style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 0.75rem; color: var(--text-muted);">Contact Email</label>
+              <input type="email" id="editPartyEmail" placeholder="billing@..." style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.6rem; padding: 0.85rem 1.25rem; border-top: 1px solid var(--bg-card-border); background: var(--bg-secondary);">
+        <button type="button" class="btn btn-secondary" onclick="closeEditPartyModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveEditedParty()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=25"></script>
+  <script src="/static/v2.js?v=4"></script>
 </body>
 
 </html>

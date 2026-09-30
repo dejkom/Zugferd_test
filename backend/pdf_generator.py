@@ -64,8 +64,26 @@ def _generate_standard_layout(inv: InvoiceData, output_pdf_path: str, logo_path:
         normal_style
     )
 
+    doc_type = str(inv.invoice_type_code or "380")
+    if doc_type == "381":
+        doc_title = "CREDIT NOTE"
+    elif doc_type == "384":
+        doc_title = "CORRECTED INVOICE"
+    elif doc_type == "326":
+        doc_title = "PARTIAL INVOICE"
+    elif doc_type == "386":
+        doc_title = "PREPAYMENT INVOICE"
+    elif doc_type == "220" or getattr(inv, "document_format", "") == "orderx":
+        doc_title = "PURCHASE ORDER"
+    else:
+        doc_title = "INVOICE"
+
+    prec_info = ""
+    if inv.preceding_invoice_number:
+        prec_info = f"<br/><font size=8 color='#ef4444'><b>Preceding Inv:</b> {inv.preceding_invoice_number}</font>"
+
     left_header_elements = [
-        Paragraph(f"<b>INVOICE</b><br/><font size=9 color='#64748b'>#{inv.invoice_number}</font>", title_style),
+        Paragraph(f"<b>{doc_title}</b><br/><font size=9 color='#64748b'>#{inv.invoice_number}</font>{prec_info}", title_style),
         Spacer(1, 4 * mm),
         seller_details
     ]
@@ -95,19 +113,44 @@ def _generate_standard_layout(inv: InvoiceData, output_pdf_path: str, logo_path:
     story.append(Spacer(1, 8 * mm))
 
     # Bill To (Left) & Invoice Details (Pushed more to the right)
-    meta_info = f"""
-    <b>Invoice Date:</b> {inv.issue_date}<br/>
-    <b>Due Date:</b> {inv.due_date or 'N/A'}<br/>
-    <b>Currency:</b> {inv.currency}<br/>
-    <b>Buyer Ref:</b> {inv.buyer_reference or 'N/A'}
-    """
+    meta_lines = [
+        f"<b>Invoice Date:</b> {inv.issue_date}",
+        f"<b>Due Date:</b> {inv.due_date or 'N/A'}",
+        f"<b>Currency:</b> {inv.currency}",
+    ]
+    if inv.buyer_reference:
+        meta_lines.append(f"<b>Buyer Ref / Leitweg-ID:</b> {inv.buyer_reference}")
+    if inv.purchase_order_number:
+        meta_lines.append(f"<b>Purchase Order (PO):</b> {inv.purchase_order_number}")
+    if inv.service_period_start or inv.service_period_end:
+        start_p = inv.service_period_start or ""
+        end_p = inv.service_period_end or ""
+        meta_lines.append(f"<b>Billing Period:</b> {start_p} &ndash; {end_p}")
+    if inv.preceding_invoice_number:
+        prec_str = f"{inv.preceding_invoice_number}"
+        if inv.preceding_invoice_date:
+            prec_str += f" ({inv.preceding_invoice_date})"
+        meta_lines.append(f"<b>Preceding Document:</b> {prec_str}")
+
+    meta_info = "<br/>".join(meta_lines)
+
+    buyer_lines = [f"<b>{inv.buyer.name}</b>"]
+    if inv.buyer.street:
+        buyer_lines.append(inv.buyer.street)
+    city_postal = f"{inv.buyer.postcode or ''} {inv.buyer.city or ''}".strip()
+    if city_postal:
+        buyer_lines.append(city_postal)
+    if inv.buyer.country_code:
+        buyer_lines.append(inv.buyer.country_code)
+    buyer_lines.append(f"VAT: {inv.buyer.vat_id or 'N/A'}")
+
     party_data = [
         [
             Paragraph("<b>BILLED TO:</b>", header_label),
-            Paragraph("<b>INVOICE DETAILS:</b>", header_label)
+            Paragraph("<b>DOCUMENT DETAILS:</b>", header_label)
         ],
         [
-            Paragraph(f"<b>{inv.buyer.name}</b><br/>{inv.buyer.street or ''}<br/>{inv.buyer.postcode or ''} {inv.buyer.city or ''}<br/>{inv.buyer.country_code or ''}<br/>VAT: {inv.buyer.vat_id or 'N/A'}", normal_style),
+            Paragraph("<br/>".join(buyer_lines), normal_style),
             Paragraph(meta_info, normal_style)
         ]
     ]
@@ -116,7 +159,37 @@ def _generate_standard_layout(inv: InvoiceData, output_pdf_path: str, logo_path:
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     story.append(t_party)
-    story.append(Spacer(1, 8 * mm))
+    story.append(Spacer(1, 5 * mm))
+
+    # Optional Delivery / Shipping Block
+    if inv.delivery and (inv.delivery.recipient_name or inv.delivery.street or inv.delivery.city or inv.delivery.delivery_date):
+        deliv_lines = []
+        if inv.delivery.recipient_name:
+            deliv_lines.append(f"<b>Recipient:</b> {inv.delivery.recipient_name}")
+        if inv.delivery.delivery_date:
+            deliv_lines.append(f"<b>Date:</b> {inv.delivery.delivery_date}")
+        deliv_addr = []
+        if inv.delivery.street:
+            deliv_addr.append(inv.delivery.street)
+        deliv_pc = f"{inv.delivery.postcode or ''} {inv.delivery.city or ''}".strip()
+        if deliv_pc:
+            deliv_addr.append(deliv_pc)
+        if inv.delivery.country_code:
+            deliv_addr.append(inv.delivery.country_code)
+        if deliv_addr:
+            deliv_lines.append("<b>Address:</b> " + ", ".join(deliv_addr))
+        
+        t_deliv = Table([
+            [Paragraph("<font color='#0284c7'><b>🚚 DELIVERY / SHIPPING DESTINATION:</b></font>", ParagraphStyle("DelivHead", parent=header_label, fontSize=7.5, textColor=colors.HexColor("#0284c7")))],
+            [Paragraph("<br/>".join(deliv_lines), normal_style)]
+        ], colWidths=[180 * mm])
+        t_deliv.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#f0f9ff")),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor("#bae6fd")),
+            ('PADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(t_deliv)
+        story.append(Spacer(1, 5 * mm))
 
     # Line Items Table
     table_rows = [
@@ -125,6 +198,7 @@ def _generate_standard_layout(inv: InvoiceData, output_pdf_path: str, logo_path:
             Paragraph("<b>Description</b>", header_label),
             Paragraph("<b>Qty</b>", header_label),
             Paragraph("<b>Unit Price</b>", header_label),
+            Paragraph("<b>Discount</b>", header_label),
             Paragraph("<b>Tax %</b>", header_label),
             Paragraph("<b>Total</b>", header_label)
         ]
@@ -137,6 +211,7 @@ def _generate_standard_layout(inv: InvoiceData, output_pdf_path: str, logo_path:
             Paragraph("General Services", normal_style),
             Paragraph("1", normal_style),
             Paragraph(f"{inv.line_net_total:.2f} {inv.currency}", normal_style),
+            Paragraph("-", normal_style),
             Paragraph(f"{inv.tax_total:.2f}", normal_style),
             Paragraph(f"{inv.line_net_total:.2f} {inv.currency}", normal_style)
         ])
@@ -145,66 +220,103 @@ def _generate_standard_layout(inv: InvoiceData, output_pdf_path: str, logo_path:
             tax_val = getattr(item, 'tax_rate', None)
             if tax_val is None:
                 tax_val = getattr(item, 'tax_percent', 0.0)
+            
+            disc_text = "-"
+            item_disc = getattr(item, 'discount_amount', 0.0) or 0.0
+            if item_disc > 0:
+                disc_text = f"<font color='#ef4444'>-{item_disc:.2f}</font>"
+            elif getattr(item, 'discount_percent', None):
+                disc_text = f"{item.discount_percent}%"
+
             table_rows.append([
                 Paragraph(str(idx), normal_style),
                 Paragraph(item.name, normal_style),
-                Paragraph(f"{item.quantity:g}", normal_style),
+                Paragraph(f"{item.quantity:g} {getattr(item, 'unit_code', '')}".strip(), normal_style),
                 Paragraph(f"{item.unit_price:.2f}", normal_style),
+                Paragraph(disc_text, normal_style),
                 Paragraph(f"{tax_val:.1f}%", normal_style),
                 Paragraph(f"{item.line_total_amount:.2f}", normal_style)
             ])
 
-    col_widths = [10 * mm, 80 * mm, 25 * mm, 22 * mm, 18 * mm, 25 * mm]
+    col_widths = [8 * mm, 68 * mm, 24 * mm, 22 * mm, 18 * mm, 16 * mm, 24 * mm]
     t_items = Table(table_rows, colWidths=col_widths)
     t_items.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f8fafc")),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
         ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     story.append(t_items)
-    story.append(Spacer(1, 6 * mm))
+    story.append(Spacer(1, 5 * mm))
 
     # Totals block
     totals_data = [
         [Paragraph("Net Total:", normal_style), Paragraph(f"<b>{inv.line_net_total:.2f} {inv.currency}</b>", normal_style)],
+    ]
+    
+    total_disc_amt = sum(d.amount for d in inv.discounts if d.amount > 0) if inv.discounts else 0.0
+    if total_disc_amt > 0:
+        disc_label = "Discounts / Rebates:"
+        if len(inv.discounts) == 1 and inv.discounts[0].reason:
+            disc_label = f"Discount ({inv.discounts[0].reason}):"
+        totals_data.append([
+            Paragraph(disc_label, normal_style),
+            Paragraph(f"<font color='#ef4444'><b>-{total_disc_amt:.2f} {inv.currency}</b></font>", normal_style)
+        ])
+
+    totals_data.extend([
         [Paragraph("Tax Total:", normal_style), Paragraph(f"<b>{inv.tax_total:.2f} {inv.currency}</b>", normal_style)],
         [Paragraph("<b>Grand Total:</b>", normal_style), Paragraph(f"<b><font size=11 color='#059669'>{inv.grand_total:.2f} {inv.currency}</font></b>", normal_style)],
-        [Paragraph("Due Amount:", normal_style), Paragraph(f"<b>{inv.due_payable_amount:.2f} {inv.currency}</b>", normal_style)]
-    ]
-    t_totals = Table(totals_data, colWidths=[35 * mm, 35 * mm])
+    ])
+
+    if inv.prepaid_amount and inv.prepaid_amount > 0:
+        totals_data.append([
+            Paragraph("Already Settled / Prepaid:", normal_style),
+            Paragraph(f"<font color='#64748b'><b>-{inv.prepaid_amount:.2f} {inv.currency}</b></font>", normal_style)
+        ])
+
+    totals_data.append([
+        [Paragraph("<b>Due Payable Amount:</b>", normal_style), Paragraph(f"<b><font size=10 color='#1e293b'>{inv.due_payable_amount:.2f} {inv.currency}</font></b>", normal_style)]
+    ])
+
+    t_totals = Table(totals_data, colWidths=[45 * mm, 35 * mm])
     t_totals.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
     ]))
 
-    totals_container = Table([["", t_totals]], colWidths=[110 * mm, 70 * mm])
+    totals_container = Table([["", t_totals]], colWidths=[100 * mm, 80 * mm])
     totals_container.setStyle(TableStyle([
         ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
     ]))
     story.append(totals_container)
-    story.append(Spacer(1, 8 * mm))
+    story.append(Spacer(1, 6 * mm))
 
-    # Payment details (Notes removed as requested)
+    # Payment details & Notes
     payment_txt = ""
     if inv.payment.iban:
-        payment_txt += f"<b>IBAN:</b> {inv.payment.iban} &bull; <b>BIC:</b> {inv.payment.bic or 'N/A'}<br/>"
+        payment_txt += f"<b>IBAN:</b> {inv.payment.iban}"
+        if inv.payment.bic:
+            payment_txt += f" &bull; <b>BIC:</b> {inv.payment.bic}"
+        payment_txt += "<br/>"
     if inv.payment.bank_name:
         payment_txt += f"<b>Bank:</b> {inv.payment.bank_name}<br/>"
     if inv.payment.payment_terms:
-        payment_txt += f"<b>Terms:</b> {inv.payment.payment_terms}<br/>"
+        payment_txt += f"<b>Payment Terms:</b> {inv.payment.payment_terms}<br/>"
 
+    exemption_txt = f"<br/><font size=8 color='#d97706'><b>VAT Notice:</b> {inv.vat_exemption_reason}</font>" if inv.vat_exemption_reason else ""
     notes_txt = "<br/>".join(inv.notes) if inv.notes else ""
-    notes_block = f"<br/><font size=8 color='#94a3b8'><b>Notes:</b> {notes_txt}</font>" if notes_txt else ""
+    notes_block = f"<br/><font size=8 color='#64748b'><b>Notes:</b> {notes_txt}</font>" if notes_txt else ""
 
     footer_text = f"""
-    <font color='#475569'><b>Payment Information:</b><br/>{payment_txt or 'Credit transfer / standard terms'}</font>{notes_block}
+    <font color='#475569'><b>Payment Information:</b><br/>{payment_txt or 'Credit transfer / standard terms'}</font>{exemption_txt}{notes_block}
     """
     story.append(Paragraph(footer_text, normal_style))
 
     doc.build(story)
     return output_pdf_path
+
 
 def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, footer_config: dict = None) -> str:
     """
@@ -315,9 +427,23 @@ def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: st
     story.append(t_parties)
     story.append(Spacer(1, 8 * mm))
 
-    # 4. Central Document Title 'Rechnung'
-    story.append(Paragraph("<b>Rechnung</b>", odelo_title))
-    story.append(Spacer(1, 4 * mm))
+    # 4. Central Document Title (dynamically reflecting invoice type)
+    doc_type = str(inv.invoice_type_code or "380")
+    if doc_type == "381":
+        odelo_title_text = "Gutschrift / Credit Note"
+    elif doc_type == "384":
+        odelo_title_text = "Rechnungskorrektur / Corrected Invoice"
+    elif doc_type == "326":
+        odelo_title_text = "Teilrechnung / Partial Invoice"
+    elif doc_type == "386":
+        odelo_title_text = "Vorauszahlungsrechnung / Prepayment"
+    elif doc_type == "220" or getattr(inv, "document_format", "") == "orderx":
+        odelo_title_text = "Bestellung / Purchase Order"
+    else:
+        odelo_title_text = "Rechnung"
+
+    story.append(Paragraph(f"<b>{odelo_title_text}</b>", odelo_title))
+    story.append(Spacer(1, 3 * mm))
 
     # 5. Boxed Metadata Table (Rechnungsnummer / Rechnungsdatum) on right side
     inv_date_formatted = inv.issue_date
@@ -334,22 +460,35 @@ def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: st
         ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
     ]))
 
-    vat_num_html = f"<font size=7.5><b>Your VAT Number:</b><br/><b>{inv.buyer.vat_id or 'N/A'}</b></font>"
+    extra_meta_lines = []
+    if inv.buyer.vat_id:
+        extra_meta_lines.append(f"<b>Your VAT Number:</b> {inv.buyer.vat_id}")
+    if inv.purchase_order_number:
+        extra_meta_lines.append(f"<b>PO / Bestellt:</b> {inv.purchase_order_number}")
+    if inv.buyer_reference:
+        extra_meta_lines.append(f"<b>Ihre Ref / Leitweg:</b> {inv.buyer_reference}")
+    if inv.preceding_invoice_number:
+        extra_meta_lines.append(f"<b>Ursprungsrechnung:</b> {inv.preceding_invoice_number}")
+    if inv.service_period_start or inv.service_period_end:
+        extra_meta_lines.append(f"<b>Leistungszeitraum:</b> {inv.service_period_start or ''} - {inv.service_period_end or ''}")
+
+    extra_meta_html = "<br/>".join(extra_meta_lines) if extra_meta_lines else f"<b>Your VAT Number:</b> {inv.buyer.vat_id or 'N/A'}"
     right_meta_table = Table([
         [t_meta_box],
-        [Spacer(1, 2 * mm)],
-        [Paragraph(vat_num_html, ParagraphStyle("VatNum", alignment=2, fontName="Helvetica", fontSize=7.5, leading=10))]
-    ], colWidths=[60 * mm])
+        [Spacer(1, 1.5 * mm)],
+        [Paragraph(f"<font size=7 color='#1e293b'>{extra_meta_html}</font>", ParagraphStyle("VatNum", alignment=2, fontName="Helvetica", fontSize=7, leading=9.5))]
+    ], colWidths=[65 * mm])
     right_meta_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
     ]))
 
-    t_meta_row = Table([["", right_meta_table]], colWidths=[114 * mm, 60 * mm])
+    t_meta_row = Table([["", right_meta_table]], colWidths=[109 * mm, 65 * mm])
     t_meta_row.setStyle(TableStyle([
         ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
     ]))
     story.append(t_meta_row)
-    story.append(Spacer(1, 4 * mm))
+    story.append(Spacer(1, 3 * mm))
+
 
     # 6. Odelo Line Items Table with black top/bottom border
     th_style = ParagraphStyle("OdeloTH", fontName="Helvetica-Bold", fontSize=7.5, leading=9.5, textColor=colors.black)
