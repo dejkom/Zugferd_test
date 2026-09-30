@@ -1,0 +1,18 @@
+services:
+  zugferd-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zugferd-studio
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - zugferd_uploads:/app/uploads
+      - zugferd_outputs:/app/outputs
+
+volumes:
+  zugferd_uploads:
+  zugferd_outputs:

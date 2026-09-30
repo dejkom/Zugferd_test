@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZUGFeRD & Factur-X Studio | PDF/A-3 Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/static/index.css?v=7">
+</head>
+
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="logo-badge">FX</div>
+      <div class="brand-text">
+        <h1>ZUGFeRD & Factur-X Studio</h1>
+        <span>ISO 19005-3 / PDF/A-3 & CII EN 16931 Compliant Generator</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <!-- 4 Scenario Navigation Buttons in Header -->
+      <nav class="scenario-nav">
+        <button class="nav-tab-btn active" id="tab-pdf" onclick="switchScenario('pdf')">
+          <span>📄 PDF ➔ PDF/A-3</span>
+        </button>
+        <button class="nav-tab-btn" id="tab-docx" onclick="switchScenario('docx')">
+          <span>📝 DOCX ➔ PDF/A-3</span>
+        </button>
+        <button class="nav-tab-btn" id="tab-manual" onclick="switchScenario('manual')">
+          <span>✍️ New Invoice (Manual Form)</span>
+        </button>
+        <button class="nav-tab-btn" id="tab-config" onclick="switchScenario('config')">
+          <span>⚙️ Configuration</span>
+        </button>
+      </nav>
+
+      <button class="btn btn-secondary" id="themeToggleBtn" title="Switch Light / Dark Theme"
+        style="padding: 0.5rem 0.8rem; font-size: 1rem;">
+        <span id="themeIcon">☀️</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- ================= SCENARIO 1: PDF CONVERSION ================= -->
+    <div id="scenario-pdf-container">
+      <!-- Stepper indicator -->
+      <div class="stepper">
+        <div class="step-item active" id="step1-indicator">
+          <div class="step-icon">1</div>
+          <div class="step-label">Upload PDF</div>
+        </div>
+        <div class="step-item" id="step2-indicator">
+          <div class="step-icon">2</div>
+          <div class="step-label">AI Extract & Review</div>
+        </div>
+        <div class="step-item" id="step3-indicator">
+          <div class="step-icon">3</div>
+          <div class="step-label">factur-x.xml Preview</div>
+        </div>
+        <div class="step-item" id="step4-indicator">
+          <div class="step-icon">4</div>
+          <div class="step-label">PDF/A-3 Embed & Validate</div>
+        </div>
+      </div>
+
+      <!-- Main Workspace -->
+      <div class="workflow-grid">
+        <!-- Left Column: Upload & Invoice Details -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; min-width: 0;">
+
+          <!-- Step 1: Upload Card -->
+          <div class="card" id="uploadCard">
+            <div class="card-title">
+              <span>1. PDF Document Source</span>
+              <span class="tag">PDF Format</span>
+            </div>
+
+            <div class="dropzone" id="dropzone">
+              <div class="dropzone-icon">📄</div>
+              <div>
+                <strong style="color: #60a5fa;">Click or drag PDF invoice here</strong>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Supports invoices, bills, credit notes (.pdf)</div>
+              </div>
+              <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+            </div>
+
+            <div id="fileInfoBar"
+              style="display: none; align-items: center; justify-content: space-between; background: var(--bg-input); padding: 0.75rem 1rem; border-radius: 8px;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
+                <span style="color: var(--accent);">📎</span>
+                <span id="fileNameDisplay" style="font-weight: 600;"></span>
+              </div>
+              <button class="btn btn-primary" id="extractBtn">
+                <span>Extract with AI</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 2: Extracted Data Review -->
+          <div class="card" id="dataCard" style="display: none;">
+            <div class="card-title">
+              <span>2. Extracted Invoice Fields</span>
+              <span class="tag">Structured Data</span>
+            </div>
+
+            <!-- AI Usage & Cost Strip -->
+            <div id="aiUsageStrip"
+              style="display: none; align-items: center; justify-content: space-between; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.82rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 1.1rem;">🤖</span>
+                <span><strong>AI Extraction Cost:</strong> <span id="aiCostAmount"
+                    style="color: #10b981; font-weight: 700;">$0.0000</span></span>
+              </div>
+              <div style="font-family: monospace; font-size: 0.78rem; color: var(--text-muted);" id="aiTokensBreakdown">
+              </div>
+            </div>
+
+            <!-- Human-In-The-Loop Validation Reminder Banner -->
+            <div id="aiValidationNotice"
+              style="display: none; flex-direction: column; gap: 0.35rem; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 0.75rem 1rem; font-size: 0.82rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: #f59e0b;">
+                <span>⚠️ Action Required: Verify AI-Extracted Data</span>
+              </div>
+              <div style="color: var(--text-muted); font-size: 0.78rem; line-height: 1.4;">
+                Because invoices are legally binding, please double-check all extracted numbers and accounts before creating your PDF/A-3:
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 2px;">
+                <span class="conf-tag high">HIGH: Confident</span>
+                <span class="conf-tag medium">MEDIUM: Review Suggested</span>
+                <span class="conf-tag low">LOW: Please Verify</span>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Invoice Number</label>
+                <input type="text" id="invNumber">
+              </div>
+              <div class="form-group">
+                <label>Issue Date</label>
+                <input type="date" id="invIssueDate">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Currency</label>
+                <input type="text" id="invCurrency" value="EUR">
+              </div>
+              <div class="form-group">
+                <label>Buyer Reference (BT-10)</label>
+                <input type="text" id="invBuyerRef" placeholder="Order ID or reference">
+              </div>
+            </div>
+
+            <!-- Parties -->
+            <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1rem;">
+              <h4 style="font-size: 0.85rem; color: #60a5fa; margin-bottom: 0.6rem;">Seller (Creditor)</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Company Name</label>
+                  <input type="text" id="sellerName">
+                </div>
+                <div class="form-group">
+                  <label>VAT ID</label>
+                  <input type="text" id="sellerVat">
+                </div>
+              </div>
+              <div class="form-row" style="margin-top: 0.5rem;">
+                <div class="form-group">
+                  <label>Street & No.</label>
+                  <input type="text" id="sellerStreet">
+                </div>
+                <div class="form-group">
+                  <label>City & Postcode</label>
+                  <input type="text" id="sellerCity">
+                </div>
+              </div>
+            </div>
+
+            <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1rem;">
+              <h4 style="font-size: 0.85rem; color: #a78bfa; margin-bottom: 0.6rem;">Buyer (Debtor)</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Company Name</label>
+                  <input type="text" id="buyerName">
+                </div>
+                <div class="form-group">
+                  <label>VAT ID</label>
+                  <input type="text" id="buyerVat">
+                </div>
+              </div>
+              <div class="form-row" style="margin-top: 0.5rem;">
+                <div class="form-group">
+                  <label>Street & No.</label>
+                  <input type="text" id="buyerStreet">
+                </div>
+                <div class="form-group">
+                  <label>City & Postcode</label>
+                  <input type="text" id="buyerCity">
+                </div>
+              </div>
+            </div>
+
+            <!-- Payment -->
+            <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1rem;">
+              <h4 style="font-size: 0.85rem; color: #34d399; margin-bottom: 0.6rem;">Payment Details</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>IBAN</label>
+                  <input type="text" id="payIban">
+                </div>
+                <div class="form-group">
+                  <label>BIC / SWIFT</label>
+                  <input type="text" id="payBic">
+                </div>
+              </div>
+            </div>
+
+            <!-- Invoice Line Items Table -->
+            <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                <h4 style="font-size: 0.85rem; color: #38bdf8; margin: 0;">Line Items (<span id="pdfItemCount">0</span> items)</h4>
+                <button type="button" class="btn-add-item" onclick="addPdfLineItem()">+ Add Item</button>
+              </div>
+              <div class="items-table-wrapper">
+                <table class="items-table">
+                  <thead>
+                    <tr>
+                      <th>Description</th>
+                      <th style="width: 80px;">Qty</th>
+                      <th style="width: 110px;">Price (€)</th>
+                      <th style="width: 75px;">Tax %</th>
+                      <th style="width: 110px;">Net (€)</th>
+                      <th style="width: 40px; text-align: center;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="pdfItemsTableBody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Totals -->
+            <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1rem;">
+              <h4 style="font-size: 0.85rem; color: #f59e0b; margin-bottom: 0.6rem;">Monetary Totals</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Net Total (€)</label>
+                  <input type="number" step="0.01" id="totNet">
+                </div>
+                <div class="form-group">
+                  <label>Tax Total (€)</label>
+                  <input type="number" step="0.01" id="totTax">
+                </div>
+              </div>
+              <div class="form-row" style="margin-top: 0.5rem;">
+                <div class="form-group">
+                  <label>Grand Total (€)</label>
+                  <input type="number" step="0.01" id="totGrand">
+                </div>
+                <div class="form-group">
+                  <label>Due Amount (€)</label>
+                  <input type="number" step="0.01" id="totDue">
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem;">
+              <button class="btn btn-secondary" id="recalcXmlBtn">Regenerate XML</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Column: XML Preview & Mustang PDF/A-3 Embed -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; min-width: 0;">
+          
+          <!-- Step 3: XML Preview -->
+          <div class="card" id="xmlCard">
+            <div class="card-title">
+              <span>3. Embedded factur-x.xml Preview</span>
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <select id="profileSelect"
+                  style="background: var(--bg-input); color: var(--text-main); border: 1px solid var(--bg-card-border); border-radius: 6px; padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                  <option value="EN16931" selected>Profile: EN16931 (Comfort)</option>
+                  <option value="BASIC">Profile: BASIC</option>
+                </select>
+                <button class="btn btn-success" id="embedBtnTop" style="padding: 0.4rem 0.9rem; font-size: 0.8rem;">
+                  <span>⚡ Embed to PDF/A-3</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="code-viewer" id="xmlCodeViewer" contenteditable="true" spellcheck="false" style="height: 380px;">
+              <!-- XML will be displayed here -->&lt;!-- Upload PDF and run AI extraction to preview factur-x.xml --&gt;
+            </div>
+
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; padding-top: 0.5rem; border-top: 1px solid var(--bg-card-border);">
+              <div style="font-size: 0.8rem; color: var(--text-muted);">
+                ✅ Ready for PDF/A-3 embedding with Mustangproject
+              </div>
+              <button class="btn btn-success" id="embedBtn" style="font-size: 0.95rem; padding: 0.75rem 1.5rem;">
+                <span>⚡ Embed to PDF/A-3 & Validate</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 4: Results & Validation -->
+          <div class="card" id="resultCard" style="display: none;">
+            <div class="card-title">
+              <span>4. Output & Mustangproject Report</span>
+              <span class="status-pill" id="validBadge">Valid PDF/A-3</span>
+            </div>
+
+            <div id="validationSummary"
+              style="font-size: 0.85rem; line-height: 1.6; background: rgba(0, 0, 0, 0.2); padding: 1rem; border-radius: 8px; border: 1px solid var(--bg-card-border);">
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+              <a class="btn btn-primary" id="downloadBtn" target="_blank" download>
+                ⬇️ Download ZUGFeRD PDF/A-3
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= SCENARIO 2: DOCX CONVERSION ================= -->
+    <div id="scenario-docx-container" style="display: none;">
+      <div class="workflow-grid">
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; min-width: 0;">
+          <div class="card">
+            <div class="card-title">
+              <span>1. Word Document (.docx) Source</span>
+              <span class="tag">DOCX Format</span>
+            </div>
+
+            <div class="dropzone" id="docxDropzone">
+              <div class="dropzone-icon">📝</div>
+              <div>
+                <strong style="color: #60a5fa;">Click or drag Word (.docx) invoice here</strong>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Extracts invoice data & generates visual layout + PDF/A-3</div>
+              </div>
+              <input type="file" id="docxFileInput" accept=".docx" style="display: none;">
+            </div>
+
+            <div id="docxFileInfoBar"
+              style="display: none; align-items: center; justify-content: space-between; background: var(--bg-input); padding: 0.75rem 1rem; border-radius: 8px;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
+                <span style="color: var(--accent);">📎</span>
+                <span id="docxFileNameDisplay" style="font-weight: 600;"></span>
+              </div>
+              <button class="btn btn-primary" id="docxExtractBtn">
+                <span>Extract with AI</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card" id="docxDataCard" style="display: none;">
+            <div class="card-title">
+              <span>2. Extracted Fields from Word</span>
+              <span class="tag">Structured Data</span>
+            </div>
+            <div id="docxAiUsageStrip"
+              style="display: none; align-items: center; justify-content: space-between; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.82rem;">
+              <div>🤖 <span id="docxAiCostAmount" style="color: #10b981; font-weight: 700;">$0.0000</span></div>
+              <div id="docxAiTokensBreakdown" style="font-family: monospace; font-size: 0.75rem; color: var(--text-muted);"></div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Invoice Number</label>
+                <input type="text" id="docxInvNumber">
+              </div>
+              <div class="form-group">
+                <label>Issue Date</label>
+                <input type="date" id="docxInvIssueDate">
+              </div>
+            </div>
+            <!-- Line items for DOCX -->
+            <div style="border-top: 1px solid var(--bg-card-border); padding-top: 0.8rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                <h4 style="font-size: 0.85rem; color: #38bdf8; margin: 0;">Line Items (<span id="docxItemCount">0</span> items)</h4>
+                <button type="button" class="btn-add-item" onclick="addDocxLineItem()">+ Add Item</button>
+              </div>
+              <div class="items-table-wrapper">
+                <table class="items-table">
+                  <thead>
+                    <tr>
+                      <th>Description</th>
+                      <th style="width: 80px;">Qty</th>
+                      <th style="width: 110px;">Price (€)</th>
+                      <th style="width: 75px;">Tax %</th>
+                      <th style="width: 110px;">Net (€)</th>
+                      <th style="width: 40px; text-align: center;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="docxItemsTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Total Net (€)</label>
+                <input type="number" step="0.01" id="docxTotNet">
+              </div>
+              <div class="form-group">
+                <label>Total Grand (€)</label>
+                <input type="number" step="0.01" id="docxTotGrand">
+              </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+              <button class="btn btn-secondary" id="docxRecalcXmlBtn">Update factur-x.xml</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; min-width: 0;">
+          <div class="card">
+            <div class="card-title">
+              <span>3. Factur-X XML & PDF/A-3 Generator</span>
+              <button class="btn btn-success" id="docxEmbedBtn" disabled style="padding: 0.4rem 1rem; font-size: 0.85rem;">
+                <span>⚡ Build PDF/A-3 & Validate</span>
+              </button>
+            </div>
+            <div class="code-viewer" id="docxXmlViewer" contenteditable="true" spellcheck="false" style="height: 380px;">
+              &lt;!-- Upload .docx file to preview factur-x.xml --&gt;
+            </div>
+          </div>
+
+          <div class="card" id="docxResultCard" style="display: none;">
+            <div class="card-title">
+              <span>4. Output Report</span>
+              <span class="status-pill" id="docxValidBadge">Valid PDF/A-3</span>
+            </div>
+            <div id="docxValidationSummary" style="font-size: 0.85rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--bg-card-border);"></div>
+            <div style="display: flex; justify-content: flex-end;">
+              <a class="btn btn-primary" id="docxDownloadBtn" target="_blank" download>⬇️ Download ZUGFeRD PDF/A-3</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= SCENARIO 3: MANUAL INVOICE CREATION ================= -->
+    <div id="scenario-manual-container" style="display: none;">
+      <div class="workflow-grid">
+        <!-- Manual Form Inputs -->
+        <div class="card" style="min-width: 0;">
+          <div class="card-title">
+            <span>✍️ Create New Electronic Invoice</span>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <select id="manLayoutSelect" style="background: var(--bg-input); color: var(--text-main); border: 1px solid var(--bg-card-border); border-radius: 6px; padding: 0.25rem 0.6rem; font-size: 0.78rem;" title="Select PDF invoice visual layout" onchange="handleManualLayoutChange(this.value)">
+                <option value="layout1">Layout 1: Modern Studio</option>
+                <option value="layout2">Layout 2: Odelo Corporate</option>
+              </select>
+              <button type="button" class="btn btn-secondary" id="fillExampleDataBtn" style="padding: 0.3rem 0.75rem; font-size: 0.78rem;" onclick="fillManualExampleData()">
+                <span>💡 Fill with example data</span>
+              </button>
+              <button type="button" class="btn btn-secondary" style="padding: 0.3rem 0.75rem; font-size: 0.78rem;" onclick="clearManualForm()">
+                <span>🧹 Clear</span>
+              </button>
+            </div>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            Fill in the details below. The system will synthesize a clean visual invoice PDF, generate `factur-x.xml`, and compile them directly into an ISO 19005-3 compliant PDF/A-3 file.
+          </div>
+
+          <!-- Document Info -->
+          <div class="form-row">
+            <div class="form-group">
+              <label>Invoice Number *</label>
+              <input type="text" id="manInvNumber" placeholder="e.g. INV-2026-001">
+            </div>
+            <div class="form-group">
+              <label>Issue Date *</label>
+              <input type="date" id="manIssueDate">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Due Date</label>
+              <input type="date" id="manDueDate">
+            </div>
+            <div class="form-group">
+              <label>Currency</label>
+              <input type="text" id="manCurrency" value="EUR" placeholder="EUR">
+            </div>
+          </div>
+
+          <!-- Seller Info -->
+          <div style="border-top: 1px solid var(--bg-card-border); padding-top: 0.8rem;">
+            <h4 style="font-size: 0.85rem; color: #60a5fa; margin-bottom: 0.5rem;">Seller (Your Business)</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Company Name *</label>
+                <input type="text" id="manSellerName" placeholder="e.g. Acme Solutions Ltd">
+              </div>
+              <div class="form-group">
+                <label>VAT ID</label>
+                <input type="text" id="manSellerVat" placeholder="e.g. DE123456789">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 0.4rem;">
+              <div class="form-group">
+                <label>Street Address</label>
+                <input type="text" id="manSellerStreet" placeholder="e.g. Bahnhofstrasse 10">
+              </div>
+              <div class="form-group">
+                <label>City & Postcode</label>
+                <input type="text" id="manSellerCity" placeholder="e.g. 10115 Berlin">
+              </div>
+            </div>
+          </div>
+
+          <!-- Buyer Info -->
+          <div style="border-top: 1px solid var(--bg-card-border); padding-top: 0.8rem;">
+            <h4 style="font-size: 0.85rem; color: #a78bfa; margin-bottom: 0.5rem;">Buyer (Client / Debtor)</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Company Name *</label>
+                <input type="text" id="manBuyerName" placeholder="e.g. Client Corp Inc">
+              </div>
+              <div class="form-group">
+                <label>VAT ID</label>
+                <input type="text" id="manBuyerVat" placeholder="e.g. SI52093808 or DE987654321">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 0.4rem;">
+              <div class="form-group">
+                <label>Buyer Reference / Order #</label>
+                <input type="text" id="manBuyerRef" placeholder="e.g. PO-99482">
+              </div>
+              <div class="form-group">
+                <label>Street Address</label>
+                <input type="text" id="manBuyerStreet" placeholder="e.g. Market Street 42">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 0.4rem;">
+              <div class="form-group">
+                <label>City & Postcode</label>
+                <input type="text" id="manBuyerCity" placeholder="e.g. 80331 Munich">
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment -->
+          <div style="border-top: 1px solid var(--bg-card-border); padding-top: 0.8rem;">
+            <h4 style="font-size: 0.85rem; color: #34d399; margin-bottom: 0.5rem;">Bank / Payment</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label>IBAN</label>
+                <input type="text" id="manIban" placeholder="e.g. DE89370400440532013000">
+              </div>
+              <div class="form-group">
+                <label>BIC / SWIFT</label>
+                <input type="text" id="manBic" placeholder="e.g. DBBADEFFXXX">
+              </div>
+            </div>
+          </div>
+
+          <!-- Manual Invoice Line Items Table -->
+          <div style="border-top: 1px solid var(--bg-card-border); padding-top: 0.8rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+              <div>
+                <h4 style="font-size: 0.85rem; color: #38bdf8; margin: 0;">Line Items (<span id="manItemCount">1</span> items)</h4>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Add individual products, deliverables, or consulting lines</div>
+              </div>
+              <button type="button" class="btn-add-item" onclick="addManualLineItem()">+ Add Item</button>
+            </div>
+            <div class="items-table-wrapper">
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Description *</th>
+                    <th style="width: 80px;">Qty</th>
+                    <th style="width: 110px;">Unit Price (€)</th>
+                    <th style="width: 75px;">Tax %</th>
+                    <th style="width: 110px;">Net (€)</th>
+                    <th style="width: 40px; text-align: center;"></th>
+                  </tr>
+                </thead>
+                <tbody id="manItemsTableBody">
+                  <!-- Rows populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Monetary Totals -->
+          <div style="border-top: 1px solid var(--bg-card-border); padding-top: 0.8rem;">
+            <h4 style="font-size: 0.85rem; color: #f59e0b; margin-bottom: 0.5rem;">Calculated Invoice Totals</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Total Net Amount (€)</label>
+                <input type="number" step="0.01" id="manNetTotal" value="1500.00" readonly style="opacity: 0.9; background: var(--bg-secondary);">
+              </div>
+              <div class="form-group">
+                <label>Total Tax Amount (€)</label>
+                <input type="number" step="0.01" id="manTaxTotal" value="285.00" readonly style="opacity: 0.9; background: var(--bg-secondary);">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 0.4rem;">
+              <div class="form-group">
+                <label>Grand Payable Total (€)</label>
+                <input type="number" step="0.01" id="manGrandTotal" value="1785.00" readonly style="font-weight: 700; color: #10b981; background: var(--bg-secondary);">
+              </div>
+              <div class="form-group">
+                <label>Payment Due Date</label>
+                <input type="text" id="manDueDateDisplay" value="30 days net" readonly style="opacity: 0.8;">
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+            <button class="btn btn-success" id="generateManualPdfBtn" style="padding: 0.75rem 1.5rem; font-size: 0.95rem;">
+              <span>⚡ Generate ZUGFeRD PDF/A-3</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Manual Output Preview -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; min-width: 0;">
+          <div class="card" id="manResultCard" style="display: none;">
+            <div class="card-title">
+              <span>Output & Mustangproject Status</span>
+              <span class="status-pill" id="manValidBadge">Valid PDF/A-3</span>
+            </div>
+            <div id="manValidationSummary" style="font-size: 0.85rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--bg-card-border);"></div>
+            <div style="display: flex; justify-content: flex-end;">
+              <a class="btn btn-primary" id="manDownloadBtn" target="_blank" download>⬇️ Download ZUGFeRD PDF/A-3</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">
+              <span>Generated factur-x.xml</span>
+              <span class="tag">EN 16931</span>
+            </div>
+            <div class="code-viewer" id="manXmlViewer" style="height: 480px;">
+              &lt;!-- Generated factur-x.xml will display here after creation --&gt;
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= SCENARIO 4: CONFIGURATION ================= -->
+    <div id="scenario-config-container" style="display: none;">
+      <div style="max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem;">
+        <div class="card">
+          <div class="card-title">
+            <span>⚙️ System & AI Configuration</span>
+            <span class="tag">Preferences</span>
+          </div>
+
+          <div class="form-group">
+            <label>OpenAI API Key</label>
+            <input type="password" id="configApiKey" placeholder="sk-...">
+            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Used for AI document extraction from PDF & DOCX invoices.</span>
+          </div>
+
+          <div class="form-group" style="margin-top: 0.5rem;">
+            <label>Default ZUGFeRD Profile</label>
+            <select id="configDefaultProfile">
+              <option value="EN16931" selected>EN 16931 (Comfort / Standard European E-Invoice)</option>
+              <option value="BASIC">BASIC (Common basic invoice standard)</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-top: 0.5rem;">
+            <label>PDF Invoice Layout Template</label>
+            <select id="configInvoiceLayout">
+              <option value="layout1" selected>Layout Option 1: Modern Studio (Two-column card style)</option>
+              <option value="layout2">Layout Option 2: Odelo Corporate Automotive (DIN style, top-right logo, multi-column footer)</option>
+            </select>
+            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Choose the visual layout used when synthesizing PDF/A-3 invoices from manual forms.</span>
+          </div>
+
+          <!-- Company Logo Upload -->
+          <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1rem; margin-top: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <div>
+                <label style="font-weight: 700; font-size: 0.85rem; color: #60a5fa;">Company Logo (for Manual Invoices)</label>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Uploaded logo will appear on the top-left of the synthesized PDF invoice.</div>
+              </div>
+              <button type="button" class="btn btn-secondary" id="removeLogoBtn" style="display: none; padding: 0.3rem 0.75rem; font-size: 0.75rem; color: #ef4444;" onclick="removeLogo()">
+                <span>🗑️ Remove Logo</span>
+              </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 1.25rem; margin-top: 0.75rem;">
+              <div id="logoPreviewContainer" style="width: 140px; height: 60px; border: 1px dashed var(--bg-card-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--bg-input); overflow: hidden;">
+                <span id="noLogoText" style="font-size: 0.72rem; color: var(--text-muted);">No logo uploaded</span>
+                <img id="logoPreviewImg" src="" alt="Company Logo" style="display: none; max-width: 100%; max-height: 100%; object-fit: contain;">
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                <input type="file" id="logoFileInput" accept=".png,.jpg,.jpeg" style="display: none;" onchange="handleLogoSelected(this)">
+                <button type="button" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.82rem;" onclick="document.getElementById('logoFileInput').click()">
+                  <span>📁 Choose Image (.png, .jpg)</span>
+                </button>
+                <span id="logoUploadStatus" style="font-size: 0.75rem; color: var(--text-muted);">Recommended: transparent PNG, ~300x120px</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+            <button class="btn btn-primary" onclick="saveConfiguration()">Save Configuration</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/static/app.js?v=10"></script>
+</body>
+
+</html>
