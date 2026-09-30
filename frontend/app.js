@@ -323,6 +323,15 @@ function closePinModal() {
 }
 window.closePinModal = closePinModal;
 
+function handlePinInput(input) {
+  const err = document.getElementById("pinError");
+  if (err) err.style.display = "none";
+  if (input && input.value.trim().length === 4) {
+    handlePinSubmit();
+  }
+}
+window.handlePinInput = handlePinInput;
+
 function handlePinSubmit(e) {
   if (e) e.preventDefault();
   const input = document.getElementById("pinInput");

@@ -710,6 +710,7 @@
             </table>
           </div>
         </div>
+      </div>
     </div>
 
     <!-- PDF In-Browser Preview Modal (Popup) -->
@@ -751,6 +752,7 @@
           <div style="margin-bottom: 1.25rem;">
             <input type="password" id="pinInput" maxlength="4" placeholder="••••" autocomplete="off"
               style="font-size: 1.75rem; letter-spacing: 0.4em; text-align: center; width: 160px; padding: 0.5rem; border-radius: 8px; border: 2px solid var(--accent); background: var(--bg-input); color: var(--text-main);"
+              oninput="handlePinInput(this)"
               autofocus>
           </div>
           <div id="pinError" style="display: none; color: #ef4444; font-size: 0.8rem; margin-bottom: 1rem; font-weight: 600;">
@@ -949,7 +951,7 @@
 
   </div>
 
-  <script src="/static/app.js?v=16"></script>
+  <script src="/static/app.js?v=18"></script>
 </body>
 
 </html>
