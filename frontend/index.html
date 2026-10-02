@@ -676,17 +676,17 @@
         </div>
 
         <!-- AI Auto-Fill Dropzone Banner -->
-        <div class="v2-prefill-banner" id="v2PrefillBanner" onclick="document.getElementById('v2PrefillFileInput').click()">
+        <label class="v2-prefill-banner" id="v2PrefillBanner" for="v2PrefillFileInput" style="cursor: pointer;">
           <div class="v2-prefill-icon">⚡</div>
           <div class="v2-prefill-text">
             <div class="v2-prefill-title" id="v2PrefillTitle">Have an existing invoice or document?</div>
-            <div class="v2-prefill-desc" id="v2PrefillDesc">Upload a PDF or Word (DOCX) file and our AI will prefill the form automatically.</div>
+            <div class="v2-prefill-desc" id="v2PrefillDesc">Click or drag & drop a PDF or Word (DOCX) file here to extract and prefill the form automatically.</div>
           </div>
           <div class="v2-prefill-badge">
             <span>✨ Auto-Fill</span>
           </div>
-        </div>
-        <input type="file" id="v2PrefillFileInput" accept=".pdf,.docx" style="display: none;" onchange="if(this.files.length) handleV2PrefillUpload(this.files[0])">
+        </label>
+        <input type="file" id="v2PrefillFileInput" accept=".pdf,.docx" style="display: none;" onchange="onV2FileInputChanged(this)">
 
         <!-- Validation Alert Banner -->
         <div class="v2-alert-banner" id="v2AlertBanner" style="display: none;">
@@ -702,7 +702,11 @@
               <span class="tag" id="v2DocTypeLabel" style="font-size: 0.72rem; text-transform: uppercase;">Commercial Invoice</span>
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <button type="button" class="btn btn-secondary" style="padding: 0.28rem 0.65rem; font-size: 0.76rem; border-color: rgba(37,99,235,0.3);" onclick="toggleV2XmlPreview()">
+                <span>🔍 Live XML</span>
+              </button>
               <select id="v2LayoutSelect" class="v2-select" style="padding: 0.3rem 0.6rem; font-size: 0.78rem; width: auto;" title="Visual PDF invoice template">
+                <option value="original" selected>Layout: Original Format</option>
                 <option value="layout1">Layout 1: Modern Studio</option>
                 <option value="layout2">Layout 2: Odelo Corporate</option>
               </select>
@@ -797,6 +801,26 @@
                 <label class="v2-label">Payment Terms Note</label>
                 <input type="text" id="v2PayTerms" class="v2-input" placeholder="e.g. Payable within 30 days without deductions">
               </div>
+
+              <!-- Document Notes (BT-22: IncludedNote) Dynamic Section -->
+              <div style="margin-top: 1rem; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                  <div>
+                    <label class="v2-label" style="margin-bottom: 0.15rem; font-weight: 600;">
+                      📝 Invoice Notes &amp; Legal Notices (<span style="font-family: monospace; font-size: 0.76rem;">&lt;ram:IncludedNote&gt;</span> / BT-22)
+                    </label>
+                    <div style="font-size: 0.73rem; color: var(--text-muted);">
+                      Each line generates a distinct legal note in Factur-X/ZUGFeRD XML (e.g. performance notice, delivery terms, or tax notes).
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-secondary" onclick="addV2InvoiceNote()" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; white-space: nowrap;">
+                    <span>+ Add Note</span>
+                  </button>
+                </div>
+                <div id="v2NotesContainer" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                  <!-- Dynamically rendered note rows -->
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -857,9 +881,15 @@
                 <label class="v2-label">Company Name *</label>
                 <input type="text" id="v2SellerName" class="v2-input" placeholder="e.g. Acme Solutions Ltd">
               </div>
-              <div class="v2-field">
-                <label class="v2-label">VAT ID / Tax ID</label>
-                <input type="text" id="v2SellerVat" class="v2-input" placeholder="e.g. DE123456789">
+              <div class="v2-grid-2">
+                <div class="v2-field">
+                  <label class="v2-label">VAT ID (USt-IdNr.)</label>
+                  <input type="text" id="v2SellerVat" class="v2-input" placeholder="e.g. DE123456789">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Local Tax Number / Steuernummer (FC)</label>
+                  <input type="text" id="v2SellerTaxNumber" class="v2-input" placeholder="e.g. 99022/20844">
+                </div>
               </div>
               <div class="v2-field">
                 <label class="v2-label">Street Address</label>
@@ -868,11 +898,11 @@
               <div class="v2-grid-3">
                 <div class="v2-field">
                   <label class="v2-label">Postcode</label>
-                  <input type="text" id="v2SellerPostcode" class="v2-input" placeholder="e.g. 10115">
+                  <input type="text" id="v2SellerPostcode" class="v2-input" placeholder="e.g. 70329">
                 </div>
                 <div class="v2-field">
                   <label class="v2-label">City</label>
-                  <input type="text" id="v2SellerCity" class="v2-input" placeholder="e.g. Berlin">
+                  <input type="text" id="v2SellerCity" class="v2-input" placeholder="e.g. Stuttgart">
                 </div>
                 <div class="v2-field">
                   <label class="v2-label">Country</label>
@@ -975,20 +1005,46 @@
           <div id="v2DeliverySection" style="display: none; margin-top: 1rem;">
             <div class="v2-grid-4">
               <div class="v2-field">
-                <label class="v2-label">Recipient Name</label>
-                <input type="text" id="v2DelivName" class="v2-input" placeholder="e.g. Warehouse 42">
+                <label class="v2-label">Ship-to Party Name (BT-70)</label>
+                <input type="text" id="v2DelivName" class="v2-input" placeholder="e.g. Mercedes-Benz AG Werk Sindelfingen">
               </div>
               <div class="v2-field">
-                <label class="v2-label">Delivery Date</label>
+                <label class="v2-label">Ship-to Location ID / Abladestelle (BT-71)</label>
+                <input type="text" id="v2DelivLocationId" class="v2-input" placeholder="e.g. Tor 3 / Abladestelle 42">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">Actual Delivery Date (BT-72)</label>
                 <input type="date" id="v2DelivDate" class="v2-input">
               </div>
               <div class="v2-field">
-                <label class="v2-label">Street</label>
-                <input type="text" id="v2DelivStreet" class="v2-input" placeholder="Delivery street">
+                <label class="v2-label">Despatch Advice Ref (BT-16)</label>
+                <input type="text" id="v2DelivDespatchRef" class="v2-input" placeholder="e.g. LS-2026-9042">
+              </div>
+            </div>
+            <div class="v2-grid-4" style="margin-top: 0.75rem;">
+              <div class="v2-field">
+                <label class="v2-label">Ship-to Street Address (BT-75)</label>
+                <input type="text" id="v2DelivStreet" class="v2-input" placeholder="e.g. Bela-Barenyi-Strasse">
               </div>
               <div class="v2-field">
-                <label class="v2-label">City & Postcode</label>
-                <input type="text" id="v2DelivCity" class="v2-input" placeholder="City">
+                <label class="v2-label">Postcode (BT-76)</label>
+                <input type="text" id="v2DelivPostcode" class="v2-input" placeholder="e.g. 71063">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">City (BT-77)</label>
+                <input type="text" id="v2DelivCity" class="v2-input" placeholder="e.g. Sindelfingen">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">Country (BT-80)</label>
+                <select id="v2DelivCountry" class="v2-select">
+                  <option value="DE" selected>Germany (DE)</option>
+                  <option value="AT">Austria (AT)</option>
+                  <option value="CH">Switzerland (CH)</option>
+                  <option value="SI">Slovenia (SI)</option>
+                  <option value="FR">France (FR)</option>
+                  <option value="IT">Italy (IT)</option>
+                  <option value="US">United States (US)</option>
+                </select>
               </div>
             </div>
           </div>
@@ -1075,12 +1131,35 @@
 
         <!-- 7. Actions Bar -->
         <div class="v2-actions-bar">
-          <button type="button" class="btn btn-secondary" onclick="validateV2Invoice()" style="padding: 0.75rem 1.5rem; font-size: 0.95rem;">
-            <span>🛡️ Validate Document</span>
-          </button>
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary" onclick="validateV2Invoice()" style="padding: 0.75rem 1.4rem; font-size: 0.95rem;">
+              <span>🛡️ Validate Document</span>
+            </button>
+            <button type="button" class="btn btn-secondary" id="v2ViewXmlBtn" onclick="toggleV2XmlPreview()" style="padding: 0.75rem 1.4rem; font-size: 0.95rem; border-color: rgba(37,99,235,0.4);">
+              <span>🔍 View Generated XML</span>
+            </button>
+          </div>
           <button type="button" class="btn btn-primary" id="v2GenerateBtn" onclick="handleV2GenerateSubmit()" style="padding: 0.75rem 2rem; font-size: 0.98rem; font-weight: 700;">
             <span>⚡ Generate & Download PDF/A-3</span>
           </button>
+        </div>
+
+        <!-- 8. Generated XML Live Preview Card (Collapsible) -->
+        <div class="v2-card" id="v2XmlCard" style="display: none; margin-top: 1.5rem; border-color: rgba(37, 99, 235, 0.4);">
+          <div class="v2-card-header">
+            <div class="v2-card-title">
+              <span>📄 Generated Factur-X / Order-X XML Preview</span>
+              <span class="tag" id="v2XmlProfileBadge">EN 16931</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 0.72rem; color: var(--text-muted); font-style: italic;">💡 Clicking form fields highlights matching tags below</span>
+              <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;" onclick="copyV2XmlToClipboard()">📋 Copy XML</button>
+              <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;" onclick="toggleV2XmlPreview()">✕ Close</button>
+            </div>
+          </div>
+          <div class="code-viewer" id="v2XmlViewer" style="height: 520px;">
+            &lt;!-- Generated factur-x.xml will display here --&gt;
+          </div>
         </div>
       </div>
     </div>
@@ -1274,6 +1353,61 @@
             <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Choose the visual layout used when synthesizing PDF/A-3 invoices from manual forms.</span>
           </div>
 
+          <!-- AI Extraction Prompt Management & Editor Section -->
+          <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1.25rem; margin-top: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <div>
+                <h4 style="font-size: 0.95rem; color: #a78bfa; margin: 0 0 4px 0;">🧠 AI Document Extraction Prompt Manager</h4>
+                <span style="font-size: 0.75rem; color: var(--text-dim);">Select, create, edit, or test multiple parsing prompts sent to OpenAI GPT-4o.</span>
+              </div>
+              <button type="button" class="btn btn-secondary" onclick="addNewPromptTemplate()" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">
+                <span>+ New Prompt</span>
+              </button>
+            </div>
+
+            <div class="form-group" style="margin-top: 0.5rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                <label style="font-weight: 700; font-size: 0.82rem; margin: 0;">Active Prompt Preset:</label>
+                <span id="promptStatusBadge" class="tag" style="background: rgba(167, 139, 250, 0.15); color: #a78bfa;">Active</span>
+              </div>
+              <select id="cfgPromptSelect" onchange="handlePromptSelectionChange(this.value)" style="width: 100%; padding: 0.5rem 0.75rem; font-size: 0.85rem; border-radius: 8px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main);">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+
+            <div style="background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
+              <div class="form-row">
+                <div class="form-group" style="flex: 2;">
+                  <label style="font-size: 0.75rem; color: var(--text-muted);">Preset Name</label>
+                  <input type="text" id="cfgPromptName" placeholder="e.g. Standard EN 16931 Parser" style="font-size: 0.82rem;">
+                </div>
+                <div class="form-group" style="flex: 3;">
+                  <label style="font-size: 0.75rem; color: var(--text-muted);">Description / Purpose</label>
+                  <input type="text" id="cfgPromptDesc" placeholder="e.g. Optimized for DACH invoices with reverse-charge" style="font-size: 0.82rem;">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                  <label style="font-size: 0.75rem; color: var(--text-muted);">System Prompt Instructions (Markdown / Text):</label>
+                  <button type="button" class="btn btn-secondary" onclick="resetActivePromptToDefault()" style="padding: 2px 7px; font-size: 0.7rem;" title="Reset this prompt back to default European standard">↺ Reset to Default</button>
+                </div>
+                <textarea id="cfgPromptContent" rows="11" style="width: 100%; font-family: 'Fira Code', monospace; font-size: 0.75rem; line-height: 1.45; padding: 0.75rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--code-bg); color: var(--text-main); resize: vertical; box-sizing: border-box;" placeholder="Enter system instructions for GPT-4o parser..."></textarea>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn btn-secondary" id="btnDeletePrompt" onclick="deleteActivePrompt()" style="color: #ef4444; padding: 0.35rem 0.75rem; font-size: 0.75rem;">
+                  <span>🗑️ Delete Preset</span>
+                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                  <button type="button" class="btn btn-secondary" onclick="savePromptPresetOnly()" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">
+                    <span>💾 Save Prompt Changes</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Seller (Your Business) Default Profile Settings -->
           <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1.25rem; margin-top: 0.5rem;">
             <div style="margin-bottom: 0.75rem;">
@@ -1291,13 +1425,17 @@
               </div>
             </div>
             <div class="form-row" style="margin-top: 0.5rem;">
-              <div class="form-group">
+              <div class="form-group" style="flex: 2;">
                 <label>Street Address</label>
-                <input type="text" id="cfgSellerStreet" placeholder="e.g. Bahnhofstrasse 10">
+                <input type="text" id="cfgSellerStreet" placeholder="e.g. Hedelfinger Straße 137">
               </div>
-              <div class="form-group">
-                <label>City & Postcode</label>
-                <input type="text" id="cfgSellerCity" placeholder="e.g. 10115 Berlin">
+              <div class="form-group" style="flex: 1;">
+                <label>Postcode</label>
+                <input type="text" id="cfgSellerPostcode" placeholder="e.g. 70329">
+              </div>
+              <div class="form-group" style="flex: 1.5;">
+                <label>City</label>
+                <input type="text" id="cfgSellerCity" placeholder="e.g. Stuttgart">
               </div>
             </div>
             <div class="form-row" style="margin-top: 0.5rem;">
@@ -1325,16 +1463,23 @@
                 <input type="text" id="cfgSellerCourt" placeholder="e.g. Amtsgericht Stuttgart">
               </div>
               <div class="form-group">
-                <label>Commercial Register (HRB / Tax ID)</label>
+                <label>Commercial Register (HRB)</label>
                 <input type="text" id="cfgSellerHrb" placeholder="e.g. HRB 736903">
               </div>
             </div>
 
             <div class="form-row" style="margin-top: 0.5rem;">
               <div class="form-group">
+                <label>Local Tax Number / Steuernummer (FC)</label>
+                <input type="text" id="cfgSellerTaxNumber" placeholder="e.g. 99022/20844">
+              </div>
+              <div class="form-group">
                 <label>UST-ID-Nr. (VAT ID for Footer)</label>
                 <input type="text" id="cfgSellerUstId" placeholder="e.g. DE 347120003 (leave empty to use Seller VAT ID)">
               </div>
+            </div>
+
+            <div class="form-row" style="margin-top: 0.5rem;">
               <div class="form-group">
                 <label>Managing Directors (Geschäftsführer)</label>
                 <input type="text" id="cfgSellerDirectors" placeholder="e.g. Mürsel Gülen, Sedat Kilic">
@@ -1536,8 +1681,8 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=25"></script>
-  <script src="/static/v2.js?v=4"></script>
+  <script src="/static/app.js?v=30"></script>
+  <script src="/static/v2.js?v=18"></script>
 </body>
 
 </html>

@@ -3,9 +3,10 @@
    ========================================================================= */
 
 .v2-container {
-  max-width: 920px;
+  max-width: 1480px;
+  width: 100%;
   margin: 0 auto;
-  padding: 1.5rem 1rem 4rem 1rem;
+  padding: 1rem 0.5rem 4rem 0.5rem;
 }
 
 /* Header title area */
@@ -123,23 +124,31 @@
 /* Grid systems */
 .v2-grid-4 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
 }
 
 .v2-grid-3 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
 }
 
 .v2-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .v2-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 768px) {
+  .v2-grid-4,
+  .v2-grid-3,
   .v2-grid-2 {
     grid-template-columns: 1fr;
   }
@@ -408,4 +417,45 @@
 
 .v2-saved-party-row:hover {
   border-color: var(--accent);
+}
+
+/* XML Highlight System */
+.xml-hl-tag {
+  background: rgba(245, 158, 11, 0.35) !important;
+  color: #d97706 !important;
+  border-radius: 3px;
+  padding: 1px 3px;
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+  transition: all 0.2s ease;
+}
+
+[data-theme="dark"] .xml-hl-tag {
+  background: rgba(251, 191, 36, 0.3) !important;
+  color: #fde68a !important;
+}
+
+.xml-hl-value {
+  background: rgba(16, 185, 129, 0.35) !important;
+  color: #047857 !important;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.45);
+  animation: pulseHighlight 1.5s infinite alternate;
+}
+
+[data-theme="dark"] .xml-hl-value {
+  background: rgba(52, 211, 153, 0.3) !important;
+  color: #6ee7b7 !important;
+}
+
+@keyframes pulseHighlight {
+  0% { box-shadow: 0 0 4px rgba(16, 185, 129, 0.4); }
+  100% { box-shadow: 0 0 14px rgba(16, 185, 129, 0.8); }
+}
+
+.input-xml-active {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35) !important;
 }

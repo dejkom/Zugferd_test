@@ -1,3 +1,4 @@
+import os
 import re
 from datetime import datetime
 from xml.sax.saxutils import escape
@@ -24,11 +25,19 @@ def clean_date(d_str: str) -> str:
 def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     """
     Generate compliant factur-x.xml (ZUGFeRD 2.x / UN/CEFACT CII 16B).
-    Default guideline: urn:cen.eu:en16931:2017
+    EN16931 guideline: urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:en16931
     """
-    guideline_id = "urn:cen.eu:en16931:2017" if profile == "EN16931" else "urn:factur-x.eu:1p0:basic"
+    if profile == "EN16931":
+        guideline_id = "urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:en16931"
+    elif profile == "COMFORT":
+        guideline_id = "urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:en16931"
+    elif profile == "EXTENDED":
+        guideline_id = "urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended"
+    else:
+        guideline_id = "urn:factur-x.eu:1p0:basic"
     issue_date_formatted = clean_date(inv.issue_date)
     due_date_formatted = clean_date(inv.due_date) if inv.due_date else None
+
     
     # Seller cleanups
     s_vat = inv.seller.vat_id.replace(" ", "").upper() if inv.seller.vat_id else ""
@@ -36,19 +45,56 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     s_iban = inv.payment.iban.replace(" ", "").upper() if inv.payment.iban else ""
     s_bic = inv.payment.bic.replace(" ", "").upper() if inv.payment.bic else ""
 
-    buyer_ref = inv.buyer_reference or "N/A"
+    # Buyer Reference & Order Date parsing
+    raw_buyer_ref = (inv.buyer_reference or "").strip()
+    extracted_order_date = getattr(inv, "purchase_order_date", None)
     
-    # Notes XML
+    # Strip date suffixes from buyer_reference (e.g., '12345 v. 17.04.2026' or 'PO-999 vom 2026-04-17')
+    match_v_date = re.search(r"\s+(?:v\.|vom)\s+([0-9\.\-\/]+)", raw_buyer_ref, flags=re.IGNORECASE)
+    if match_v_date:
+        if not extracted_order_date:
+            extracted_order_date = match_v_date.group(1).strip()
+        cleaned_buyer_ref = raw_buyer_ref[:match_v_date.start()].strip()
+    else:
+        cleaned_buyer_ref = raw_buyer_ref
+
+    buyer_ref = cleaned_buyer_ref or "N/A"
+
+    # Clean seller address to prevent postcode concatenating into CityName
+    s_postcode = (inv.seller.postcode or "").strip()
+    s_city = (inv.seller.city or "").strip()
+    if not s_postcode and s_city:
+        m_s_pc = re.match(r"^(\d{4,5})\s+(.*)$", s_city)
+        if m_s_pc:
+            s_postcode = m_s_pc.group(1).strip()
+            s_city = m_s_pc.group(2).strip()
+    elif s_city and re.match(r"^\d{4,5}\s+", s_city):
+        s_city = re.sub(r"^\d{4,5}\s+", "", s_city).strip()
+
+    # Clean buyer address similarly
+    b_postcode = (inv.buyer.postcode or "").strip()
+    b_city = (inv.buyer.city or "").strip()
+    if not b_postcode and b_city:
+        m_b_pc = re.match(r"^(\d{4,5})\s+(.*)$", b_city)
+        if m_b_pc:
+            b_postcode = m_b_pc.group(1).strip()
+            b_city = m_b_pc.group(2).strip()
+    elif b_city and re.match(r"^\d{4,5}\s+", b_city):
+        b_city = re.sub(r"^\d{4,5}\s+", "", b_city).strip()
+
+    
+    # Notes XML (BT-22: IncludedNote)
     notes_xml = ""
-    for note in inv.notes:
-        if note and note.strip():
+    effective_notes = inv.invoice_notes if (getattr(inv, "invoice_notes", None) and len(inv.invoice_notes) > 0) else (inv.notes or [])
+    for note in effective_notes:
+        if note and str(note).strip():
+            # Filter out any synthetic generator watermarks if previously stored
+            if "ZUGFeRD PDF/A-3 Generator" in str(note):
+                continue
             notes_xml += f"""    <ram:IncludedNote>
-      <ram:Content>{escape(note.strip())}</ram:Content>
+      <ram:Content>{escape(str(note).strip())}</ram:Content>
     </ram:IncludedNote>\n"""
-    if not notes_xml:
-        notes_xml = """    <ram:IncludedNote>
-      <ram:Content>Invoice processed with ZUGFeRD PDF/A-3 Generator</ram:Content>
-    </ram:IncludedNote>\n"""
+
 
     # Line Items XML
     line_items_xml = ""
@@ -136,9 +182,25 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
         seller_tax_xml += f"""        <ram:SpecifiedTaxRegistration>
           <ram:ID schemeID="VA">{s_vat}</ram:ID>
         </ram:SpecifiedTaxRegistration>\n"""
-    if inv.seller.tax_registration_id:
+    
+    # Local Tax Number / Steuernummer (FC)
+    s_tax_number = (getattr(inv.seller, "tax_number", None) or inv.seller.tax_registration_id or "").strip()
+    if not s_tax_number:
+        # Fallback to system configuration if available
+        try:
+            from backend.app import UPLOAD_DIR
+            import json
+            cfg_path = os.path.join(UPLOAD_DIR, "system_settings.json")
+            if os.path.exists(cfg_path):
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    cfg_data = json.load(f)
+                    s_tax_number = (cfg_data.get("seller_tax_number") or "").strip()
+        except Exception:
+            pass
+
+    if s_tax_number:
         seller_tax_xml += f"""        <ram:SpecifiedTaxRegistration>
-          <ram:ID schemeID="FC">{escape(inv.seller.tax_registration_id)}</ram:ID>
+          <ram:ID schemeID="FC">{escape(s_tax_number)}</ram:ID>
         </ram:SpecifiedTaxRegistration>\n"""
 
     # Buyer tax IDs
@@ -162,11 +224,18 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
           {name_x}{phone_x}{email_x}
         </ram:DefinedTradeContact>\n"""
 
-    # Buyer order / Purchase Order reference
+    # Buyer order / Purchase Order reference (BT-13 & BT-14)
     buyer_order_xml = ""
-    if inv.purchase_order_number:
+    po_number = inv.purchase_order_number or (cleaned_buyer_ref if cleaned_buyer_ref != "N/A" and extracted_order_date else "")
+    if po_number:
+        po_date_xml = ""
+        if extracted_order_date:
+            formatted_po_date = clean_date(extracted_order_date)
+            po_date_xml = f"""\n        <ram:FormattedIssueDateTime>
+          <qdt:DateTimeString format="102">{formatted_po_date}</qdt:DateTimeString>
+        </ram:FormattedIssueDateTime>"""
         buyer_order_xml = f"""      <ram:BuyerOrderReferencedDocument>
-        <ram:IssuerAssignedID>{escape(inv.purchase_order_number)}</ram:IssuerAssignedID>
+        <ram:IssuerAssignedID>{escape(po_number)}</ram:IssuerAssignedID>{po_date_xml}
       </ram:BuyerOrderReferencedDocument>\n"""
 
     # Preceding invoice reference (Required for Credit Notes 381 and Corrected Invoices 384)
@@ -182,32 +251,74 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
         <ram:IssuerAssignedID>{escape(inv.preceding_invoice_number)}</ram:IssuerAssignedID>
 {prec_date_xml}      </ram:InvoiceReferencedDocument>\n"""
 
-    # Delivery Party XML
+    # Delivery Party XML (BG-13)
     delivery_xml = "<ram:ApplicableHeaderTradeDelivery />"
-    if inv.delivery and (inv.delivery.recipient_name or inv.delivery.street or inv.delivery.city or inv.delivery.delivery_date):
+    if inv.delivery:
+        # BT-16: Despatch Advice Reference (Lieferschein-Nr.)
+        despatch_id = (inv.delivery.despatch_advice_id or inv.delivery.despatch_advice_reference or "").strip()
+        cleaned_despatch = despatch_id.lstrip("-").lstrip(":").strip()
+        banned_despatch_labels = [
+            "lieferdatum", "lieferschein", "lieferschein-nr", "nr", "-nr", "bestell-nr", 
+            "kundennummer", "kontakt", "lieferanten-nr", "datum", "none", "null"
+        ]
+        despatch_advice_xml = ""
+        if (
+            cleaned_despatch 
+            and cleaned_despatch.lower() not in banned_despatch_labels 
+            and any(c.isdigit() for c in cleaned_despatch) 
+            and len(cleaned_despatch) >= 3
+        ):
+            despatch_advice_xml = f"""        <ram:DespatchAdviceReferencedDocument>
+          <ram:IssuerAssignedID>{escape(cleaned_despatch)}</ram:IssuerAssignedID>
+        </ram:DespatchAdviceReferencedDocument>\n"""
+
+
+
+        # BT-70..BT-80: Ship-To Trade Party
+        deliv_party_xml = ""
+        clean_loc_id = (inv.delivery.location_id or "").strip()
+        if clean_loc_id:
+            # Strip verbal prefix if present (e.g. 'Abladestelle Nr. 960' -> '960')
+            clean_loc_id = re.sub(r"^.*?(?:Abladestelle|Tor|Gate|Dock)(?:\s+Nr\.?)?\s*", "", clean_loc_id, flags=re.IGNORECASE).strip()
+
+        if inv.delivery.recipient_name or inv.delivery.street or inv.delivery.city or clean_loc_id:
+            # BT-71: Only emit schemeID="0088" if strictly a 13-digit GLN number
+            is_valid_gln = bool(re.fullmatch(r"\d{13}", clean_loc_id))
+            if clean_loc_id:
+                if is_valid_gln or (inv.delivery.location_scheme == "0088" and is_valid_gln):
+                    deliv_id_xml = f"<ram:ID schemeID=\"0088\">{escape(clean_loc_id)}</ram:ID>\n          "
+                elif inv.delivery.location_scheme and inv.delivery.location_scheme != "0088":
+                    deliv_id_xml = f"<ram:ID schemeID=\"{escape(inv.delivery.location_scheme)}\">{escape(clean_loc_id)}</ram:ID>\n          "
+                else:
+                    deliv_id_xml = f"<ram:ID>{escape(clean_loc_id)}</ram:ID>\n          "
+            else:
+                deliv_id_xml = ""
+
+            deliv_name = f"<ram:Name>{escape(inv.delivery.recipient_name)}</ram:Name>\n          " if inv.delivery.recipient_name else ""
+            deliv_country = (inv.delivery.country_code or "DE").strip().upper()[:2]
+            deliv_party_xml = f"""        <ram:ShipToTradeParty>
+          {deliv_id_xml}{deliv_name}<ram:PostalTradeAddress>
+            <ram:PostcodeCode>{escape(inv.delivery.postcode or "")}</ram:PostcodeCode>
+            <ram:LineOne>{escape(inv.delivery.street or "")}</ram:LineOne>
+            <ram:CityName>{escape(inv.delivery.city or "")}</ram:CityName>
+            <ram:CountryID>{escape(deliv_country)}</ram:CountryID>
+          </ram:PostalTradeAddress>
+        </ram:ShipToTradeParty>\n"""
+
+
+        # BT-72: Actual Delivery Date Event (format 102: YYYYMMDD)
         deliv_date_xml = ""
         if inv.delivery.delivery_date:
             deliv_d_clean = clean_date(inv.delivery.delivery_date)
-            deliv_date_xml = f"""        <ram:ActualDeliverySupplyChainEvent>
+            if deliv_d_clean:
+                deliv_date_xml = f"""        <ram:ActualDeliverySupplyChainEvent>
           <ram:OccurrenceDateTime>
             <udt:DateTimeString format="102">{deliv_d_clean}</udt:DateTimeString>
           </ram:OccurrenceDateTime>
         </ram:ActualDeliverySupplyChainEvent>\n"""
-        
-        deliv_party_xml = ""
-        if inv.delivery.recipient_name or inv.delivery.street:
-            deliv_name = f"<ram:Name>{escape(inv.delivery.recipient_name)}</ram:Name>\n" if inv.delivery.recipient_name else ""
-            deliv_party_xml = f"""        <ram:ShipToTradeParty>
-          {deliv_name}          <ram:PostalTradeAddress>
-            <ram:PostcodeCode>{escape(inv.delivery.postcode or "")}</ram:PostcodeCode>
-            <ram:LineOne>{escape(inv.delivery.street or "")}</ram:LineOne>
-            <ram:CityName>{escape(inv.delivery.city or "")}</ram:CityName>
-            <ram:CountryID>{escape(inv.delivery.country_code or "DE")}</ram:CountryID>
-          </ram:PostalTradeAddress>
-        </ram:ShipToTradeParty>\n"""
-        
+
         delivery_xml = f"""    <ram:ApplicableHeaderTradeDelivery>
-{deliv_party_xml}{deliv_date_xml}    </ram:ApplicableHeaderTradeDelivery>"""
+{despatch_advice_xml}{deliv_party_xml}{deliv_date_xml}    </ram:ApplicableHeaderTradeDelivery>"""
 
     # Billing period XML
     billing_period_xml = ""
@@ -281,18 +392,18 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
       <ram:SellerTradeParty>
         <ram:Name>{escape(inv.seller.name)}</ram:Name>
 {seller_contact_xml}        <ram:PostalTradeAddress>
-          <ram:PostcodeCode>{escape(inv.seller.postcode or "")}</ram:PostcodeCode>
+          <ram:PostcodeCode>{escape(s_postcode)}</ram:PostcodeCode>
           <ram:LineOne>{escape(inv.seller.street or "")}</ram:LineOne>
-          <ram:CityName>{escape(inv.seller.city or "")}</ram:CityName>
+          <ram:CityName>{escape(s_city)}</ram:CityName>
           <ram:CountryID>{inv.seller.country_code or "DE"}</ram:CountryID>
         </ram:PostalTradeAddress>
 {seller_tax_xml}      </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
         <ram:Name>{escape(inv.buyer.name)}</ram:Name>
         <ram:PostalTradeAddress>
-          <ram:PostcodeCode>{escape(inv.buyer.postcode or "")}</ram:PostcodeCode>
+          <ram:PostcodeCode>{escape(b_postcode)}</ram:PostcodeCode>
           <ram:LineOne>{escape(inv.buyer.street or "")}</ram:LineOne>
-          <ram:CityName>{escape(inv.buyer.city or "")}</ram:CityName>
+          <ram:CityName>{escape(b_city)}</ram:CityName>
           <ram:CountryID>{inv.buyer.country_code or "DE"}</ram:CountryID>
         </ram:PostalTradeAddress>
 {buyer_tax_xml}      </ram:BuyerTradeParty>
@@ -361,6 +472,12 @@ def generate_orderx_xml(inv: InvoiceData, profile: str = "BASIC") -> str:
     if s_vat:
         seller_tax_xml = f"""        <ram:SpecifiedTaxRegistration>
           <ram:ID schemeID="VA">{s_vat}</ram:ID>
+        </ram:SpecifiedTaxRegistration>\n"""
+    
+    s_tax_number = (getattr(inv.seller, "tax_number", None) or inv.seller.tax_registration_id or "").strip()
+    if s_tax_number:
+        seller_tax_xml += f"""        <ram:SpecifiedTaxRegistration>
+          <ram:ID schemeID="FC">{escape(s_tax_number)}</ram:ID>
         </ram:SpecifiedTaxRegistration>\n"""
     
     buyer_tax_xml = ""

@@ -5,16 +5,65 @@
 
 let v2LineItems = [];
 let v2DocumentDiscounts = [];
+let v2ExtractedNotes = [];
 let v2TokenUsage = null;
+let v2UploadedFileId = null;
+let v2UploadedFileName = null;
 
 // Initialize on script load
 function initV2Studio() {
   initV2LineItems();
   initV2DocumentDiscounts();
+  initV2InvoiceNotes();
   populateV2SellerDefaults();
   updateV2DocumentTypeFields();
   loadV2SavedPartiesDropdowns();
+  setupV2PrefillDropzone();
   recalcV2Totals();
+}
+
+function onV2FileInputChanged(input) {
+  if (input && input.files && input.files.length) {
+    const file = input.files[0];
+    input.value = "";
+    handleV2PrefillUpload(file);
+  }
+}
+window.onV2FileInputChanged = onV2FileInputChanged;
+
+function setupV2PrefillDropzone() {
+  const banner = document.getElementById("v2PrefillBanner");
+  const fileInput = document.getElementById("v2PrefillFileInput");
+  if (!banner || !fileInput) return;
+
+  fileInput.onchange = function() {
+    if (this.files && this.files.length) {
+      const file = this.files[0];
+      this.value = "";
+      handleV2PrefillUpload(file);
+    }
+  };
+
+  banner.ondragover = (e) => {
+    e.preventDefault();
+    banner.style.borderColor = "var(--accent)";
+    banner.style.background = "rgba(37, 99, 235, 0.12)";
+  };
+
+  banner.ondragleave = (e) => {
+    e.preventDefault();
+    banner.style.borderColor = "";
+    banner.style.background = "";
+  };
+
+  banner.ondrop = (e) => {
+    e.preventDefault();
+    banner.style.borderColor = "";
+    banner.style.background = "";
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      handleV2PrefillUpload(e.dataTransfer.files[0]);
+    }
+  };
 }
 
 // 1. Populate Seller from Configuration
@@ -25,16 +74,29 @@ function populateV2SellerDefaults() {
     if (el && (!el.value || el.value.trim() === "")) el.value = val || "";
   };
 
-  setVal("v2SellerName", settings.seller_name || "Acme Solutions Ltd");
-  setVal("v2SellerVat", settings.seller_vat || "DE123456789");
-  setVal("v2SellerStreet", settings.seller_street || "Bahnhofstrasse 10");
-  setVal("v2SellerCity", settings.seller_city || "Berlin");
-  setVal("v2SellerPostcode", "10115");
+  let cityStr = settings.seller_city || "Stuttgart";
+  let postcodeStr = settings.seller_postcode || "";
+  if (!postcodeStr && cityStr) {
+    const pcMatch = cityStr.match(/^(\d{4,5})\s+(.*)$/);
+    if (pcMatch) {
+      postcodeStr = pcMatch[1];
+      cityStr = pcMatch[2];
+    }
+  }
+  if (!postcodeStr) postcodeStr = "70329";
+  if (!cityStr) cityStr = "Stuttgart";
+
+  setVal("v2SellerName", settings.seller_name || "odelo GmbH");
+  setVal("v2SellerVat", settings.seller_vat || "DE347120003");
+  setVal("v2SellerTaxNumber", settings.seller_tax_number || "99022/20844");
+  setVal("v2SellerStreet", settings.seller_street || "Hedelfinger Straße 137");
+  setVal("v2SellerCity", cityStr);
+  setVal("v2SellerPostcode", postcodeStr);
   setVal("v2SellerCountry", settings.seller_country || "DE");
-  setVal("v2SellerPhone", settings.seller_phone || "");
+  setVal("v2SellerPhone", settings.seller_phone || "+49 (0)711 18563-0");
   setVal("v2SellerFax", settings.seller_fax || "");
-  setVal("v2PayIban", settings.seller_bank1_iban || "DE89370400440532013000");
-  setVal("v2PayBic", settings.seller_bank1_bic || "DBBADEFFXXX");
+  setVal("v2PayIban", settings.seller_bank1_iban || "DE44600400710556706000");
+  setVal("v2PayBic", settings.seller_bank1_bic || "COBADEFFXXX");
 }
 window.populateV2SellerDefaults = populateV2SellerDefaults;
 
@@ -307,6 +369,69 @@ function handleV2DiscountPercentChange(idx, pctVal) {
 }
 window.handleV2DiscountPercentChange = handleV2DiscountPercentChange;
 
+// 4b. Dynamic Document Notes (<ram:IncludedNote> / BT-22)
+function initV2InvoiceNotes() {
+  renderV2InvoiceNotes();
+}
+
+function renderV2InvoiceNotes() {
+  const container = document.getElementById("v2NotesContainer");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (!v2ExtractedNotes || v2ExtractedNotes.length === 0) {
+    container.innerHTML = `
+      <div style="font-size: 0.76rem; color: var(--text-muted); font-style: italic; padding: 0.4rem 0.6rem; background: var(--bg-input); border-radius: 6px; border: 1px dashed var(--bg-card-border);">
+        No document notes added. Click "+ Add Note" to include performance notices, delivery terms, or legal remarks.
+      </div>
+    `;
+    return;
+  }
+
+  v2ExtractedNotes.forEach((noteText, idx) => {
+    const row = document.createElement("div");
+    row.style.cssText = "display: flex; align-items: center; gap: 0.5rem;";
+    row.innerHTML = `
+      <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; width: 1.5rem; text-align: center;">#${idx + 1}</span>
+      <input type="text" class="v2-input" style="flex: 1;" value="${escapeHtml(noteText || '')}" 
+             placeholder="e.g. Wir berechnen 100% gemäß beigefügter Musterprüfberichte"
+             oninput="updateV2InvoiceNoteField(${idx}, this.value)">
+      <button type="button" class="v2-item-trash" onclick="removeV2InvoiceNote(${idx})" title="Remove this note">🗑️</button>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function addV2InvoiceNote(text = "") {
+  if (!Array.isArray(v2ExtractedNotes)) v2ExtractedNotes = [];
+  v2ExtractedNotes.push(text);
+  renderV2InvoiceNotes();
+  if (typeof updateV2LiveXml === "function") {
+    updateV2LiveXml();
+  }
+}
+window.addV2InvoiceNote = addV2InvoiceNote;
+
+function removeV2InvoiceNote(idx) {
+  if (!Array.isArray(v2ExtractedNotes)) return;
+  v2ExtractedNotes.splice(idx, 1);
+  renderV2InvoiceNotes();
+  if (typeof updateV2LiveXml === "function") {
+    updateV2LiveXml();
+  }
+}
+window.removeV2InvoiceNote = removeV2InvoiceNote;
+
+function updateV2InvoiceNoteField(idx, val) {
+  if (Array.isArray(v2ExtractedNotes) && v2ExtractedNotes[idx] !== undefined) {
+    v2ExtractedNotes[idx] = val;
+    if (typeof updateV2LiveXml === "function") {
+      updateV2LiveXml();
+    }
+  }
+}
+window.updateV2InvoiceNoteField = updateV2InvoiceNoteField;
+
 // 5. Dynamic Calculations & Tax Matrix
 function recalcV2Totals() {
   let lineNetTotal = 0;
@@ -403,24 +528,26 @@ window.recalcV2Totals = recalcV2Totals;
 function applyV2ConfidenceScores(scores) {
   if (!scores) return;
 
+  // Verified Master Data & Bank details are always HIGH confidence (no pink/low warning borders)
   const fieldMapping = {
     "v2InvNumber": scores.invoice_number || "HIGH",
     "v2IssueDate": scores.issue_date || "HIGH",
     "v2DueDate": scores.due_date || (document.getElementById("v2DueDate")?.value ? "HIGH" : "MEDIUM"),
     "v2Currency": scores.currency || "HIGH",
     "v2BuyerRef": scores.buyer_reference || (document.getElementById("v2BuyerRef")?.value ? "MEDIUM" : "LOW"),
-    "v2SellerName": scores.seller_name || "HIGH",
-    "v2SellerVat": scores.seller_vat || "HIGH",
-    "v2SellerStreet": scores.seller_street || "HIGH",
-    "v2SellerCity": scores.seller_city || "HIGH",
-    "v2SellerPostcode": scores.seller_city || "HIGH",
+    "v2SellerName": "HIGH",
+    "v2SellerVat": "HIGH",
+    "v2SellerTaxNumber": "HIGH",
+    "v2SellerStreet": "HIGH",
+    "v2SellerCity": "HIGH",
+    "v2SellerPostcode": "HIGH",
     "v2BuyerName": scores.buyer_name || "HIGH",
     "v2BuyerVat": scores.buyer_vat || "HIGH",
     "v2BuyerStreet": scores.buyer_street || "HIGH",
     "v2BuyerCity": scores.buyer_city || "HIGH",
     "v2BuyerPostcode": scores.buyer_city || "HIGH",
-    "v2PayIban": scores.iban || "HIGH",
-    "v2PayBic": scores.bic || "HIGH"
+    "v2PayIban": "HIGH",
+    "v2PayBic": "HIGH"
   };
 
   Object.entries(fieldMapping).forEach(([inputId, rawConfidence]) => {
@@ -511,6 +638,7 @@ async function saveV2Party(type) {
   if (isSeller) {
     partyData.phone = document.getElementById("v2SellerPhone")?.value.trim() || "";
     partyData.email = document.getElementById("v2SellerEmail")?.value.trim() || "";
+    partyData.tax_number = document.getElementById("v2SellerTaxNumber")?.value.trim() || "";
     partyData.iban = document.getElementById("v2PayIban")?.value.trim() || "";
     partyData.bic = document.getElementById("v2PayBic")?.value.trim() || "";
   }
@@ -576,6 +704,7 @@ function selectV2SavedParty(type, partyId) {
   if (isSeller) {
     if (party.phone) setVal("v2SellerPhone", party.phone);
     if (party.email) setVal("v2SellerEmail", party.email);
+    if (party.tax_number) setVal("v2SellerTaxNumber", party.tax_number);
     if (party.iban) setVal("v2PayIban", party.iban);
     if (party.bic) setVal("v2PayBic", party.bic);
   }
@@ -589,8 +718,14 @@ async function handleV2PrefillUpload(file) {
   const bannerTitle = document.getElementById("v2PrefillTitle");
   const bannerDesc = document.getElementById("v2PrefillDesc");
 
-  if (bannerTitle) bannerTitle.textContent = `Extracting ${file.name} with AI...`;
-  if (bannerDesc) bannerDesc.textContent = "Parsing parties, line items, discounts, and totals...";
+  if (banner) {
+    banner.style.opacity = "0.7";
+    banner.style.pointerEvents = "none";
+    banner.style.borderStyle = "solid";
+    banner.style.borderColor = "var(--accent)";
+  }
+  if (bannerTitle) bannerTitle.textContent = `⏳ Extracting ${file.name} with AI...`;
+  if (bannerDesc) bannerDesc.textContent = "Uploading document and contacting GPT-4o parser (may take 5-10s)...";
 
   const formData = new FormData();
   formData.append("file", file);
@@ -600,11 +735,15 @@ async function handleV2PrefillUpload(file) {
     const upData = await upRes.json();
     if (!upRes.ok) throw new Error(upData.detail || "Upload failed");
 
+    v2UploadedFileId = upData.file_id;
+    v2UploadedFileName = file.name;
+
     const apiKey = (typeof getStoredApiKey === "function" ? getStoredApiKey() : "") || undefined;
+    const promptId = window.cachedCompanySettings?.active_prompt_id || undefined;
     const extRes = await fetch("/api/extract", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_id: upData.file_id, api_key: apiKey })
+      body: JSON.stringify({ file_id: upData.file_id, api_key: apiKey, prompt_id: promptId })
     });
     const extData = await extRes.json();
     if (!extRes.ok) throw new Error(extData.detail || "Extraction failed");
@@ -612,6 +751,9 @@ async function handleV2PrefillUpload(file) {
     // Populate v2 form
     const inv = extData.invoice_data;
     v2TokenUsage = extData.usage || null;
+    const rawNotes = inv.invoice_notes || inv.notes || [];
+    v2ExtractedNotes = Array.isArray(rawNotes) ? rawNotes.filter(n => n && String(n).trim().length > 0) : [];
+    renderV2InvoiceNotes();
 
     if (inv.invoice_number) document.getElementById("v2InvNumber").value = inv.invoice_number;
     if (inv.issue_date) document.getElementById("v2IssueDate").value = inv.issue_date;
@@ -619,20 +761,89 @@ async function handleV2PrefillUpload(file) {
     if (inv.currency) document.getElementById("v2Currency").value = inv.currency;
     if (inv.buyer_reference) document.getElementById("v2BuyerRef").value = inv.buyer_reference;
 
-    if (inv.seller?.name) document.getElementById("v2SellerName").value = inv.seller.name;
-    if (inv.seller?.vat_id) document.getElementById("v2SellerVat").value = inv.seller.vat_id;
-    if (inv.seller?.street) document.getElementById("v2SellerStreet").value = inv.seller.street;
-    if (inv.seller?.city) document.getElementById("v2SellerCity").value = inv.seller.city;
-    if (inv.seller?.postcode) document.getElementById("v2SellerPostcode").value = inv.seller.postcode;
+    // Master Data Precedence: Enforce verified corporate seller configuration over OCR extraction
+    const cfg = window.cachedCompanySettings || {};
+    let cfgCity = cfg.seller_city || "Stuttgart";
+    let cfgPostcode = cfg.seller_postcode || "";
+    if (!cfgPostcode && cfgCity) {
+      const matchPc = cfgCity.match(/^(\d{4,5})\s+(.*)$/);
+      if (matchPc) {
+        cfgPostcode = matchPc[1];
+        cfgCity = matchPc[2];
+      }
+    }
+    if (!cfgPostcode) cfgPostcode = "70329";
+    if (!cfgCity) cfgCity = "Stuttgart";
 
+    document.getElementById("v2SellerName").value = cfg.seller_name || inv.seller?.name || "odelo GmbH";
+    document.getElementById("v2SellerVat").value = cfg.seller_vat || inv.seller?.vat_id || "DE347120003";
+    document.getElementById("v2SellerTaxNumber").value = cfg.seller_tax_number || inv.seller?.tax_number || inv.seller?.tax_registration_id || "99022/20844";
+    document.getElementById("v2SellerStreet").value = cfg.seller_street || inv.seller?.street || "Hedelfinger Straße 137";
+    document.getElementById("v2SellerCity").value = cfgCity;
+    document.getElementById("v2SellerPostcode").value = cfgPostcode;
+    document.getElementById("v2SellerCountry").value = cfg.seller_country || "DE";
+    if (cfg.seller_phone) document.getElementById("v2SellerPhone").value = cfg.seller_phone;
+    if (cfg.seller_bank1_iban) document.getElementById("v2PayIban").value = cfg.seller_bank1_iban;
+    else if (inv.payment?.iban) document.getElementById("v2PayIban").value = inv.payment.iban;
+    if (cfg.seller_bank1_bic) document.getElementById("v2PayBic").value = cfg.seller_bank1_bic;
+    else if (inv.payment?.bic) document.getElementById("v2PayBic").value = inv.payment.bic;
+
+    // Payment terms note
+    if (inv.payment?.payment_terms) {
+      const payTermsEl = document.getElementById("v2PayTerms");
+      if (payTermsEl) payTermsEl.value = inv.payment.payment_terms;
+    }
+
+    // Buyer details: Dynamic from extraction payload
     if (inv.buyer?.name) document.getElementById("v2BuyerName").value = inv.buyer.name;
     if (inv.buyer?.vat_id) document.getElementById("v2BuyerVat").value = inv.buyer.vat_id;
     if (inv.buyer?.street) document.getElementById("v2BuyerStreet").value = inv.buyer.street;
     if (inv.buyer?.city) document.getElementById("v2BuyerCity").value = inv.buyer.city;
     if (inv.buyer?.postcode) document.getElementById("v2BuyerPostcode").value = inv.buyer.postcode;
+    if (inv.buyer?.country_code) document.getElementById("v2BuyerCountry").value = inv.buyer.country_code;
 
-    if (inv.payment?.iban) document.getElementById("v2PayIban").value = inv.payment.iban;
-    if (inv.payment?.bic) document.getElementById("v2PayBic").value = inv.payment.bic;
+    // Delivery & Logistics (BG-13): Auto-populate and expand section if present
+    if (inv.delivery) {
+      if (inv.delivery.recipient_name) document.getElementById("v2DelivName").value = inv.delivery.recipient_name;
+      
+      let locId = inv.delivery.location_id || "";
+      if (!locId && inv.delivery.recipient_name) {
+        const mLoc = inv.delivery.recipient_name.match(/Abladestelle(?:\s+Nr\.?)?\s*([A-Za-z0-9\-_]+)/i);
+        if (mLoc) locId = mLoc[1];
+      }
+      if (locId) {
+        // Strip non-identifier text if present (e.g., 'Abladestelle Nr. 960' -> '960')
+        const cleanLoc = locId.replace(/^.*?(?:Abladestelle|Tor|Gate|Dock)(?:\s+Nr\.?)?\s*/i, "").trim();
+        document.getElementById("v2DelivLocationId").value = cleanLoc || locId;
+      }
+
+      if (inv.delivery.delivery_date) document.getElementById("v2DelivDate").value = inv.delivery.delivery_date;
+      
+      const rawDespatch = inv.delivery.despatch_advice_reference || inv.delivery.despatch_advice_id || "";
+      const cleanedDespatch = rawDespatch.trim().replace(/^[-:\s]+/, "").trim();
+      const bannedLabels = [
+        "lieferdatum", "lieferschein", "lieferschein-nr", "nr", "-nr", "bestell-nr", 
+        "kundennummer", "kontakt", "lieferanten-nr", "datum", "none", "null", ""
+      ];
+      const hasDigit = /\d/.test(cleanedDespatch);
+      const isBogusDespatch = bannedLabels.includes(cleanedDespatch.toLowerCase()) || !hasDigit || cleanedDespatch.length < 3;
+      if (!isBogusDespatch) {
+        document.getElementById("v2DelivDespatchRef").value = cleanedDespatch;
+      } else {
+        document.getElementById("v2DelivDespatchRef").value = "";
+      }
+
+      
+      if (inv.delivery.street) document.getElementById("v2DelivStreet").value = inv.delivery.street;
+      if (inv.delivery.postcode) document.getElementById("v2DelivPostcode").value = inv.delivery.postcode;
+      if (inv.delivery.city) document.getElementById("v2DelivCity").value = inv.delivery.city;
+      if (inv.delivery.country_code) document.getElementById("v2DelivCountry").value = inv.delivery.country_code;
+
+      const delivSection = document.getElementById("v2DeliverySection");
+      if (delivSection && (inv.delivery.recipient_name || inv.delivery.delivery_date || locId || despatchRef)) {
+        delivSection.style.display = "block";
+      }
+    }
 
     // Line items
     if (inv.items && inv.items.length > 0) {
@@ -666,10 +877,22 @@ async function handleV2PrefillUpload(file) {
 
     if (bannerTitle) bannerTitle.textContent = `✅ Prefilled from ${file.name}!`;
     if (bannerDesc) bannerDesc.textContent = "Values have been populated into the fields below with AI confidence indicators.";
+
+    // If XML viewer is open or cached, update live XML
+    if (typeof updateV2LiveXml === "function") {
+      updateV2LiveXml();
+    }
   } catch (err) {
     alert("Prefill error: " + err.message);
     if (bannerTitle) bannerTitle.textContent = "Have an existing invoice?";
     if (bannerDesc) bannerDesc.textContent = "Upload a PDF or Word file and AI will prefill the form";
+  } finally {
+    if (banner) {
+      banner.style.opacity = "1";
+      banner.style.pointerEvents = "auto";
+      banner.style.borderStyle = "dashed";
+      banner.style.borderColor = "";
+    }
   }
 }
 window.handleV2PrefillUpload = handleV2PrefillUpload;
@@ -738,6 +961,11 @@ function harvestV2InvoiceData() {
   const grandTotal = Math.round((discountedNet + taxTotal) * 100) / 100;
   const dueAmount = Math.max(0, Math.round((grandTotal - prepaidAmount) * 100) / 100);
 
+  // Harvest clean invoice notes from user input rows
+  const cleanNotes = (v2ExtractedNotes || [])
+    .map(n => (typeof n === "string" ? n.trim() : String(n || "").trim()))
+    .filter(n => n.length > 0 && !n.includes("ZUGFeRD PDF/A-3 Generator"));
+
   return {
     invoice_number: document.getElementById("v2InvNumber")?.value.trim() || `INV-${Date.now().toString().slice(-6)}`,
     issue_date: document.getElementById("v2IssueDate")?.value || new Date().toISOString().split("T")[0],
@@ -757,6 +985,8 @@ function harvestV2InvoiceData() {
     seller: {
       name: document.getElementById("v2SellerName")?.value.trim() || "Seller Company",
       vat_id: document.getElementById("v2SellerVat")?.value.trim() || "",
+      tax_number: document.getElementById("v2SellerTaxNumber")?.value.trim() || "",
+      tax_registration_id: document.getElementById("v2SellerTaxNumber")?.value.trim() || "",
       street: document.getElementById("v2SellerStreet")?.value.trim() || "",
       city: document.getElementById("v2SellerCity")?.value.trim() || "",
       postcode: document.getElementById("v2SellerPostcode")?.value.trim() || "",
@@ -774,7 +1004,9 @@ function harvestV2InvoiceData() {
     },
     delivery: {
       recipient_name: document.getElementById("v2DelivName")?.value.trim() || null,
+      location_id: document.getElementById("v2DelivLocationId")?.value.trim() || null,
       delivery_date: document.getElementById("v2DelivDate")?.value || null,
+      despatch_advice_id: document.getElementById("v2DelivDespatchRef")?.value.trim() || null,
       street: document.getElementById("v2DelivStreet")?.value.trim() || null,
       city: document.getElementById("v2DelivCity")?.value.trim() || null,
       postcode: document.getElementById("v2DelivPostcode")?.value.trim() || null,
@@ -784,8 +1016,10 @@ function harvestV2InvoiceData() {
       iban: document.getElementById("v2PayIban")?.value.trim() || "",
       bic: document.getElementById("v2PayBic")?.value.trim() || "",
       payment_means_code: document.getElementById("v2PayMethod")?.value || "58",
-      payment_terms: document.getElementById("v2PayTerms")?.value || "Payment due as agreed."
+      payment_terms: document.getElementById("v2PayTerms")?.value.trim() || ""
     },
+    notes: cleanNotes,
+    invoice_notes: cleanNotes,
     items: items,
     tax_breakdown: Object.values(taxBreakdownMap),
     line_net_total: lineNetTotal,
@@ -844,7 +1078,7 @@ async function handleV2GenerateSubmit() {
 
   try {
     const invData = harvestV2InvoiceData();
-    const layout = document.getElementById("v2LayoutSelect")?.value || "layout1";
+    const layout = document.getElementById("v2LayoutSelect")?.value || "original";
 
     const res = await fetch("/api/create-invoice-pdfa3", {
       method: "POST",
@@ -852,6 +1086,7 @@ async function handleV2GenerateSubmit() {
       body: JSON.stringify({
         invoice_data: invData,
         layout: layout,
+        file_id: v2UploadedFileId,
         generator: "v2",
         source_type: "v2",
         profile: invData.document_format === "orderx" ? "BASIC" : "EN16931",
@@ -861,6 +1096,14 @@ async function handleV2GenerateSubmit() {
 
     const result = await res.json();
     if (!result.success) throw new Error(result.error || "Generation failed");
+
+    // Populate XML viewer with the generated XML
+    const xmlViewer = document.getElementById("v2XmlViewer");
+    if (xmlViewer && result.xml_content) {
+      xmlViewer.dataset.rawXml = result.xml_content;
+      xmlViewer.textContent = result.xml_content;
+      v2CurrentXml = result.xml_content;
+    }
 
     // Success dialog or auto-download
     const alertEl = document.getElementById("v2AlertBanner");
@@ -873,7 +1116,10 @@ async function handleV2GenerateSubmit() {
           <div>
             <strong>🎉 Successfully Created!</strong> ${result.output_filename}
           </div>
-          <div style="display: flex; gap: 0.5rem;">
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.78rem;" onclick="toggleV2XmlPreview()">
+              📄 View XML
+            </button>
             <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.78rem;" onclick="openPdfPreview('${result.output_filename}', '${escapeHtml(invData.invoice_number)}')">
               👁️ View Preview
             </button>
@@ -1010,6 +1256,11 @@ function populateV2FromHistory(inv, layout) {
   }
   renderV2DocumentDiscounts();
 
+  // Notes
+  const historyNotes = inv.invoice_notes || inv.notes || [];
+  v2ExtractedNotes = Array.isArray(historyNotes) ? historyNotes.filter(n => n && String(n).trim().length > 0) : [];
+  renderV2InvoiceNotes();
+
   // Confidence indicators if saved
   if (inv.confidence_scores) {
     applyV2ConfidenceScores(inv.confidence_scores);
@@ -1019,7 +1270,79 @@ function populateV2FromHistory(inv, layout) {
 }
 window.populateV2FromHistory = populateV2FromHistory;
 
+// =========================================================================
+// STUDIO V2 LIVE XML PREVIEW & HIGHLIGHT INTEGRATION
+// =========================================================================
+
+let v2CurrentXml = "";
+
+async function updateV2LiveXml() {
+  const viewer = document.getElementById("v2XmlViewer");
+  const badge = document.getElementById("v2XmlProfileBadge");
+  if (!viewer) return;
+
+  try {
+    const invData = harvestV2InvoiceData();
+    const isOrderX = invData.document_format === "orderx";
+    if (badge) {
+      badge.textContent = isOrderX ? "Order-X BASIC" : "EN 16931";
+    }
+
+    const res = await fetch("/api/generate-xml", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        invoice_data: invData,
+        profile: isOrderX ? "BASIC" : "EN16931"
+      })
+    });
+
+    const data = await res.json();
+    if (data.xml_content) {
+      v2CurrentXml = data.xml_content;
+      viewer.dataset.rawXml = data.xml_content;
+      viewer.textContent = data.xml_content;
+
+      // If an active element is focused, highlight it immediately
+      const activeEl = document.activeElement;
+      if (activeEl && typeof highlightXmlForInput === "function") {
+        highlightXmlForInput(activeEl);
+      }
+    }
+  } catch (err) {
+    console.warn("Could not generate live XML in Studio v2:", err);
+  }
+}
+window.updateV2LiveXml = updateV2LiveXml;
+
+function toggleV2XmlPreview() {
+  const card = document.getElementById("v2XmlCard");
+  if (!card) return;
+  const isHidden = card.style.display === "none" || card.classList.contains("hidden");
+  card.style.display = isHidden ? "block" : "none";
+  card.classList.remove("hidden");
+
+  if (isHidden) {
+    updateV2LiveXml();
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+window.toggleV2XmlPreview = toggleV2XmlPreview;
+
+function copyV2XmlToClipboard() {
+  const viewer = document.getElementById("v2XmlViewer");
+  const xml = (viewer && viewer.dataset.rawXml) || v2CurrentXml || (viewer ? viewer.textContent : "");
+  if (!xml) return;
+  navigator.clipboard.writeText(xml).then(() => {
+    alert("✅ XML copied to clipboard!");
+  }).catch(e => {
+    alert("Could not copy XML: " + e.message);
+  });
+}
+window.copyV2XmlToClipboard = copyV2XmlToClipboard;
+
 // Run on load
 document.addEventListener("DOMContentLoaded", () => {
   initV2Studio();
 });
+

@@ -33,6 +33,8 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 class ExtractionRequest(BaseModel):
     file_id: str
     api_key: Optional[str] = None
+    prompt_id: Optional[str] = None
+    prompt_text: Optional[str] = None
 
 class GenerateXmlRequest(BaseModel):
     invoice_data: InvoiceData
@@ -50,7 +52,8 @@ class CombineRequest(BaseModel):
 class CreateFromManualRequest(BaseModel):
     invoice_data: InvoiceData
     profile: Optional[str] = "EN16931"
-    layout: Optional[str] = "layout1"
+    layout: Optional[str] = "original"
+    file_id: Optional[str] = None
     token_usage: Optional[dict] = None
     generator: Optional[str] = "v1"
     source_type: Optional[str] = "manual"
@@ -105,8 +108,23 @@ async def extract_pdf(req: ExtractionRequest):
     if not os.path.exists(target_path):
         raise HTTPException(status_code=404, detail="Uploaded file not found.")
     
+    # Resolve system prompt: user request prompt_text > prompt_id from settings > active_prompt_id from settings > default
+    sys_settings = load_system_settings()
+    custom_prompt = None
+    if req.prompt_text and req.prompt_text.strip():
+        custom_prompt = req.prompt_text.strip()
+    elif req.prompt_id and "extraction_prompts" in sys_settings:
+        prompts = sys_settings.get("extraction_prompts", {})
+        if req.prompt_id in prompts:
+            custom_prompt = prompts[req.prompt_id].get("content")
+    elif "active_prompt_id" in sys_settings and "extraction_prompts" in sys_settings:
+        active_id = sys_settings.get("active_prompt_id")
+        prompts = sys_settings.get("extraction_prompts", {})
+        if active_id in prompts:
+            custom_prompt = prompts[active_id].get("content")
+
     try:
-        data, usage_info = extract_invoice_data(target_path, api_key=req.api_key)
+        data, usage_info = extract_invoice_data(target_path, api_key=req.api_key, system_prompt=custom_prompt)
         # Also build initial XML for instant preview
         xml_content = generate_facturx_xml(data)
         return {
@@ -120,7 +138,11 @@ async def extract_pdf(req: ExtractionRequest):
 @app.post("/api/generate-xml")
 async def generate_xml(req: GenerateXmlRequest):
     try:
-        xml_content = generate_facturx_xml(req.invoice_data, profile=req.profile or "EN16931")
+        is_orderx = getattr(req.invoice_data, "document_format", "zugferd") == "orderx" or req.invoice_data.invoice_type_code == "220"
+        if is_orderx:
+            xml_content = generate_orderx_xml(req.invoice_data, profile=req.profile or "BASIC")
+        else:
+            xml_content = generate_facturx_xml(req.invoice_data, profile=req.profile or "EN16931")
         return {"xml_content": xml_content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -240,15 +262,30 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
     work_id = uuid.uuid4().hex
     visual_pdf_path = os.path.join(OUTPUT_DIR, f"{work_id}_visual.pdf")
     xml_path = os.path.join(OUTPUT_DIR, f"{work_id}_factur-x.xml")
-    chosen_layout = req.layout or "layout1"
+    chosen_layout = req.layout or "original"
     clean_inv_num = (req.invoice_data.invoice_number or "invoice").replace("/", "_").replace("\\", "_")
     final_pdf_name = f"zugferd_{chosen_layout}_{clean_inv_num}_{work_id[:6]}.pdf"
     final_pdf_path = os.path.join(OUTPUT_DIR, final_pdf_name)
 
-    # 1. Generate visual PDF (incorporating company logo if uploaded and layout choice)
-    logo_file = LOGO_PATH if os.path.exists(LOGO_PATH) else None
-    sys_settings = load_system_settings()
-    generate_invoice_pdf_from_data(req.invoice_data, visual_pdf_path, logo_path=logo_file, layout=chosen_layout, footer_config=sys_settings)
+    # 1. Determine base PDF: If original format chosen and file uploaded, use original PDF; otherwise synthesize layout
+    is_original_format = chosen_layout == "original"
+    source_uploaded_pdf = None
+    if req.file_id:
+        cand_path = os.path.join(UPLOAD_DIR, req.file_id)
+        if os.path.exists(cand_path) and cand_path.lower().endswith(".pdf"):
+            source_uploaded_pdf = cand_path
+
+    if is_original_format and source_uploaded_pdf:
+        base_pdf_path = source_uploaded_pdf
+        is_temp_visual = False
+    else:
+        # Fall back or use selected layout
+        effective_layout = "layout1" if chosen_layout == "original" else chosen_layout
+        logo_file = LOGO_PATH if os.path.exists(LOGO_PATH) else None
+        sys_settings = load_system_settings()
+        generate_invoice_pdf_from_data(req.invoice_data, visual_pdf_path, logo_path=logo_file, layout=effective_layout, footer_config=sys_settings)
+        base_pdf_path = visual_pdf_path
+        is_temp_visual = True
 
     # 2. Generate XML (Factur-X or Order-X)
     is_orderx = getattr(req.invoice_data, "document_format", "zugferd") == "orderx" or req.invoice_data.invoice_type_code == "220"
@@ -265,7 +302,7 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
     # 3. Combine into PDF/A-3
     try:
         build_pdfa3_zugferd(
-            input_pdf_path=visual_pdf_path,
+            input_pdf_path=base_pdf_path,
             facturx_xml_path=xml_path,
             output_pdf_path=final_pdf_path,
             profile=req.profile or ("BASIC" if is_orderx else "EN16931"),
@@ -279,7 +316,7 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
         }
 
     # 4. Clean up temp visual PDF
-    if os.path.exists(visual_pdf_path):
+    if is_temp_visual and os.path.exists(visual_pdf_path):
         try:
             os.remove(visual_pdf_path)
         except Exception:
@@ -345,10 +382,11 @@ async def preview_file(filename: str):
 SETTINGS_FILE = os.path.join(UPLOAD_DIR, "system_settings.json")
 
 DEFAULT_SETTINGS = {
-    "seller_name": "Acme Solutions Ltd",
-    "seller_vat": "DE123456789",
-    "seller_street": "Bahnhofstrasse 10",
-    "seller_city": "10115 Berlin",
+    "seller_name": "odelo GmbH",
+    "seller_vat": "DE347120003",
+    "seller_street": "Hedelfinger Straße 137",
+    "seller_postcode": "70329",
+    "seller_city": "Stuttgart",
     "seller_country": "DE",
     "seller_website": "www.acme-solutions.com",
     "seller_court": "Amtsgericht Stuttgart",
@@ -366,6 +404,41 @@ DEFAULT_SETTINGS = {
     "saved_parties": {
         "sellers": [],
         "buyers": []
+    },
+    "active_prompt_id": "standard_en16931",
+    "extraction_prompts": {
+        "standard_en16931": {
+            "name": "Standard EN 16931 & ZUGFeRD 2.x (Recommended)",
+            "description": "Standard European invoice parser for invoice number, dates, parties, reverse-charge taxes, and totals.",
+            "content": """You are an expert accounting system and invoice parser specialized in European standard EN 16931 and ZUGFeRD / Factur-X specifications.
+Your goal is to parse raw text extracted from invoice PDFs into a clean, complete, structured InvoiceData object.
+
+Instructions:
+1. Identify Invoice Number, Issue Date (format YYYY-MM-DD or DD.MM.YYYY), Due Date, and Currency (e.g. EUR).
+2. Identify Seller (Supplier) details: Name, Street, Postcode, City, Country Code (ISO alpha-2 e.g. DE, SI), VAT ID (e.g. DE814113634), Tax Registration Number (e.g. HRB number or local tax number), and Contact details.
+3. Identify Buyer (Customer) details: Name, Street, Postcode, City, Country Code (e.g. SI, DE), VAT ID (e.g. SI52093808), and Buyer Reference (if present).
+4. Payment information: IBAN (remove spaces), BIC/SWIFT, Bank Name, and Payment Terms text.
+5. Line items: For each line item, extract name/description, quantity (default 1.0 if not listed), unit code (e.g. C62 for pieces/units, HUR for hours, or DAY), unit price, net line total amount, tax category code ('S' for standard, 'AE' for reverse charge, 'Z' for zero, 'E' for exempt), and tax rate percent.
+6. Tax breakdown: Provide tax basis amount, tax percent, tax amount, and exemption reason if reverse charge (e.g. "Reverse charge / The beneficiary is responsible for the taxation of this amount").
+7. Totals: Calculate or extract line_net_total, tax_total, grand_total, and due_payable_amount. Verify that line_net_total + tax_total == grand_total (and due_payable_amount).
+8. Confidence scoring: In confidence_scores dictionary, assign 'HIGH', 'MEDIUM', or 'LOW' for each field:
+   - 'HIGH' if the field was clearly labeled and explicitly printed on the document.
+   - 'MEDIUM' if inferred, calculated from other numbers, or slightly ambiguous.
+   - 'LOW' if guessed, defaulted, or hard to distinguish on the invoice.
+   Keys: 'invoice_number', 'issue_date', 'currency', 'buyer_reference', 'seller_name', 'seller_vat', 'seller_street', 'seller_city', 'buyer_name', 'buyer_vat', 'buyer_street', 'buyer_city', 'iban', 'bic', 'total_net', 'total_tax', 'total_grand', 'total_due'."""
+        },
+        "automotive_german": {
+            "name": "German Automotive & Manufacturing (Strict Tax & PO)",
+            "description": "Optimized for German DACH invoices with USt-IdNr, Steuernummer, Delivery Dates, and explicit PO/Order References.",
+            "content": """You are an accounting specialist focused on German manufacturing, supply-chain, and automotive suppliers (e.g., DIN / EN 16931).
+Parse the raw document text into an InvoiceData object with extra precision on:
+1. Identifying German tax numbers: USt-IdNr (format DE followed by 9 digits) and Steuernummer / HRB register court details.
+2. Detecting Order Number / Purchase Order (Bestellnummer / PO) and preceding invoice references if Gutschrift / Credit Note.
+3. Extracting exact German addresses (PLZ 5 digits, Ort, Strasse, Hausnummer).
+4. Extracting payment terms, Skonto discounts, or banking details (IBAN/BIC).
+5. Accurate line items with German standard tax rates (19% standard, 7% reduced, or 0% reverse charge § 13b UStG).
+6. Provide accurate confidence scores ('HIGH', 'MEDIUM', 'LOW')."""
+        }
     }
 }
 
@@ -377,6 +450,11 @@ def load_system_settings() -> dict:
                 data = json.load(f)
                 res = DEFAULT_SETTINGS.copy()
                 res.update(data)
+                # Ensure extraction_prompts is always present
+                if "extraction_prompts" not in res or not res["extraction_prompts"]:
+                    res["extraction_prompts"] = DEFAULT_SETTINGS["extraction_prompts"]
+                if "active_prompt_id" not in res or not res["active_prompt_id"]:
+                    res["active_prompt_id"] = "standard_en16931"
                 return res
         except Exception:
             pass
@@ -506,10 +584,7 @@ def delete_history_item(entry_id: str):
     save_history(history)
     return {"success": True}
 
-@app.post("/api/config/settings")
-async def save_server_settings(req: SaveSettingsRequest):
-    save_system_settings(req.settings)
-    return {"success": True, "settings": req.settings}
+
 
 # Mount frontend static files
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))

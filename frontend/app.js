@@ -59,14 +59,54 @@ let cachedCompanySettings = {
   seller_bank1_iban: "DE89370400440532013000",
   seller_bank2_name: "Baden-Württembergische Bank",
   seller_bank2_bic: "SOLA DEST",
-  seller_bank2_iban: "DE30 6005 0101 7871 5056 72"
+  seller_bank2_iban: "DE30 6005 0101 7871 5056 72",
+  active_prompt_id: "standard_en16931",
+  extraction_prompts: {
+    standard_en16931: {
+      name: "Standard EN 16931 & ZUGFeRD 2.x (Recommended)",
+      description: "Standard European invoice parser for invoice number, dates, parties, reverse-charge taxes, and totals.",
+      content: `You are an expert accounting system and invoice parser specialized in European standard EN 16931 and ZUGFeRD / Factur-X specifications.
+Your goal is to parse raw text extracted from invoice PDFs into a clean, complete, structured InvoiceData object.
+
+Instructions:
+1. Identify Invoice Number, Issue Date (format YYYY-MM-DD or DD.MM.YYYY), Due Date, and Currency (e.g. EUR).
+2. Identify Seller (Supplier) details: Name, Street, Postcode, City, Country Code (ISO alpha-2 e.g. DE, SI), VAT ID (e.g. DE814113634), Tax Registration Number (e.g. HRB number or local tax number), and Contact details.
+3. Identify Buyer (Customer) details: Name, Street, Postcode, City, Country Code (e.g. SI, DE), VAT ID (e.g. SI52093808), and Buyer Reference (if present).
+4. Payment information: IBAN (remove spaces), BIC/SWIFT, Bank Name, and Payment Terms text.
+5. Line items: For each line item, extract name/description, quantity (default 1.0 if not listed), unit code (e.g. C62 for pieces/units, HUR for hours, or DAY), unit price, net line total amount, tax category code ('S' for standard, 'AE' for reverse charge, 'Z' for zero, 'E' for exempt), and tax rate percent.
+6. Tax breakdown: Provide tax basis amount, tax percent, tax amount, and exemption reason if reverse charge (e.g. "Reverse charge / The beneficiary is responsible for the taxation of this amount").
+7. Totals: Calculate or extract line_net_total, tax_total, grand_total, and due_payable_amount. Verify that line_net_total + tax_total == grand_total (and due_payable_amount).
+8. Confidence scoring: In confidence_scores dictionary, assign 'HIGH', 'MEDIUM', or 'LOW' for each field:
+   - 'HIGH' if the field was clearly labeled and explicitly printed on the document.
+   - 'MEDIUM' if inferred, calculated from other numbers, or slightly ambiguous.
+   - 'LOW' if guessed, defaulted, or hard to distinguish on the invoice.
+   Keys: 'invoice_number', 'issue_date', 'currency', 'buyer_reference', 'seller_name', 'seller_vat', 'seller_street', 'seller_city', 'buyer_name', 'buyer_vat', 'buyer_street', 'buyer_city', 'iban', 'bic', 'total_net', 'total_tax', 'total_grand', 'total_due'.`
+    },
+    automotive_german: {
+      name: "German Automotive & Manufacturing (Strict Tax & PO)",
+      description: "Optimized for German DACH invoices with USt-IdNr, Steuernummer, Delivery Dates, and explicit PO/Order References.",
+      content: `You are an accounting specialist focused on German manufacturing, supply-chain, and automotive suppliers (e.g., DIN / EN 16931).
+Parse the raw document text into an InvoiceData object with extra precision on:
+1. Identifying German tax numbers: USt-IdNr (format DE followed by 9 digits) and Steuernummer / HRB register court details.
+2. Detecting Order Number / Purchase Order (Bestellnummer / PO) and preceding invoice references if Gutschrift / Credit Note.
+3. Extracting exact German addresses (PLZ 5 digits, Ort, Strasse, Hausnummer).
+4. Extracting payment terms, Skonto discounts, or banking details (IBAN/BIC).
+5. Accurate line items with German standard tax rates (19% standard, 7% reduced, or 0% reverse charge § 13b UStG).
+6. Provide accurate confidence scores ('HIGH', 'MEDIUM', 'LOW').`
+    }
+  }
 };
 
 function getSellerSettings() {
   const local = localStorage.getItem("ZUGFERD_COMPANY_SETTINGS");
   if (local) {
     try {
-      return Object.assign({}, cachedCompanySettings, JSON.parse(local));
+      const parsed = JSON.parse(local);
+      const res = Object.assign({}, cachedCompanySettings, parsed);
+      if (!res.extraction_prompts || Object.keys(res.extraction_prompts).length === 0) {
+        res.extraction_prompts = cachedCompanySettings.extraction_prompts;
+      }
+      return res;
     } catch (e) { }
   }
   return cachedCompanySettings;
@@ -77,11 +117,13 @@ function applySellerSettingsToInputs(settings) {
     cfgSellerName: "seller_name",
     cfgSellerVat: "seller_vat",
     cfgSellerStreet: "seller_street",
+    cfgSellerPostcode: "seller_postcode",
     cfgSellerCity: "seller_city",
     cfgSellerCountry: "seller_country",
     cfgSellerWebsite: "seller_website",
     cfgSellerCourt: "seller_court",
     cfgSellerHrb: "seller_hrb",
+    cfgSellerTaxNumber: "seller_tax_number",
     cfgSellerUstId: "seller_ust_id",
     cfgSellerPhone: "seller_phone",
     cfgSellerFax: "seller_fax",
@@ -99,7 +141,24 @@ function applySellerSettingsToInputs(settings) {
       el.value = settings[key];
     }
   }
+
+  // If postcode is empty but city has postcode prefix (e.g. '70329 Stuttgart'), split them
+  const pcEl = document.getElementById("cfgSellerPostcode");
+  const cityEl = document.getElementById("cfgSellerCity");
+  if (cityEl && cityEl.value) {
+    const matchPc = cityEl.value.match(/^(\d{4,5})\s+(.*)$/);
+    if (matchPc) {
+      if (pcEl && (!pcEl.value || pcEl.value === "10115")) {
+        pcEl.value = matchPc[1];
+      }
+      cityEl.value = matchPc[2];
+    }
+  }
+  if (pcEl && (!pcEl.value || pcEl.value === "10115")) {
+    pcEl.value = "70329";
+  }
 }
+
 
 function populateManualSellerDefaults() {
   const s = getSellerSettings();
@@ -158,6 +217,7 @@ async function loadPreferences() {
         applySellerSettingsToInputs(cachedCompanySettings);
         populateManualSellerDefaults();
         renderSavedPartiesConfig();
+        renderPromptConfigUI();
         if (typeof loadV2SavedPartiesDropdowns === "function") {
           loadV2SavedPartiesDropdowns();
         }
@@ -207,15 +267,29 @@ async function saveConfiguration() {
   }
 
   // Gather seller & footer settings from configuration form
+  let rawCity = document.getElementById("cfgSellerCity")?.value.trim() || "";
+  let rawPostcode = document.getElementById("cfgSellerPostcode")?.value.trim() || "";
+  if (!rawPostcode && rawCity) {
+    const m = rawCity.match(/^(\d{4,5})\s+(.*)$/);
+    if (m) {
+      rawPostcode = m[1];
+      rawCity = m[2];
+    }
+  } else if (rawCity && /^\d{4,5}\s+/.test(rawCity)) {
+    rawCity = rawCity.replace(/^\d{4,5}\s+/, "").trim();
+  }
+
   const newSettings = {
     seller_name: document.getElementById("cfgSellerName")?.value.trim() || "",
     seller_vat: document.getElementById("cfgSellerVat")?.value.trim() || "",
     seller_street: document.getElementById("cfgSellerStreet")?.value.trim() || "",
-    seller_city: document.getElementById("cfgSellerCity")?.value.trim() || "",
+    seller_postcode: rawPostcode || "70329",
+    seller_city: rawCity || "Stuttgart",
     seller_country: document.getElementById("cfgSellerCountry")?.value.trim() || "DE",
     seller_website: document.getElementById("cfgSellerWebsite")?.value.trim() || "",
     seller_court: document.getElementById("cfgSellerCourt")?.value.trim() || "",
     seller_hrb: document.getElementById("cfgSellerHrb")?.value.trim() || "",
+    seller_tax_number: document.getElementById("cfgSellerTaxNumber")?.value.trim() || "",
     seller_ust_id: document.getElementById("cfgSellerUstId")?.value.trim() || "",
     seller_phone: document.getElementById("cfgSellerPhone")?.value.trim() || "",
     seller_fax: document.getElementById("cfgSellerFax")?.value.trim() || "",
@@ -226,8 +300,20 @@ async function saveConfiguration() {
     seller_bank2_name: document.getElementById("cfgBank2Name")?.value.trim() || "",
     seller_bank2_bic: document.getElementById("cfgBank2Bic")?.value.trim() || "",
     seller_bank2_iban: document.getElementById("cfgBank2Iban")?.value.trim() || "",
-    saved_parties: currentParties
+    saved_parties: currentParties,
+    active_prompt_id: currentEditingPromptId || (window.cachedCompanySettings && window.cachedCompanySettings.active_prompt_id) || "standard_en16931",
+    extraction_prompts: (window.cachedCompanySettings && window.cachedCompanySettings.extraction_prompts) || {}
   };
+
+  // If prompt editor is modified, save current active prompt content
+  if (currentEditingPromptId && newSettings.extraction_prompts[currentEditingPromptId]) {
+    const pName = document.getElementById("cfgPromptName")?.value.trim();
+    const pDesc = document.getElementById("cfgPromptDesc")?.value.trim();
+    const pContent = document.getElementById("cfgPromptContent")?.value.trim();
+    if (pName) newSettings.extraction_prompts[currentEditingPromptId].name = pName;
+    if (pDesc) newSettings.extraction_prompts[currentEditingPromptId].description = pDesc;
+    if (pContent) newSettings.extraction_prompts[currentEditingPromptId].content = pContent;
+  }
 
   window.cachedCompanySettings = Object.assign({}, window.cachedCompanySettings, newSettings);
   localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(window.cachedCompanySettings));
@@ -253,6 +339,7 @@ async function saveConfiguration() {
   // Update manual and v2 forms
   populateManualSellerDefaults();
   renderSavedPartiesConfig();
+  renderPromptConfigUI();
   if (typeof loadV2SavedPartiesDropdowns === "function") {
     loadV2SavedPartiesDropdowns();
   }
@@ -260,6 +347,215 @@ async function saveConfiguration() {
   alert("Configuration saved successfully!");
 }
 window.saveConfiguration = saveConfiguration;
+
+// ================= PROMPT MANAGEMENT (CONFIG VIEW) =================
+let currentEditingPromptId = "standard_en16931";
+
+function renderPromptConfigUI() {
+  const settings = getSellerSettings();
+  window.cachedCompanySettings = settings;
+  const prompts = settings.extraction_prompts || {};
+  const activeId = settings.active_prompt_id || "standard_en16931";
+  currentEditingPromptId = activeId;
+
+  const selectEl = document.getElementById("cfgPromptSelect");
+  if (!selectEl) return;
+  selectEl.innerHTML = "";
+
+  Object.entries(prompts).forEach(([id, p]) => {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = `${p.name || id} ${id === activeId ? '★ (Active)' : ''}`;
+    if (id === currentEditingPromptId) opt.selected = true;
+    selectEl.appendChild(opt);
+  });
+
+  populatePromptEditor(currentEditingPromptId);
+}
+window.renderPromptConfigUI = renderPromptConfigUI;
+
+function populatePromptEditor(promptId) {
+  const settings = window.cachedCompanySettings || {};
+  const prompts = settings.extraction_prompts || {};
+  const p = prompts[promptId];
+  if (!p) return;
+
+  currentEditingPromptId = promptId;
+
+  const nameEl = document.getElementById("cfgPromptName");
+  const descEl = document.getElementById("cfgPromptDesc");
+  const contentEl = document.getElementById("cfgPromptContent");
+  const badgeEl = document.getElementById("promptStatusBadge");
+  const delBtn = document.getElementById("btnDeletePrompt");
+
+  if (nameEl) nameEl.value = p.name || "";
+  if (descEl) descEl.value = p.description || "";
+  if (contentEl) contentEl.value = p.content || "";
+
+  const isActive = (settings.active_prompt_id || "standard_en16931") === promptId;
+  if (badgeEl) {
+    badgeEl.textContent = isActive ? "Active Preset" : "Alternative Preset";
+    badgeEl.style.background = isActive ? "rgba(16, 185, 129, 0.15)" : "rgba(148, 163, 184, 0.15)";
+    badgeEl.style.color = isActive ? "#10b981" : "var(--text-muted)";
+  }
+
+  if (delBtn) {
+    delBtn.style.display = promptId === "standard_en16931" ? "none" : "inline-flex";
+  }
+}
+
+async function handlePromptSelectionChange(promptId) {
+  currentEditingPromptId = promptId;
+  populatePromptEditor(promptId);
+
+  // Set as active prompt
+  const settings = window.cachedCompanySettings || {};
+  settings.active_prompt_id = promptId;
+  window.cachedCompanySettings = settings;
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(settings));
+
+  try {
+    await fetch("/api/config/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { active_prompt_id: promptId } })
+    });
+  } catch (e) {
+    console.warn("Could not save active prompt selection:", e);
+  }
+
+  renderPromptConfigUI();
+}
+window.handlePromptSelectionChange = handlePromptSelectionChange;
+
+function addNewPromptTemplate() {
+  const name = prompt("Enter a title for the new prompt preset:", "Specialized Custom Prompt");
+  if (!name || !name.trim()) return;
+
+  const newId = "prompt_" + Date.now().toString(36);
+  const settings = window.cachedCompanySettings || {};
+  if (!settings.extraction_prompts) settings.extraction_prompts = {};
+
+  const baseContent = (settings.extraction_prompts[currentEditingPromptId] && settings.extraction_prompts[currentEditingPromptId].content) ||
+    document.getElementById("cfgPromptContent")?.value || "";
+
+  settings.extraction_prompts[newId] = {
+    name: name.trim(),
+    description: "Custom user-defined invoice parser prompt",
+    content: baseContent
+  };
+  settings.active_prompt_id = newId;
+
+  window.cachedCompanySettings = settings;
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(settings));
+
+  // Sync to backend
+  fetch("/api/config/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ settings: settings })
+  }).catch(e => console.warn(e));
+
+  renderPromptConfigUI();
+}
+window.addNewPromptTemplate = addNewPromptTemplate;
+
+async function savePromptPresetOnly() {
+  const name = document.getElementById("cfgPromptName")?.value.trim();
+  const desc = document.getElementById("cfgPromptDesc")?.value.trim();
+  const content = document.getElementById("cfgPromptContent")?.value.trim();
+
+  if (!name) {
+    alert("Prompt Preset Name is required.");
+    return;
+  }
+  if (!content) {
+    alert("Prompt Content cannot be empty.");
+    return;
+  }
+
+  const settings = window.cachedCompanySettings || {};
+  if (!settings.extraction_prompts) settings.extraction_prompts = {};
+  if (!settings.extraction_prompts[currentEditingPromptId]) {
+    settings.extraction_prompts[currentEditingPromptId] = {};
+  }
+
+  settings.extraction_prompts[currentEditingPromptId].name = name;
+  settings.extraction_prompts[currentEditingPromptId].description = desc;
+  settings.extraction_prompts[currentEditingPromptId].content = content;
+  settings.active_prompt_id = currentEditingPromptId;
+
+  window.cachedCompanySettings = settings;
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(settings));
+
+  try {
+    await fetch("/api/config/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: settings })
+    });
+    alert(`✅ Prompt Preset "${name}" saved and set as active parser!`);
+  } catch (err) {
+    alert("Could not save prompt to server: " + err.message);
+  }
+
+  renderPromptConfigUI();
+}
+window.savePromptPresetOnly = savePromptPresetOnly;
+
+async function deleteActivePrompt() {
+  if (currentEditingPromptId === "standard_en16931") {
+    alert("The standard default prompt preset cannot be deleted.");
+    return;
+  }
+  if (!confirm("Are you sure you want to delete this prompt preset?")) return;
+
+  const settings = window.cachedCompanySettings || {};
+  if (settings.extraction_prompts && settings.extraction_prompts[currentEditingPromptId]) {
+    delete settings.extraction_prompts[currentEditingPromptId];
+  }
+  settings.active_prompt_id = "standard_en16931";
+  currentEditingPromptId = "standard_en16931";
+
+  window.cachedCompanySettings = settings;
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(settings));
+
+  try {
+    await fetch("/api/config/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: settings })
+    });
+  } catch (e) {
+    console.warn(e);
+  }
+
+  renderPromptConfigUI();
+}
+window.deleteActivePrompt = deleteActivePrompt;
+
+function resetActivePromptToDefault() {
+  const defaultPrompt = `You are an expert accounting system and invoice parser specialized in European standard EN 16931 and ZUGFeRD / Factur-X specifications.
+Your goal is to parse raw text extracted from invoice PDFs into a clean, complete, structured InvoiceData object.
+
+Instructions:
+1. Identify Invoice Number, Issue Date (format YYYY-MM-DD or DD.MM.YYYY), Due Date, and Currency (e.g. EUR).
+2. Identify Seller (Supplier) details: Name, Street, Postcode, City, Country Code (ISO alpha-2 e.g. DE, SI), VAT ID (e.g. DE814113634), Tax Registration Number (e.g. HRB number or local tax number), and Contact details.
+3. Identify Buyer (Customer) details: Name, Street, Postcode, City, Country Code (e.g. SI, DE), VAT ID (e.g. SI52093808), and Buyer Reference (if present).
+4. Payment information: IBAN (remove spaces), BIC/SWIFT, Bank Name, and Payment Terms text.
+5. Line items: For each line item, extract name/description, quantity (default 1.0 if not listed), unit code (e.g. C62 for pieces/units, HUR for hours, or DAY), unit price, net line total amount, tax category code ('S' for standard, 'AE' for reverse charge, 'Z' for zero, 'E' for exempt), and tax rate percent.
+6. Tax breakdown: Provide tax basis amount, tax percent, tax amount, and exemption reason if reverse charge (e.g. "Reverse charge / The beneficiary is responsible for the taxation of this amount").
+7. Totals: Calculate or extract line_net_total, tax_total, grand_total, and due_payable_amount. Verify that line_net_total + tax_total == grand_total (and due_payable_amount).
+8. Confidence scoring: In confidence_scores dictionary, assign 'HIGH', 'MEDIUM', or 'LOW' for each field:
+   - 'HIGH' if the field was clearly labeled and explicitly printed on the document.
+   - 'MEDIUM' if inferred, calculated from other numbers, or slightly ambiguous.
+   - 'LOW' if guessed, defaulted, or hard to distinguish on the invoice.
+   Keys: 'invoice_number', 'issue_date', 'currency', 'buyer_reference', 'seller_name', 'seller_vat', 'seller_street', 'seller_city', 'buyer_name', 'buyer_vat', 'buyer_street', 'buyer_city', 'iban', 'bic', 'total_net', 'total_tax', 'total_grand', 'total_due'.`;
+
+  const contentEl = document.getElementById("cfgPromptContent");
+  if (contentEl) contentEl.value = defaultPrompt;
+}
+window.resetActivePromptToDefault = resetActivePromptToDefault;
 
 // ================= SAVED PARTIES MANAGEMENT (CONFIG VIEW) =================
 async function renderSavedPartiesConfig() {
@@ -678,6 +974,7 @@ function executeSwitchScenario(scenario) {
   if (scenario === "config") {
     applySellerSettingsToInputs(getSellerSettings());
     renderSavedPartiesConfig();
+    renderPromptConfigUI();
     checkLogoStatus();
   }
   if (scenario === "v2") {
@@ -2225,3 +2522,218 @@ async function deleteHistoryInvoice(id) {
   }
 }
 window.deleteHistoryInvoice = deleteHistoryInvoice;
+
+// =========================================================================
+// UNIVERSAL XML FIELD HIGHLIGHTING ENGINE (v1 & v2)
+// When clicking/focusing any form field, highlights the corresponding XML tags/data in the viewer
+// =========================================================================
+
+const XML_FIELD_MAP = {
+  // Document Info
+  "invNumber": ["<ram:ID>", "</ram:ID>"],
+  "invIssueDate": ["<ram:IssueDateTime>", "</ram:IssueDateTime>", "<udt:DateTimeString"],
+  "invCurrency": ["<ram:InvoiceCurrencyCode>", "</ram:InvoiceCurrencyCode>"],
+  "invBuyerRef": ["<ram:BuyerReference>", "</ram:BuyerReference>"],
+
+  // Manual Form (v1)
+  "manInvNumber": ["<ram:ID>", "</ram:ID>"],
+  "manIssueDate": ["<ram:IssueDateTime>", "</ram:IssueDateTime>", "<udt:DateTimeString"],
+  "manDueDate": ["<ram:DueDateDateTime>", "</ram:DueDateDateTime>", "<ram:SpecifiedTradePaymentTerms>"],
+  "manCurrency": ["<ram:InvoiceCurrencyCode>", "</ram:InvoiceCurrencyCode>"],
+  "manBuyerRef": ["<ram:BuyerReference>", "</ram:BuyerReference>"],
+  "manSellerName": ["<ram:SellerTradeParty>", "<ram:Name>"],
+  "manSellerVat": ["<ram:SellerTradeParty>", "schemeID=\"VA\">"],
+  "manSellerStreet": ["<ram:SellerTradeParty>", "<ram:LineOne>"],
+  "manSellerCity": ["<ram:SellerTradeParty>", "<ram:CityName>"],
+  "manBuyerName": ["<ram:BuyerTradeParty>", "<ram:Name>"],
+  "manBuyerVat": ["<ram:BuyerTradeParty>", "schemeID=\"VA\">"],
+  "manBuyerStreet": ["<ram:BuyerTradeParty>", "<ram:LineOne>"],
+  "manBuyerCity": ["<ram:BuyerTradeParty>", "<ram:CityName>"],
+  "manIban": ["<ram:PayeePartyCreditorFinancialAccount>", "<ram:IBANID>"],
+  "manBic": ["<ram:PayeeSpecifiedCreditorFinancialInstitution>", "<ram:BICID>"],
+  "manNetTotal": ["<ram:LineTotalAmount>", "<ram:TaxBasisTotalAmount>"],
+  "manTaxTotal": ["<ram:TaxTotalAmount"],
+  "manGrandTotal": ["<ram:GrandTotalAmount>"],
+
+  // PDF Extraction form
+  "sellerName": ["<ram:SellerTradeParty>", "<ram:Name>"],
+  "sellerVat": ["<ram:SellerTradeParty>", "schemeID=\"VA\">"],
+  "sellerStreet": ["<ram:SellerTradeParty>", "<ram:LineOne>"],
+  "sellerCity": ["<ram:SellerTradeParty>", "<ram:CityName>"],
+  "buyerName": ["<ram:BuyerTradeParty>", "<ram:Name>"],
+  "buyerVat": ["<ram:BuyerTradeParty>", "schemeID=\"VA\">"],
+  "buyerStreet": ["<ram:BuyerTradeParty>", "<ram:LineOne>"],
+  "buyerCity": ["<ram:BuyerTradeParty>", "<ram:CityName>"],
+  "payIban": ["<ram:PayeePartyCreditorFinancialAccount>", "<ram:IBANID>"],
+  "payBic": ["<ram:PayeeSpecifiedCreditorFinancialInstitution>", "<ram:BICID>"],
+  "totNet": ["<ram:LineTotalAmount>", "<ram:TaxBasisTotalAmount>"],
+  "totTax": ["<ram:TaxTotalAmount"],
+  "totGrand": ["<ram:GrandTotalAmount>"],
+  "totDue": ["<ram:DuePayableAmount>"],
+
+  // DOCX form
+  "docxInvNumber": ["<ram:ID>", "</ram:ID>"],
+  "docxInvIssueDate": ["<ram:IssueDateTime>", "</ram:IssueDateTime>"],
+  "docxSellerName": ["<ram:SellerTradeParty>", "<ram:Name>"],
+  "docxBuyerName": ["<ram:BuyerTradeParty>", "<ram:Name>"],
+  "docxTotNet": ["<ram:LineTotalAmount>"],
+  "docxTotGrand": ["<ram:GrandTotalAmount>"],
+
+  // Studio v2
+  "v2InvNumber": ["<ram:ID>", "</ram:ID>"],
+  "v2DocTypeSelect": ["<ram:TypeCode>", "</ram:TypeCode>"],
+  "v2IssueDate": ["<ram:IssueDateTime>", "</ram:IssueDateTime>", "<udt:DateTimeString"],
+  "v2DueDate": ["<ram:DueDateDateTime>", "</ram:DueDateDateTime>", "<ram:SpecifiedTradePaymentTerms>"],
+  "v2Currency": ["<ram:InvoiceCurrencyCode>", "</ram:InvoiceCurrencyCode>"],
+  "v2BuyerRef": ["<ram:BuyerReference>", "</ram:BuyerReference>"],
+  "v2PurchaseOrder": ["<ram:BuyerOrderReferencedDocument>", "<ram:IssuerAssignedID>"],
+  "v2PrecedingInvNumber": ["<ram:InvoiceReferencedDocument>", "<ram:IssuerAssignedID>"],
+  "v2PrecedingInvDate": ["<ram:InvoiceReferencedDocument>", "<ram:FormattedIssueDateTime>"],
+  "v2PrepaidAmount": ["<ram:TotalPrepaidAmount>"],
+  "v2PayTerms": ["<ram:SpecifiedTradePaymentTerms>", "<ram:Description>"],
+  "v2ExemptionReason": ["<ram:ExemptionReason>"],
+  "v2SellerName": ["<ram:SellerTradeParty>", "<ram:Name>"],
+  "v2SellerVat": ["<ram:SellerTradeParty>", "schemeID=\"VA\">"],
+  "v2SellerStreet": ["<ram:SellerTradeParty>", "<ram:LineOne>"],
+  "v2SellerPostcode": ["<ram:SellerTradeParty>", "<ram:PostcodeCode>"],
+  "v2SellerCity": ["<ram:SellerTradeParty>", "<ram:CityName>"],
+  "v2SellerCountry": ["<ram:SellerTradeParty>", "<ram:CountryID>"],
+  "v2SellerPhone": ["<ram:SellerTradeParty>", "<ram:CompleteNumber>"],
+  "v2SellerEmail": ["<ram:SellerTradeParty>", "<ram:URIID>"],
+  "v2BuyerName": ["<ram:BuyerTradeParty>", "<ram:Name>"],
+  "v2BuyerVat": ["<ram:BuyerTradeParty>", "schemeID=\"VA\">"],
+  "v2BuyerStreet": ["<ram:BuyerTradeParty>", "<ram:LineOne>"],
+  "v2BuyerPostcode": ["<ram:BuyerTradeParty>", "<ram:PostcodeCode>"],
+  "v2BuyerCity": ["<ram:BuyerTradeParty>", "<ram:CityName>"],
+  "v2BuyerCountry": ["<ram:BuyerTradeParty>", "<ram:CountryID>"],
+  "v2DelivName": ["<ram:ShipToTradeParty>", "<ram:Name>"],
+  "v2DelivDate": ["<ram:ActualDeliverySupplyChainEvent>", "<ram:OccurrenceDateTime>"],
+  "v2DelivStreet": ["<ram:ShipToTradeParty>", "<ram:LineOne>"],
+  "v2DelivCity": ["<ram:ShipToTradeParty>", "<ram:CityName>"],
+  "v2DelivPostcode": ["<ram:ShipToTradeParty>", "<ram:PostcodeCode>"],
+  "v2PayIban": ["<ram:PayeePartyCreditorFinancialAccount>", "<ram:IBANID>"],
+  "v2PayBic": ["<ram:PayeeSpecifiedCreditorFinancialInstitution>", "<ram:BICID>"]
+};
+
+// Highlighting execution function
+function highlightXmlForInput(inputEl) {
+  if (!inputEl) return;
+  const inputId = inputEl.id;
+  const val = inputEl.value ? String(inputEl.value).trim() : "";
+
+  // Locate the active XML viewer depending on the visible tab/scenario
+  let viewer = null;
+  const v2Card = document.getElementById("v2XmlCard");
+  const v2Container = document.getElementById("scenario-v2-container");
+
+  if (v2Container && v2Container.style.display !== "none") {
+    viewer = document.getElementById("v2XmlViewer");
+    // If v2 XML card is hidden, automatically open it when user clicks input
+    if (v2Card && v2Card.style.display === "none") {
+      v2Card.style.display = "block";
+      if (typeof updateV2LiveXml === "function") {
+        updateV2LiveXml();
+      }
+    }
+  } else {
+    // Check v1 viewers
+    const manCard = document.getElementById("scenario-manual-container");
+    const docxCard = document.getElementById("scenario-docx-container");
+    if (manCard && manCard.style.display !== "none") {
+      viewer = document.getElementById("manXmlViewer");
+    } else if (docxCard && docxCard.style.display !== "none") {
+      viewer = document.getElementById("docxXmlViewer");
+    } else {
+      viewer = document.getElementById("xmlCodeViewer");
+    }
+  }
+
+  if (!viewer) return;
+
+  // Store raw text in data attribute if not already stored
+  if (!viewer.dataset.rawXml) {
+    viewer.dataset.rawXml = viewer.textContent;
+  }
+  const raw = viewer.dataset.rawXml;
+  if (!raw || raw.trim().startsWith("<!--") || raw.length < 20) return;
+
+  const targetTags = XML_FIELD_MAP[inputId] || [];
+  let matched = false;
+
+  // Build escaped HTML representation with marked matches
+  let html = escapeHtml(raw);
+
+  // Strategy 1: If value is present, search for the exact value inside XML tags
+  if (val && val.length >= 2) {
+    const escapedVal = escapeHtml(val);
+    const regexVal = new RegExp(escapeRegex(escapedVal), "g");
+    if (regexVal.test(html)) {
+      html = html.replace(regexVal, `<mark class="xml-hl-value">${escapedVal}</mark>`);
+      matched = true;
+    }
+  }
+
+  // Strategy 2: Search for relevant tag(s) associated with this field
+  if (targetTags.length > 0) {
+    targetTags.forEach(tag => {
+      const escapedTag = escapeHtml(tag);
+      const regexTag = new RegExp(escapeRegex(escapedTag), "g");
+      if (regexTag.test(html)) {
+        html = html.replace(regexTag, `<mark class="xml-hl-tag">${escapedTag}</mark>`);
+        matched = true;
+      }
+    });
+  }
+
+  if (matched) {
+    viewer.innerHTML = html;
+    // Smooth scroll the first match into view inside the code-viewer
+    const firstMark = viewer.querySelector("mark");
+    if (firstMark) {
+      firstMark.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+}
+window.highlightXmlForInput = highlightXmlForInput;
+
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Bind listeners to all tracked inputs across v1 and v2
+function attachXmlHighlightListeners() {
+  document.addEventListener("focusin", (e) => {
+    const target = e.target;
+    if (target && target.tagName && (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA")) {
+      target.classList.add("input-xml-active");
+      highlightXmlForInput(target);
+    }
+  });
+
+  document.addEventListener("focusout", (e) => {
+    const target = e.target;
+    if (target && target.classList) {
+      target.classList.remove("input-xml-active");
+    }
+  });
+
+  // Re-highlight on input change if viewer is open
+  document.addEventListener("input", (e) => {
+    const target = e.target;
+    if (target && (target.tagName === "INPUT" || target.tagName === "SELECT")) {
+      if (XML_FIELD_MAP[target.id]) {
+        // Debounce slightly
+        clearTimeout(target._hlTimeout);
+        target._hlTimeout = setTimeout(() => {
+          highlightXmlForInput(target);
+        }, 150);
+      }
+    }
+  });
+}
+
+// Run attachment on load
+document.addEventListener("DOMContentLoaded", () => {
+  attachXmlHighlightListeners();
+});
+
