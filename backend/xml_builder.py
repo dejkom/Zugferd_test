@@ -25,12 +25,12 @@ def clean_date(d_str: str) -> str:
 def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     """
     Generate compliant factur-x.xml (ZUGFeRD 2.x / UN/CEFACT CII 16B).
-    EN16931 guideline: urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:en16931
+    EN16931 guideline: urn:cen.eu:en16931:2017
     """
     if profile == "EN16931":
-        guideline_id = "urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:en16931"
+        guideline_id = "urn:cen.eu:en16931:2017"
     elif profile == "COMFORT":
-        guideline_id = "urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:en16931"
+        guideline_id = "urn:cen.eu:en16931:2017"
     elif profile == "EXTENDED":
         guideline_id = "urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended"
     else:
