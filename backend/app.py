@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import uuid
 from typing import Optional
@@ -11,6 +12,7 @@ from pydantic import BaseModel
 from backend.models import InvoiceData
 from backend.extractor import extract_invoice_data, extract_raw_text_from_doc
 from backend.xml_builder import generate_facturx_xml, generate_orderx_xml
+from backend.ubl_builder import generate_ubl_xml
 from backend.pdf_embedder import build_pdfa3_zugferd
 from backend.pdf_generator import generate_invoice_pdf_from_data
 from backend.mustang_wrapper import validate_zugferd_pdf
@@ -57,12 +59,13 @@ class CreateFromManualRequest(BaseModel):
     token_usage: Optional[dict] = None
     generator: Optional[str] = "v1"
     source_type: Optional[str] = "manual"
+    lang: Optional[str] = "sl"
 
 @app.post("/api/upload")
 async def upload_document(file: UploadFile = File(...)):
     filename_lower = file.filename.lower()
-    if not (filename_lower.endswith(".pdf") or filename_lower.endswith(".docx")):
-        raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported.")
+    if not (filename_lower.endswith(".pdf") or filename_lower.endswith(".docx") or filename_lower.endswith(".xml")):
+        raise HTTPException(status_code=400, detail="Only PDF, DOCX, and XML files are supported.")
     
     file_id = f"{uuid.uuid4().hex}_{file.filename}"
     target_path = os.path.join(UPLOAD_DIR, file_id)
@@ -123,8 +126,37 @@ async def extract_pdf(req: ExtractionRequest):
         if active_id in prompts:
             custom_prompt = prompts[active_id].get("content")
 
+    # Resolve API key: req.api_key > sys_settings.openai_api_key > os.environ
+    effective_api_key = req.api_key or sys_settings.get("openai_api_key") or os.environ.get("OPENAI_API_KEY")
+
+    # If the file is an XML (e-SLOG 2.0 or UBL or Factur-X), parse directly without OpenAI token costs!
+    if target_path.lower().endswith(".xml"):
+        try:
+            with open(target_path, "r", encoding="utf-8", errors="ignore") as f:
+                raw_xml = f.read()
+
+            # Check if eSLOG 2.0
+            if "urn:eslog" in raw_xml or "M_INVOIC" in raw_xml:
+                from backend.eslog_parser import parse_eslog2_xml
+                data = parse_eslog2_xml(raw_xml)
+                xml_content = generate_facturx_xml(data)
+                return {
+                    "invoice_data": data.model_dump(),
+                    "xml_preview": xml_content,
+                    "usage": {
+                        "model": "direct_xml_parser (e-SLOG 2.0)",
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                        "total_tokens": 0,
+                        "estimated_cost_usd": 0.0,
+                        "formatted_cost": "$0.0000"
+                    }
+                }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"e-SLOG XML parsing error: {str(e)}")
+
     try:
-        data, usage_info = extract_invoice_data(target_path, api_key=req.api_key, system_prompt=custom_prompt)
+        data, usage_info = extract_invoice_data(target_path, api_key=effective_api_key, system_prompt=custom_prompt)
         # Also build initial XML for instant preview
         xml_content = generate_facturx_xml(data)
         return {
@@ -139,11 +171,53 @@ async def extract_pdf(req: ExtractionRequest):
 async def generate_xml(req: GenerateXmlRequest):
     try:
         is_orderx = getattr(req.invoice_data, "document_format", "zugferd") == "orderx" or req.invoice_data.invoice_type_code == "220"
+        profile_key = (req.profile or "EN16931").upper()
+
         if is_orderx:
             xml_content = generate_orderx_xml(req.invoice_data, profile=req.profile or "BASIC")
+        elif "UBL" in profile_key or profile_key in ["PEPPOL", "PEPPOL_UBL"]:
+            xml_content = generate_ubl_xml(req.invoice_data, profile=profile_key)
+        elif profile_key in ["ESLOG2", "ESLOG_2_0", "ESLOG"]:
+            xml_content = generate_facturx_xml(req.invoice_data, profile="ESLOG2")
         else:
             xml_content = generate_facturx_xml(req.invoice_data, profile=req.profile or "EN16931")
         return {"xml_content": xml_content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/export-xml")
+async def export_xml_file(req: GenerateXmlRequest):
+    """Generates raw XML and saves it to outputs folder for direct download."""
+    try:
+        is_orderx = getattr(req.invoice_data, "document_format", "zugferd") == "orderx" or req.invoice_data.invoice_type_code == "220"
+        profile_key = (req.profile or "EN16931").upper()
+
+        if is_orderx:
+            xml_content = generate_orderx_xml(req.invoice_data, profile=req.profile or "BASIC")
+            prefix = "orderx"
+        elif "UBL" in profile_key or profile_key in ["PEPPOL", "PEPPOL_UBL"]:
+            xml_content = generate_ubl_xml(req.invoice_data, profile=profile_key)
+            prefix = "ubl"
+        elif profile_key in ["ESLOG2", "ESLOG_2_0", "ESLOG"]:
+            xml_content = generate_facturx_xml(req.invoice_data, profile="ESLOG2")
+            prefix = "eslog2"
+        else:
+            xml_content = generate_facturx_xml(req.invoice_data, profile=req.profile or "EN16931")
+            prefix = "facturx"
+
+        work_id = uuid.uuid4().hex[:8]
+        clean_inv = re.sub(r"[^\w\-.]", "_", req.invoice_data.invoice_number or "invoice")
+        filename = f"{prefix}_{clean_inv}_{work_id}.xml"
+        file_path = os.path.join(OUTPUT_DIR, filename)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(xml_content)
+
+        return {
+            "success": True,
+            "filename": filename,
+            "download_url": f"/api/download/{filename}",
+            "xml_content": xml_content
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -283,15 +357,23 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
         effective_layout = "layout1" if chosen_layout == "original" else chosen_layout
         logo_file = LOGO_PATH if os.path.exists(LOGO_PATH) else None
         sys_settings = load_system_settings()
-        generate_invoice_pdf_from_data(req.invoice_data, visual_pdf_path, logo_path=logo_file, layout=effective_layout, footer_config=sys_settings)
+        generate_invoice_pdf_from_data(req.invoice_data, visual_pdf_path, logo_path=logo_file, layout=effective_layout, footer_config=sys_settings, lang=req.lang or "sl")
         base_pdf_path = visual_pdf_path
         is_temp_visual = True
 
-    # 2. Generate XML (Factur-X or Order-X)
+    # 2. Generate XML (Factur-X, Order-X, e-SLOG 2.0, or UBL 2.1)
     is_orderx = getattr(req.invoice_data, "document_format", "zugferd") == "orderx" or req.invoice_data.invoice_type_code == "220"
+    profile_key = (req.profile or "EN16931").upper()
+
     if is_orderx:
         xml_content = generate_orderx_xml(req.invoice_data, profile=req.profile or "BASIC")
         attachment_name = "order-x.xml"
+    elif "UBL" in profile_key or profile_key in ["PEPPOL", "PEPPOL_UBL"]:
+        xml_content = generate_ubl_xml(req.invoice_data, profile=profile_key)
+        attachment_name = "invoice.xml"
+    elif profile_key in ["ESLOG2", "ESLOG_2_0", "ESLOG"]:
+        xml_content = generate_facturx_xml(req.invoice_data, profile="ESLOG2")
+        attachment_name = "e-slog.xml"
     else:
         xml_content = generate_facturx_xml(req.invoice_data, profile=req.profile or "EN16931")
         attachment_name = "factur-x.xml"
@@ -335,7 +417,8 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
             layout=chosen_layout,
             xml_content=xml_content,
             is_valid=val_res.get("isValid", True),
-            token_usage=req.token_usage
+            token_usage=req.token_usage,
+            lang=req.lang or "multi"
         )
     except Exception as e:
         print("Could not record history:", e)
@@ -352,9 +435,10 @@ async def download_file(filename: str):
     file_path = os.path.join(OUTPUT_DIR, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
+    media_type = "application/xml" if filename.lower().endswith(".xml") else "application/pdf"
     return FileResponse(
         file_path,
-        media_type="application/pdf",
+        media_type=media_type,
         filename=filename,
         headers={
             "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -400,15 +484,206 @@ DEFAULT_SETTINGS = {
     "seller_bank1_iban": "DE89370400440532013000",
     "seller_bank2_name": "Baden-Württembergische Bank",
     "seller_bank2_bic": "SOLA DEST",
-    "seller_bank2_iban": "DE30 6005 0101 7871 5056 72",
     "saved_parties": {
         "sellers": [],
         "buyers": []
     },
-    "active_prompt_id": "standard_en16931",
+    "tax_rates": [
+        {"id": "si_22", "country": "SI", "rate": 22.0, "category": "S", "label": "22% DDV Splošna stopnja (SI)", "is_default": True},
+        {"id": "si_95", "country": "SI", "rate": 9.5, "category": "S", "label": "9.5% DDV Znižana stopnja (SI)", "is_default": False},
+        {"id": "si_5", "country": "SI", "rate": 5.0, "category": "S", "label": "5% DDV Posebna znižana stopnja (SI)", "is_default": False},
+        {"id": "de_19", "country": "DE", "rate": 19.0, "category": "S", "label": "19% MwSt. Regelsteuersatz (DE)", "is_default": True},
+        {"id": "de_7", "country": "DE", "rate": 7.0, "category": "S", "label": "7% MwSt. Ermäßigter Satz (DE)", "is_default": False},
+        {"id": "at_20", "country": "AT", "rate": 20.0, "category": "S", "label": "20% USt. Normalsteuersatz (AT)", "is_default": True},
+        {"id": "at_10", "country": "AT", "rate": 10.0, "category": "S", "label": "10% USt. Ermäßigt (AT)", "is_default": False},
+        {"id": "hr_25", "country": "HR", "rate": 25.0, "category": "S", "label": "25% PDV Opća stopa (HR)", "is_default": True},
+        {"id": "dk_25", "country": "DK", "rate": 25.0, "category": "S", "label": "25% Moms Almindelig (DK)", "is_default": True},
+        {"id": "fr_20", "country": "FR", "rate": 20.0, "category": "S", "label": "20% TVA Taux normal (FR)", "is_default": True},
+        {"id": "it_22", "country": "IT", "rate": 22.0, "category": "S", "label": "22% IVA Ordinaria (IT)", "is_default": True},
+        {"id": "ch_81", "country": "CH", "rate": 8.1, "category": "S", "label": "8.1% MWST Normalsatz (CH)", "is_default": True},
+        {"id": "gen_ae", "country": "ALL", "rate": 0.0, "category": "AE", "label": "0% Reverse Charge / Obrnjena davčna obveznost (AE)", "is_default": False},
+        {"id": "gen_e", "country": "ALL", "rate": 0.0, "category": "E", "label": "0% Exempt / Oproščeno (E)", "is_default": False},
+        {"id": "gen_z", "country": "ALL", "rate": 0.0, "category": "Z", "label": "0% Zero Rated (Z)", "is_default": False}
+    ],
+    "extraction_synonyms": {
+        "BT-1": {
+            "bt": "BT-1",
+            "field": "invoice_number",
+            "name": "Invoice identifier",
+            "en": ["Invoice #", "Invoice No.", "Inv No.", "Bill No.", "Invoice Number"],
+            "de": ["Rechnungs-Nr.", "Rechnungsnummer", "Rg.-Nr.", "Faktura", "Rechnung Nr."],
+            "sl": ["Številka računa", "Račun št.", "Št. računa", "Št. Rač", "Račun"]
+        },
+        "BT-2": {
+            "bt": "BT-2",
+            "field": "issue_date",
+            "name": "Invoice issue date",
+            "en": ["Invoice date", "Issue date", "Date of invoice", "Date"],
+            "de": ["Rechnungsdatum", "Ausstellungsdatum", "Belegdatum", "Datum"],
+            "sl": ["Datum računa", "Datum izdaje", "Izdan dne", "Datum"]
+        },
+        "BT-9": {
+            "bt": "BT-9",
+            "field": "due_date",
+            "name": "Payment due date",
+            "en": ["Due date", "Payment due date", "Payable by"],
+            "de": ["Fälligkeitsdatum", "Fällig am", "Zahlbar bis", "Zahlungsziel"],
+            "sl": ["Datum zapadlosti", "Rok plačila", "Valuta", "Zapadlost", "Plačati do"]
+        },
+        "BT-10": {
+            "bt": "BT-10",
+            "field": "buyer_reference",
+            "name": "Buyer reference",
+            "en": ["Buyer reference", "Routing ID", "Customer ref", "Order ref"],
+            "de": ["Leitweg-ID", "Käuferreferenz", "Kundenreferenz", "Referenz"],
+            "sl": ["Referenca kupca", "Sklic kupca", "Šifra partnerja", "Kupčeva referenca"]
+        },
+        "BT-13": {
+            "bt": "BT-13",
+            "field": "purchase_order_number",
+            "name": "Purchase order reference",
+            "en": ["Purchase Order", "PO #", "PO Number", "Order No."],
+            "de": ["Bestellnummer", "Bestell-Nr.", "Best.-Nr.", "Auftragsnummer"],
+            "sl": ["Številka naročilnice", "Naročilnica št.", "Naročilo št.", "Naročilnica"]
+        },
+        "BT-14": {
+            "bt": "BT-14",
+            "field": "purchase_order_date",
+            "name": "Purchase order date",
+            "en": ["Order date", "PO Date"],
+            "de": ["Bestelldatum", "Auftragsdatum"],
+            "sl": ["Datum naročila", "Datum naročilnice"]
+        },
+        "BT-16": {
+            "bt": "BT-16",
+            "field": "despatch_advice_id",
+            "name": "Despatch advice reference (Delivery note)",
+            "en": ["Delivery note #", "Despatch advice", "Packing slip"],
+            "de": ["Lieferschein-Nr.", "Lieferscheinnummer", "LS-Nr."],
+            "sl": ["Številka dobavnice", "Dobavnica št.", "Dobavnica", "Št. dobavnice"]
+        },
+        "BT-44": {
+            "bt": "BT-44",
+            "field": "buyer_name",
+            "name": "Buyer name",
+            "en": ["Buyer", "Customer", "Bill To", "Sold To"],
+            "de": ["Käufer", "Rechnungsempfänger", "Kunde", "Auftraggeber"],
+            "sl": ["Kupec", "Prejemnik računa", "Naročnik", "Plačnik"]
+        },
+        "BT-48": {
+            "bt": "BT-48",
+            "field": "buyer_vat",
+            "name": "Buyer VAT identifier",
+            "en": ["VAT Reg No", "VAT ID", "Customer VAT", "Tax ID"],
+            "de": ["USt-IdNr.", "UID-Nr.", "Umsatzsteuer-ID", "Steuer-Nr."],
+            "sl": ["ID za DDV", "Davčna št. kupca", "Davčna številka", "ID za DDV kupca"]
+        },
+        "BT-70": {
+            "bt": "BT-70",
+            "field": "recipient_name",
+            "name": "Deliver-to recipient name",
+            "en": ["Ship To", "Deliver To", "Consignee", "Destination"],
+            "de": ["Lieferadresse", "Warenempfänger", "Lieferort"],
+            "sl": ["Prejemnik blaga", "Naslov za dostavo", "Dostava", "Prevzemnik"]
+        },
+        "BT-71": {
+            "bt": "BT-71",
+            "field": "location_id",
+            "name": "Deliver-to location identifier (GLN)",
+            "en": ["Unloading point", "Dock", "Location ID", "GLN"],
+            "de": ["Abladestelle", "Abladestelle Nr.", "Lagerort", "Tor"],
+            "sl": ["Razkladalno mesto", "Prevzemno mesto", "Skladišče", "Lokacija prevzema"]
+        },
+        "BT-72": {
+            "bt": "BT-72",
+            "field": "delivery_date",
+            "name": "Actual delivery date",
+            "en": ["Delivery date", "Shipment date", "Performance date"],
+            "de": ["Lieferdatum", "Leistungsdatum", "Lieferzeitpunkt"],
+            "sl": ["Datum dobave", "Datum opravljene storitve", "Datum dobave/storitve"]
+        },
+        "BT-83": {
+            "bt": "BT-83",
+            "field": "payment_terms",
+            "name": "Payment terms & remittance reference",
+            "en": ["Payment terms", "Due conditions", "Payment reference"],
+            "de": ["Zahlungsbedingungen", "Zahlungsziel", "Konditionen", "Skonto"],
+            "sl": ["Plačilni pogoji", "Rok plačila", "Sklic", "Sklic za plačilo", "Model"]
+        },
+        "BT-84": {
+            "bt": "BT-84",
+            "field": "iban",
+            "name": "Payment account (IBAN / Account)",
+            "en": ["IBAN", "Bank Account", "Account #"],
+            "de": ["IBAN", "Kontonummer", "Bankverbindung"],
+            "sl": ["IBAN", "TRR", "Transakcijski račun", "Številka računa (TRR)"]
+        },
+        "BT-106": {
+            "bt": "BT-106",
+            "field": "line_net_total",
+            "name": "Sum of line net amounts",
+            "en": ["Net total", "Subtotal", "Total net amount", "Net Amount"],
+            "de": ["Nettobetrag", "Gesamtbetrag Netto", "Zwischensumme Netto"],
+            "sl": ["Znesek brez DDV", "Osnova", "Skupaj brez DDV", "Neto znesek"]
+        },
+        "BT-110": {
+            "bt": "BT-110",
+            "field": "tax_total",
+            "name": "Invoice total VAT amount",
+            "en": ["Total VAT", "VAT amount", "Total tax", "Tax"],
+            "de": ["MwSt. Gesamt", "USt.", "Steuerbetrag", "MwSt."],
+            "sl": ["Znesek DDV", "Vrednost DDV", "Skupaj DDV", "DDV"]
+        },
+        "BT-112": {
+            "bt": "BT-112",
+            "field": "grand_total",
+            "name": "Invoice total with VAT (Gross)",
+            "en": ["Grand total", "Total gross", "Gross amount", "Total Amount"],
+            "de": ["Bruttobetrag", "Rechnungsbetrag", "Gesamtbetrag Brutto", "Gesamtbetrag"],
+            "sl": ["Znesek z DDV", "Skupaj z DDV", "Bruto znesek", "Skupaj za plačilo z DDV"]
+        },
+        "BT-115": {
+            "bt": "BT-115",
+            "field": "due_payable_amount",
+            "name": "Amount due for payment",
+            "en": ["Amount due", "Due payable", "Payable amount", "Balance due"],
+            "de": ["Zu zahlender Betrag", "Fälliger Betrag", "Zahlbetrag"],
+            "sl": ["Za plačilo", "Znesek za plačilo", "Skupaj za plačilo", "K plačilu"]
+        }
+    },
+    "active_prompt_id": "trilingual_dictionary",
     "extraction_prompts": {
+        "trilingual_dictionary": {
+            "name": "Trilingual Multilingual Parser (EN / DE / SI + Keyword Dictionary) ★",
+            "description": "Optimized European & Slovenian parser using the active multilingual keyword dictionary for BT-1..BT-115.",
+            "content": """You are an expert accounting AI and multilingual invoice parser specialized in European standard EN 16931, ZUGFeRD / Factur-X, and Slovenian e-SLOG 2.0 specifications.
+Your goal is to parse raw text extracted from invoice documents into a clean, complete, structured InvoiceData object.
+
+CRITICAL INSTRUCTIONS & ANTI-HALLUCINATION RULES:
+1. USE THE MULTILINGUAL KEYWORD DICTIONARY: Match field values by looking for the multilingual keyword aliases appended below (English, German, and Slovenian terms).
+2. EXTRACT SELLER & BANK DATA FROM DOCUMENT: Extract the actual Seller (Supplier / Izdajatelj / Verkäufer) and payment bank account (IBAN BT-84, BIC BT-86) from the document header, body, or footer.
+3. Extract EXACT literal values from the document body, header, and footer. Do NOT guess, approximate, or fabricate any missing numbers, identifiers, or dates.
+4. If a field is not explicitly present in the document, return null (None). Never substitute an invented value.
+
+FIELD EXTRACTION GUIDELINES:
+- Invoice Number (BT-1): Exact invoice identifier (e.g. following 'Rechnungs-Nr.', 'Rg.-Nr.', 'Številka računa', 'Račun št.', 'Št. Rač').
+- Issue Date (BT-2): Invoice date normalized to YYYY-MM-DD (e.g. from 'Rechnungsdatum', 'Datum računa', 'Datum izdaje').
+- Due Date (BT-9): Payment due date normalized to YYYY-MM-DD (e.g. from 'Fälligkeitsdatum', 'Datum zapadlosti', 'Rok plačila').
+- Currency (BT-5): 3-letter ISO 4217 currency code (e.g. EUR).
+- Buyer Reference (BT-10): Customer purchase order or routing reference (e.g. 'Leitweg-ID', 'Referenca kupca', 'Sklic kupca').
+- Purchase Order (BT-13): Order reference number (e.g. 'Bestell-Nr.', 'Auftragsnummer', 'Naročilnica št.', 'Številka naročilnice').
+- Delivery Note / Despatch Advice (BT-16): Delivery slip ID (e.g. 'Lieferschein-Nr.', 'LS-Nr.', 'Številka dobavnice', 'Dobavnica št.').
+- Seller Details (BT-27..BT-43): Legal name, VAT ID (USt-IdNr. / ID za DDV), local tax number / Steuernummer, street, postcode, city, and country code.
+- Buyer Details (BT-44..BT-55): Name, street, postcode, city, country, and VAT ID (e.g. 'USt-IdNr.', 'ID za DDV', 'Davčna št.').
+- Physical Delivery (BG-13): Recipient facility name (BT-70), location/unloading point (BT-71, 'Abladestelle', 'Prevzemno mesto'), and delivery date (BT-72, 'Lieferdatum', 'Leistungsdatum', 'Datum dobave', 'Datum opravljene storitve').
+- Payment Bank & Account (BT-84 / BT-86): Seller payment IBAN (BT-84) and BIC (BT-86).
+- Payment Terms & Remittance Reference (BT-83): Literal payment terms or Slovenian payment reference (e.g. 'Sklic', 'Model 00/01/12', 'Skonto').
+- Line Items: Line item ID, full name/description, quantity, unit_code (C62 for piece/Stück/kos, HUR for hour/ura, DAY for dan), net unit price, line net total, tax category ('S', 'AE', 'Z', 'E'), and tax rate (e.g. 19%, 22%, 9.5%, 0%).
+- Tax Breakdown & Totals: line_net_total (BT-106), tax_total (BT-110), grand_total (BT-112), and due_payable_amount (BT-115). Verify line_net_total + tax_total == grand_total.
+- Assign confidence scores ('HIGH', 'MEDIUM', 'LOW') in confidence_scores."""
+        },
         "standard_en16931": {
-            "name": "Standard EN 16931 & ZUGFeRD 2.x (Recommended)",
+            "name": "Standard EN 16931 & ZUGFeRD 2.x",
             "description": "Standard European invoice parser for invoice number, dates, parties, reverse-charge taxes, and totals.",
             "content": """You are an expert accounting system and invoice parser specialized in European standard EN 16931 and ZUGFeRD / Factur-X specifications.
 Your goal is to parse raw text extracted from invoice PDFs into a clean, complete, structured InvoiceData object.
@@ -450,11 +725,19 @@ def load_system_settings() -> dict:
                 data = json.load(f)
                 res = DEFAULT_SETTINGS.copy()
                 res.update(data)
-                # Ensure extraction_prompts is always present
+                # Ensure extraction_prompts always contains built-in presets
                 if "extraction_prompts" not in res or not res["extraction_prompts"]:
-                    res["extraction_prompts"] = DEFAULT_SETTINGS["extraction_prompts"]
+                    res["extraction_prompts"] = DEFAULT_SETTINGS["extraction_prompts"].copy()
+                else:
+                    for p_id, p_val in DEFAULT_SETTINGS["extraction_prompts"].items():
+                        if p_id not in res["extraction_prompts"]:
+                            res["extraction_prompts"][p_id] = p_val
                 if "active_prompt_id" not in res or not res["active_prompt_id"]:
-                    res["active_prompt_id"] = "standard_en16931"
+                    res["active_prompt_id"] = "trilingual_dictionary"
+                if "extraction_synonyms" not in res or not res["extraction_synonyms"]:
+                    res["extraction_synonyms"] = DEFAULT_SETTINGS["extraction_synonyms"]
+                if "tax_rates" not in res or not res["tax_rates"]:
+                    res["tax_rates"] = DEFAULT_SETTINGS["tax_rates"]
                 return res
         except Exception:
             pass
@@ -467,7 +750,8 @@ def save_system_settings(settings: dict):
 
 @app.get("/api/config")
 async def get_server_config():
-    env_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    settings = load_system_settings()
+    env_key = os.environ.get("OPENAI_API_KEY", "").strip() or settings.get("openai_api_key", "").strip()
     is_configured = bool(env_key)
     masked_key = ""
     if is_configured:
@@ -476,10 +760,10 @@ async def get_server_config():
         else:
             masked_key = "***"
     
-    settings = load_system_settings()
     return {
         "server_api_key_configured": is_configured,
         "masked_key": masked_key,
+        "openai_api_key": env_key,
         "company_settings": settings
     }
 
@@ -524,7 +808,7 @@ def save_history(history: list):
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
-def record_invoice_history(invoice_data: dict, output_filename: str, source_type: str = "manual", generator: str = "v1", layout: str = "layout1", xml_content: str = "", is_valid: bool = True, token_usage: dict = None):
+def record_invoice_history(invoice_data: dict, output_filename: str, source_type: str = "manual", generator: str = "v1", layout: str = "layout1", xml_content: str = "", is_valid: bool = True, token_usage: dict = None, lang: str = "multi"):
     from datetime import datetime
     history = load_history()
     
@@ -555,6 +839,7 @@ def record_invoice_history(invoice_data: dict, output_filename: str, source_type
         "source_type": source_type,
         "generator": generator,
         "layout": layout,
+        "lang": lang,
         "is_valid": is_valid,
         "invoice_data": invoice_data,
         "xml_content": xml_content,

@@ -603,6 +603,101 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* Keyword Chips Editor */
+.synonyms-table {
+  width: 100%;
+  border-collapse: collapse;
 }
+
+.synonyms-table th {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.synonyms-table td {
+  padding: 0.75rem 0.95rem;
+  border-bottom: 1px solid var(--bg-card-border);
+  vertical-align: top;
+}
+
+.synonyms-table tr:hover {
+  background: rgba(37, 99, 235, 0.03);
+}
+
+.keyword-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 34px;
+}
+
+.keyword-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  transition: all 0.15s ease;
+}
+
+.keyword-chip.lang-de {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.keyword-chip.lang-sl {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.keyword-chip:hover {
+  transform: translateY(-1px);
+}
+
+.keyword-chip-remove {
+  cursor: pointer;
+  opacity: 0.6;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0 2px;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+
+.keyword-chip-remove:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.keyword-chip-input {
+  background: transparent;
+  border: 1px dashed var(--bg-card-border);
+  border-radius: 6px;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.74rem;
+  color: var(--text-main);
+  outline: none;
+  min-width: 80px;
+  max-width: 140px;
+  transition: all 0.2s;
+}
+
+.keyword-chip-input:focus {
+  border-color: var(--accent);
+  background: var(--bg-input);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  min-width: 120px;
+}
+

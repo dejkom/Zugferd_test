@@ -218,8 +218,17 @@ async function loadPreferences() {
         populateManualSellerDefaults();
         renderSavedPartiesConfig();
         renderPromptConfigUI();
+        renderSynonymsTable();
+        renderTaxRatesConfig();
         if (typeof loadV2SavedPartiesDropdowns === "function") {
           loadV2SavedPartiesDropdowns();
+        }
+
+        // Auto-populate API key from server if not already stored locally on this host
+        const serverKey = data.openai_api_key || (data.company_settings && data.company_settings.openai_api_key) || "";
+        if (serverKey && configApiKey && !configApiKey.value.trim()) {
+          configApiKey.value = serverKey;
+          localStorage.setItem("OPENAI_API_KEY", serverKey);
         }
       }
     }
@@ -300,6 +309,7 @@ async function saveConfiguration() {
     seller_bank2_name: document.getElementById("cfgBank2Name")?.value.trim() || "",
     seller_bank2_bic: document.getElementById("cfgBank2Bic")?.value.trim() || "",
     seller_bank2_iban: document.getElementById("cfgBank2Iban")?.value.trim() || "",
+    openai_api_key: key || (window.cachedCompanySettings && window.cachedCompanySettings.openai_api_key) || "",
     saved_parties: currentParties,
     active_prompt_id: currentEditingPromptId || (window.cachedCompanySettings && window.cachedCompanySettings.active_prompt_id) || "standard_en16931",
     extraction_prompts: (window.cachedCompanySettings && window.cachedCompanySettings.extraction_prompts) || {}
@@ -535,29 +545,517 @@ async function deleteActivePrompt() {
 window.deleteActivePrompt = deleteActivePrompt;
 
 function resetActivePromptToDefault() {
-  const defaultPrompt = `You are an expert accounting system and invoice parser specialized in European standard EN 16931 and ZUGFeRD / Factur-X specifications.
-Your goal is to parse raw text extracted from invoice PDFs into a clean, complete, structured InvoiceData object.
+  const defaultPrompt = `You are an expert accounting AI and multilingual invoice parser specialized in European standard EN 16931, ZUGFeRD / Factur-X, and Slovenian e-SLOG 2.0 specifications.
+Your goal is to parse raw text extracted from invoice documents into a clean, complete, structured InvoiceData object.
 
-Instructions:
-1. Identify Invoice Number, Issue Date (format YYYY-MM-DD or DD.MM.YYYY), Due Date, and Currency (e.g. EUR).
-2. Identify Seller (Supplier) details: Name, Street, Postcode, City, Country Code (ISO alpha-2 e.g. DE, SI), VAT ID (e.g. DE814113634), Tax Registration Number (e.g. HRB number or local tax number), and Contact details.
-3. Identify Buyer (Customer) details: Name, Street, Postcode, City, Country Code (e.g. SI, DE), VAT ID (e.g. SI52093808), and Buyer Reference (if present).
-4. Payment information: IBAN (remove spaces), BIC/SWIFT, Bank Name, and Payment Terms text.
-5. Line items: For each line item, extract name/description, quantity (default 1.0 if not listed), unit code (e.g. C62 for pieces/units, HUR for hours, or DAY), unit price, net line total amount, tax category code ('S' for standard, 'AE' for reverse charge, 'Z' for zero, 'E' for exempt), and tax rate percent.
-6. Tax breakdown: Provide tax basis amount, tax percent, tax amount, and exemption reason if reverse charge (e.g. "Reverse charge / The beneficiary is responsible for the taxation of this amount").
-7. Totals: Calculate or extract line_net_total, tax_total, grand_total, and due_payable_amount. Verify that line_net_total + tax_total == grand_total (and due_payable_amount).
-8. Confidence scoring: In confidence_scores dictionary, assign 'HIGH', 'MEDIUM', or 'LOW' for each field:
-   - 'HIGH' if the field was clearly labeled and explicitly printed on the document.
-   - 'MEDIUM' if inferred, calculated from other numbers, or slightly ambiguous.
-   - 'LOW' if guessed, defaulted, or hard to distinguish on the invoice.
-   Keys: 'invoice_number', 'issue_date', 'currency', 'buyer_reference', 'seller_name', 'seller_vat', 'seller_street', 'seller_city', 'buyer_name', 'buyer_vat', 'buyer_street', 'buyer_city', 'iban', 'bic', 'total_net', 'total_tax', 'total_grand', 'total_due'.`;
+CRITICAL INSTRUCTIONS & ANTI-HALLUCINATION RULES:
+1. USE THE MULTILINGUAL KEYWORD DICTIONARY: Match field values by looking for the multilingual keyword aliases appended below (English, German, and Slovenian terms).
+2. EXTRACT SELLER & BANK DATA FROM DOCUMENT: Extract the actual Seller (Supplier / Izdajatelj / Verkäufer) and payment bank account (IBAN BT-84, BIC BT-86) from the document header, body, or footer.
+3. Extract EXACT literal values from the document body, header, and footer. Do NOT guess, approximate, or fabricate any missing numbers, identifiers, or dates.
+4. If a field is not explicitly present in the document, return null (None). Never substitute an invented value.
+
+FIELD EXTRACTION GUIDELINES:
+- Invoice Number (BT-1): Exact invoice identifier (e.g. following 'Rechnungs-Nr.', 'Rg.-Nr.', 'Številka računa', 'Račun št.', 'Št. Rač').
+- Issue Date (BT-2): Invoice date normalized to YYYY-MM-DD (e.g. from 'Rechnungsdatum', 'Datum računa', 'Datum izdaje').
+- Due Date (BT-9): Payment due date normalized to YYYY-MM-DD (e.g. from 'Fälligkeitsdatum', 'Datum zapadlosti', 'Rok plačila').
+- Currency (BT-5): 3-letter ISO 4217 currency code (e.g. EUR).
+- Buyer Reference (BT-10): Customer purchase order or routing reference (e.g. 'Leitweg-ID', 'Referenca kupca', 'Sklic kupca').
+- Purchase Order (BT-13): Order reference number (e.g. 'Bestell-Nr.', 'Auftragsnummer', 'Naročilnica št.', 'Številka naročilnice').
+- Delivery Note / Despatch Advice (BT-16): Delivery slip ID (e.g. 'Lieferschein-Nr.', 'LS-Nr.', 'Številka dobavnice', 'Dobavnica št.').
+- Seller Details (BT-27..BT-43): Legal name, VAT ID (USt-IdNr. / ID za DDV), local tax number / Steuernummer, street, postcode, city, and country code.
+- Buyer Details (BT-44..BT-55): Name, street, postcode, city, country, and VAT ID (e.g. 'USt-IdNr.', 'ID za DDV', 'Davčna št.').
+- Physical Delivery (BG-13): Recipient facility name (BT-70), location/unloading point (BT-71, 'Abladestelle', 'Prevzemno mesto'), and delivery date (BT-72, 'Lieferdatum', 'Leistungsdatum', 'Datum dobave', 'Datum opravljene storitve').
+- Payment Bank & Account (BT-84 / BT-86): Seller payment IBAN (BT-84) and BIC (BT-86).
+- Payment Terms & Remittance Reference (BT-83): Literal payment terms or Slovenian payment reference (e.g. 'Sklic', 'Model 00/01/12', 'Skonto').
+- Line Items: Line item ID, full name/description, quantity, unit_code (C62 for piece/Stück/kos, HUR for hour/ura, DAY for dan), net unit price, line net total, tax category ('S', 'AE', 'Z', 'E'), and tax rate (e.g. 19%, 22%, 9.5%, 0%).
+- Tax Breakdown & Totals: line_net_total (BT-106), tax_total (BT-110), grand_total (BT-112), and due_payable_amount (BT-115). Verify line_net_total + tax_total == grand_total.
+- Assign confidence scores ('HIGH', 'MEDIUM', 'LOW') in confidence_scores.`;
 
   const contentEl = document.getElementById("cfgPromptContent");
   if (contentEl) contentEl.value = defaultPrompt;
 }
 window.resetActivePromptToDefault = resetActivePromptToDefault;
 
-// ================= SAVED PARTIES MANAGEMENT (CONFIG VIEW) =================
+// ================= SYNONYMS / KEYWORDS DICTIONARY (CHIPS EDITOR) =================
+let cachedSynonyms = null;
+
+const DEFAULT_SYNONYMS_FALLBACK = {
+  "BT-1": {
+    bt: "BT-1", field: "invoice_number", name: "Invoice identifier",
+    en: ["Invoice #", "Invoice No.", "Inv No.", "Bill No.", "Invoice Number"],
+    de: ["Rechnungs-Nr.", "Rechnungsnummer", "Rg.-Nr.", "Faktura", "Rechnung Nr."],
+    sl: ["Številka računa", "Račun št.", "Št. računa", "Št. Rač", "Račun"]
+  },
+  "BT-2": {
+    bt: "BT-2", field: "issue_date", name: "Invoice issue date",
+    en: ["Invoice date", "Issue date", "Date of invoice", "Date"],
+    de: ["Rechnungsdatum", "Ausstellungsdatum", "Belegdatum", "Datum"],
+    sl: ["Datum računa", "Datum izdaje", "Izdan dne", "Datum"]
+  },
+  "BT-9": {
+    bt: "BT-9", field: "due_date", name: "Payment due date",
+    en: ["Due date", "Payment due date", "Payable by"],
+    de: ["Fälligkeitsdatum", "Fällig am", "Zahlbar bis", "Zahlungsziel"],
+    sl: ["Datum zapadlosti", "Rok plačila", "Valuta", "Zapadlost", "Plačati do"]
+  },
+  "BT-10": {
+    bt: "BT-10", field: "buyer_reference", name: "Buyer reference",
+    en: ["Buyer reference", "Routing ID", "Customer ref", "Order ref"],
+    de: ["Leitweg-ID", "Käuferreferenz", "Kundenreferenz", "Referenz"],
+    sl: ["Referenca kupca", "Sklic kupca", "Šifra partnerja", "Kupčeva referenca"]
+  },
+  "BT-13": {
+    bt: "BT-13", field: "purchase_order_number", name: "Purchase order reference",
+    en: ["Purchase Order", "PO #", "PO Number", "Order No."],
+    de: ["Bestellnummer", "Bestell-Nr.", "Best.-Nr.", "Auftragsnummer"],
+    sl: ["Številka naročilnice", "Naročilnica št.", "Naročilo št.", "Naročilnica"]
+  },
+  "BT-14": {
+    bt: "BT-14", field: "purchase_order_date", name: "Purchase order date",
+    en: ["Order date", "PO Date"],
+    de: ["Bestelldatum", "Auftragsdatum"],
+    sl: ["Datum naročila", "Datum naročilnice"]
+  },
+  "BT-16": {
+    bt: "BT-16", field: "despatch_advice_id", name: "Despatch advice reference (Delivery note)",
+    en: ["Delivery note #", "Despatch advice", "Packing slip"],
+    de: ["Lieferschein-Nr.", "Lieferscheinnummer", "LS-Nr."],
+    sl: ["Številka dobavnice", "Dobavnica št.", "Dobavnica", "Št. dobavnice"]
+  },
+  "BT-44": {
+    bt: "BT-44", field: "buyer_name", name: "Buyer name",
+    en: ["Buyer", "Customer", "Bill To", "Sold To"],
+    de: ["Käufer", "Rechnungsempfänger", "Kunde", "Auftraggeber"],
+    sl: ["Kupec", "Prejemnik računa", "Naročnik", "Plačnik"]
+  },
+  "BT-48": {
+    bt: "BT-48", field: "buyer_vat", name: "Buyer VAT identifier",
+    en: ["VAT Reg No", "VAT ID", "Customer VAT", "Tax ID"],
+    de: ["USt-IdNr.", "UID-Nr.", "Umsatzsteuer-ID", "Steuer-Nr."],
+    sl: ["ID za DDV", "Davčna št. kupca", "Davčna številka", "ID za DDV kupca"]
+  },
+  "BT-70": {
+    bt: "BT-70", field: "recipient_name", name: "Deliver-to recipient name",
+    en: ["Ship To", "Deliver To", "Consignee", "Destination"],
+    de: ["Lieferadresse", "Warenempfänger", "Lieferort"],
+    sl: ["Prejemnik blaga", "Naslov za dostavo", "Dostava", "Prevzemnik"]
+  },
+  "BT-71": {
+    bt: "BT-71", field: "location_id", name: "Deliver-to location identifier (GLN)",
+    en: ["Unloading point", "Dock", "Location ID", "GLN"],
+    de: ["Abladestelle", "Abladestelle Nr.", "Lagerort", "Tor"],
+    sl: ["Razkladalno mesto", "Prevzemno mesto", "Skladišče", "Lokacija prevzema"]
+  },
+  "BT-72": {
+    bt: "BT-72", field: "delivery_date", name: "Actual delivery date",
+    en: ["Delivery date", "Shipment date", "Performance date"],
+    de: ["Lieferdatum", "Leistungsdatum", "Lieferzeitpunkt"],
+    sl: ["Datum dobave", "Datum opravljene storitve", "Datum dobave/storitve"]
+  },
+  "BT-83": {
+    bt: "BT-83", field: "payment_terms", name: "Payment terms & remittance reference",
+    en: ["Payment terms", "Due conditions", "Payment reference"],
+    de: ["Zahlungsbedingungen", "Zahlungsziel", "Konditionen", "Skonto"],
+    sl: ["Plačilni pogoji", "Rok plačila", "Sklic", "Sklic za plačilo", "Model"]
+  },
+  "BT-84": {
+    bt: "BT-84", field: "iban", name: "Payment account (IBAN / Account)",
+    en: ["IBAN", "Bank Account", "Account #"],
+    de: ["IBAN", "Kontonummer", "Bankverbindung"],
+    sl: ["IBAN", "TRR", "Transakcijski račun", "Številka računa (TRR)"]
+  },
+  "BT-106": {
+    bt: "BT-106", field: "line_net_total", name: "Sum of line net amounts",
+    en: ["Net total", "Subtotal", "Total net amount", "Net Amount"],
+    de: ["Nettobetrag", "Gesamtbetrag Netto", "Zwischensumme Netto"],
+    sl: ["Znesek brez DDV", "Osnova", "Skupaj brez DDV", "Neto znesek"]
+  },
+  "BT-110": {
+    bt: "BT-110", field: "tax_total", name: "Invoice total VAT amount",
+    en: ["Total VAT", "VAT amount", "Total tax", "Tax"],
+    de: ["MwSt. Gesamt", "USt.", "Steuerbetrag", "MwSt."],
+    sl: ["Znesek DDV", "Vrednost DDV", "Skupaj DDV", "DDV"]
+  },
+  "BT-112": {
+    bt: "BT-112", field: "grand_total", name: "Invoice total with VAT (Gross)",
+    en: ["Grand total", "Total gross", "Gross amount", "Total Amount"],
+    de: ["Bruttobetrag", "Rechnungsbetrag", "Gesamtbetrag Brutto", "Gesamtbetrag"],
+    sl: ["Znesek z DDV", "Skupaj z DDV", "Bruto znesek", "Skupaj za plačilo z DDV"]
+  },
+  "BT-115": {
+    bt: "BT-115", field: "due_payable_amount", name: "Amount due for payment",
+    en: ["Amount due", "Due payable", "Payable amount", "Balance due"],
+    de: ["Zu zahlender Betrag", "Fälliger Betrag", "Zahlbetrag"],
+    sl: ["Za plačilo", "Znesek za plačilo", "Skupaj za plačilo", "K plačilu"]
+  }
+};
+
+function renderSynonymsTable() {
+  const tbody = document.getElementById("synonymsTableBody");
+  if (!tbody) return;
+
+  const settings = window.cachedCompanySettings || {};
+  let synonyms = settings.extraction_synonyms || DEFAULT_SYNONYMS_FALLBACK;
+  cachedSynonyms = JSON.parse(JSON.stringify(synonyms));
+
+  tbody.innerHTML = "";
+
+  Object.entries(cachedSynonyms).forEach(([btKey, item]) => {
+    const tr = document.createElement("tr");
+
+    // BT Badge
+    const tdBt = document.createElement("td");
+    tdBt.style.fontWeight = "700";
+    tdBt.style.color = "#3b82f6";
+    tdBt.textContent = btKey;
+    tr.appendChild(tdBt);
+
+    // Field Name
+    const tdField = document.createElement("td");
+    tdField.innerHTML = `
+      <div style="font-weight: 600; color: var(--text-main);">${escapeHtml(item.field || "")}</div>
+      <div style="font-size: 0.72rem; color: var(--text-dim);">${escapeHtml(item.name || "")}</div>
+    `;
+    tr.appendChild(tdField);
+
+    // Helper to create chips container for a language
+    const createChipsCell = (langKey, langClass, placeholder) => {
+      const td = document.createElement("td");
+      const wrap = document.createElement("div");
+      wrap.className = "keyword-chips-wrap";
+
+      const tags = Array.isArray(item[langKey]) ? item[langKey] : [];
+
+      const renderChips = () => {
+        wrap.innerHTML = "";
+        tags.forEach((tagText, idx) => {
+          const chip = document.createElement("span");
+          chip.className = `keyword-chip ${langClass}`;
+          chip.innerHTML = `
+            <span>${escapeHtml(tagText)}</span>
+            <span class="keyword-chip-remove" title="Remove keyword">✕</span>
+          `;
+          chip.querySelector(".keyword-chip-remove").addEventListener("click", () => {
+            tags.splice(idx, 1);
+            item[langKey] = tags;
+            renderChips();
+          });
+          wrap.appendChild(chip);
+        });
+
+        // Inline add input
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "keyword-chip-input";
+        input.placeholder = placeholder;
+
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            const val = input.value.trim().replace(/^,+|,+$/g, "");
+            if (val && !tags.includes(val)) {
+              tags.push(val);
+              item[langKey] = tags;
+              renderChips();
+            }
+          } else if (e.key === "Backspace" && !input.value && tags.length > 0) {
+            tags.pop();
+            item[langKey] = tags;
+            renderChips();
+          }
+        });
+
+        input.addEventListener("blur", () => {
+          const val = input.value.trim().replace(/^,+|,+$/g, "");
+          if (val && !tags.includes(val)) {
+            tags.push(val);
+            item[langKey] = tags;
+            renderChips();
+          }
+        });
+
+        wrap.appendChild(input);
+      };
+
+      renderChips();
+      td.appendChild(wrap);
+      return td;
+    };
+
+    tr.appendChild(createChipsCell("en", "lang-en", "+ Add EN..."));
+    tr.appendChild(createChipsCell("de", "lang-de", "+ Add DE..."));
+    tr.appendChild(createChipsCell("sl", "lang-sl", "+ Add SI..."));
+
+    tbody.appendChild(tr);
+  });
+
+  const countBadge = document.getElementById("synonymsCountBadge");
+  if (countBadge) {
+    countBadge.textContent = `${Object.keys(cachedSynonyms).length} Terms Active`;
+  }
+}
+window.renderSynonymsTable = renderSynonymsTable;
+
+function filterSynonymsTable(query) {
+  const tbody = document.getElementById("synonymsTableBody");
+  if (!tbody) return;
+  const q = (query || "").trim().toLowerCase();
+  const rows = tbody.querySelectorAll("tr");
+  rows.forEach(tr => {
+    if (!q) {
+      tr.style.display = "";
+      return;
+    }
+    const text = tr.textContent.toLowerCase();
+    tr.style.display = text.includes(q) ? "" : "none";
+  });
+}
+window.filterSynonymsTable = filterSynonymsTable;
+
+function addNewSynonymRow() {
+  const bt = prompt("Enter BT code (e.g. BT-25 or BT-153):", "BT-");
+  if (!bt || !bt.trim()) return;
+  const cleanBt = bt.trim().toUpperCase();
+
+  if (cachedSynonyms && cachedSynonyms[cleanBt]) {
+    alert(`Entry for ${cleanBt} already exists in the dictionary.`);
+    const input = document.getElementById("synonymsFilterInput");
+    if (input) {
+      input.value = cleanBt;
+      filterSynonymsTable(cleanBt);
+    }
+    return;
+  }
+
+  const fieldName = prompt(`Enter internal field name or description for ${cleanBt}:`, "custom_field");
+  if (!fieldName || !fieldName.trim()) return;
+
+  if (!cachedSynonyms) cachedSynonyms = {};
+  cachedSynonyms[cleanBt] = {
+    bt: cleanBt,
+    field: fieldName.trim(),
+    name: fieldName.trim(),
+    en: [],
+    de: [],
+    sl: []
+  };
+
+  renderSynonymsTable();
+  const input = document.getElementById("synonymsFilterInput");
+  if (input) {
+    input.value = cleanBt;
+    filterSynonymsTable(cleanBt);
+  }
+}
+window.addNewSynonymRow = addNewSynonymRow;
+
+async function saveSynonymsConfig() {
+  if (!cachedSynonyms) return;
+
+  const settings = window.cachedCompanySettings || {};
+  settings.extraction_synonyms = cachedSynonyms;
+  window.cachedCompanySettings = settings;
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(settings));
+
+  try {
+    const res = await fetch("/api/config/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { extraction_synonyms: cachedSynonyms } })
+    });
+    if (res.ok) {
+      alert("✅ Multilingual keyword dictionary saved! AI extractor will now prioritize these phrases on your documents.");
+    } else {
+      throw new Error("Server responded with error");
+    }
+  } catch (err) {
+    alert("Could not save keywords: " + err.message);
+  }
+}
+window.saveSynonymsConfig = saveSynonymsConfig;
+
+async function resetSynonymsToDefaults() {
+  if (!confirm("Reset all keyword chips back to default EN, DE, and SI definitions?")) return;
+
+  cachedSynonyms = JSON.parse(JSON.stringify(DEFAULT_SYNONYMS_FALLBACK));
+  const settings = window.cachedCompanySettings || {};
+  settings.extraction_synonyms = cachedSynonyms;
+  window.cachedCompanySettings = settings;
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(settings));
+
+  try {
+    await fetch("/api/config/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { extraction_synonyms: cachedSynonyms } })
+    });
+  } catch (e) {
+    console.warn(e);
+  }
+
+  renderSynonymsTable();
+  alert("Keywords reset to default standard.");
+}
+window.resetSynonymsToDefaults = resetSynonymsToDefaults;
+
+// ================= TAX / VAT / DDV RATES CONFIGURATION =================
+const DEFAULT_TAX_RATES_FALLBACK = [
+  { id: "si_22", country: "SI", rate: 22.0, category: "S", label: "22% DDV Splošna stopnja (SI)" },
+  { id: "si_95", country: "SI", rate: 9.5, category: "S", label: "9.5% DDV Znižana stopnja (SI)" },
+  { id: "si_5", country: "SI", rate: 5.0, category: "S", label: "5% DDV Posebna znižana (SI)" },
+  { id: "de_19", country: "DE", rate: 19.0, category: "S", label: "19% MwSt. Regelsteuersatz (DE)" },
+  { id: "de_7", country: "DE", rate: 7.0, category: "S", label: "7% MwSt. Ermäßigter Satz (DE)" },
+  { id: "at_20", country: "AT", rate: 20.0, category: "S", label: "20% USt. Normalsteuersatz (AT)" },
+  { id: "at_10", country: "AT", rate: 10.0, category: "S", label: "10% USt. Ermäßigt (AT)" },
+  { id: "hr_25", country: "HR", rate: 25.0, category: "S", label: "25% PDV Opća stopa (HR)" },
+  { id: "dk_25", country: "DK", rate: 25.0, category: "S", label: "25% Moms Almindelig (DK)" },
+  { id: "fr_20", country: "FR", rate: 20.0, category: "S", label: "20% TVA Taux normal (FR)" },
+  { id: "it_22", country: "IT", rate: 22.0, category: "S", label: "22% IVA Ordinaria (IT)" },
+  { id: "ch_81", country: "CH", rate: 8.1, category: "S", label: "8.1% MWST Normalsatz (CH)" },
+  { id: "gen_ae", country: "ALL", rate: 0.0, category: "AE", label: "0% Reverse Charge / Obrnjena obveznost (AE)" },
+  { id: "gen_e", country: "ALL", rate: 0.0, category: "E", label: "0% Exempt / Oproščeno (E)" },
+  { id: "gen_z", country: "ALL", rate: 0.0, category: "Z", label: "0% Zero Rated (Z)" }
+];
+
+let cachedTaxRates = null;
+
+function renderTaxRatesConfig() {
+  const tbody = document.getElementById("cfgTaxRatesTableBody");
+  if (!tbody) return;
+
+  const settings = window.cachedCompanySettings || {};
+  let rates = settings.tax_rates;
+  if (!Array.isArray(rates) || rates.length === 0) {
+    rates = JSON.parse(JSON.stringify(DEFAULT_TAX_RATES_FALLBACK));
+  }
+  cachedTaxRates = JSON.parse(JSON.stringify(rates));
+
+  tbody.innerHTML = "";
+
+  cachedTaxRates.forEach((r, idx) => {
+    const tr = document.createElement("tr");
+    tr.style.borderBottom = "1px solid var(--bg-card-border)";
+
+    tr.innerHTML = `
+      <td style="padding: 0.5rem 0.75rem;">
+        <input type="text" value="${escapeHtml(r.country || 'SI')}" 
+               style="width: 100%; padding: 0.3rem 0.5rem; background: var(--bg-card); border: 1px solid var(--bg-card-border); color: var(--text-main); border-radius: 4px; font-weight: 700; text-transform: uppercase;"
+               oninput="updateTaxRateField(${idx}, 'country', this.value.toUpperCase())" placeholder="e.g. SI">
+      </td>
+      <td style="padding: 0.5rem 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <input type="number" step="0.1" min="0" max="100" value="${r.rate !== undefined ? r.rate : 0}" 
+                 style="width: 100%; padding: 0.3rem 0.5rem; background: var(--bg-card); border: 1px solid var(--bg-card-border); color: var(--text-main); border-radius: 4px;"
+                 oninput="updateTaxRateField(${idx}, 'rate', parseFloat(this.value)||0)">
+          <span style="color: var(--text-muted); font-size: 0.8rem;">%</span>
+        </div>
+      </td>
+      <td style="padding: 0.5rem 0.75rem;">
+        <select style="width: 100%; padding: 0.3rem 0.4rem; background: var(--bg-card); border: 1px solid var(--bg-card-border); color: var(--text-main); border-radius: 4px;"
+                onchange="updateTaxRateField(${idx}, 'category', this.value)">
+          <option value="S" ${r.category === 'S' ? 'selected' : ''}>S - Standard Rate</option>
+          <option value="AE" ${r.category === 'AE' ? 'selected' : ''}>AE - Reverse Charge</option>
+          <option value="E" ${r.category === 'E' ? 'selected' : ''}>E - Exempt</option>
+          <option value="Z" ${r.category === 'Z' ? 'selected' : ''}>Z - Zero Rated</option>
+          <option value="K" ${r.category === 'K' ? 'selected' : ''}>K - Intra-Community</option>
+        </select>
+      </td>
+      <td style="padding: 0.5rem 0.75rem;">
+        <input type="text" value="${escapeHtml(r.label || '')}" 
+               style="width: 100%; padding: 0.3rem 0.5rem; background: var(--bg-card); border: 1px solid var(--bg-card-border); color: var(--text-main); border-radius: 4px;"
+               oninput="updateTaxRateField(${idx}, 'label', this.value)" placeholder="e.g. 22% DDV Splošna stopnja">
+      </td>
+      <td style="padding: 0.5rem 0.75rem; text-align: center;">
+        <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 0.75rem; color: #ef4444;" onclick="deleteTaxRateRow(${idx})" title="Delete tax rate">🗑️</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+window.renderTaxRatesConfig = renderTaxRatesConfig;
+
+function updateTaxRateField(idx, field, val) {
+  if (cachedTaxRates && cachedTaxRates[idx]) {
+    cachedTaxRates[idx][field] = val;
+  }
+}
+window.updateTaxRateField = updateTaxRateField;
+
+function addNewTaxRateRow() {
+  if (!cachedTaxRates) cachedTaxRates = [];
+  cachedTaxRates.unshift({
+    country: "SI",
+    rate: 22.0,
+    category: "S",
+    label: "Custom Rate"
+  });
+  renderTaxRatesConfigRows();
+}
+window.addNewTaxRateRow = addNewTaxRateRow;
+
+function deleteTaxRateRow(idx) {
+  if (!cachedTaxRates) return;
+  cachedTaxRates.splice(idx, 1);
+  renderTaxRatesConfigRows();
+}
+window.deleteTaxRateRow = deleteTaxRateRow;
+
+function renderTaxRatesConfigRows() {
+  const settings = window.cachedCompanySettings || {};
+  settings.tax_rates = cachedTaxRates;
+  window.cachedCompanySettings = settings;
+  renderTaxRatesConfig();
+}
+
+async function saveTaxRatesConfig() {
+  if (!cachedTaxRates) return;
+
+  const settings = window.cachedCompanySettings || {};
+  settings.tax_rates = cachedTaxRates;
+  window.cachedCompanySettings = settings;
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(settings));
+
+  try {
+    const res = await fetch("/api/config/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { tax_rates: cachedTaxRates } })
+    });
+    if (res.ok) {
+      alert("✅ VAT / Tax (DDV) Rates saved! Studio v2 and AI extractor are updated.");
+    } else {
+      throw new Error("Server responded with error");
+    }
+  } catch (err) {
+    alert("Could not save tax rates: " + err.message);
+  }
+}
+window.saveTaxRatesConfig = saveTaxRatesConfig;
+
+async function resetTaxRatesToDefaults() {
+  if (!confirm("Reset all VAT / DDV rates back to European standard presets?")) return;
+
+  cachedTaxRates = JSON.parse(JSON.stringify(DEFAULT_TAX_RATES_FALLBACK));
+  const settings = window.cachedCompanySettings || {};
+  settings.tax_rates = cachedTaxRates;
+  window.cachedCompanySettings = settings;
+  localStorage.setItem("ZUGFERD_COMPANY_SETTINGS", JSON.stringify(settings));
+
+  try {
+    await fetch("/api/config/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: { tax_rates: cachedTaxRates } })
+    });
+  } catch (e) {
+    console.warn(e);
+  }
+
+  renderTaxRatesConfig();
+  alert("Tax rates reset to default European presets.");
+}
+window.resetTaxRatesToDefaults = resetTaxRatesToDefaults;
+
 async function renderSavedPartiesConfig() {
   // If not yet populated or on demand, attempt to refresh settings from server
   try {
@@ -952,7 +1450,7 @@ function switchScenario(scenario) {
 window.switchScenario = switchScenario;
 
 function executeSwitchScenario(scenario) {
-  const scenarios = ["pdf", "docx", "manual", "history", "v2", "config"];
+  const scenarios = ["overview", "v2", "history", "config"];
   scenarios.forEach((s) => {
     const container = document.getElementById(`scenario-${s}-container`);
     const btn = document.getElementById(`tab-${s}`);
@@ -968,6 +1466,9 @@ function executeSwitchScenario(scenario) {
     }
   });
 
+  if (scenario === "overview") {
+    if (typeof renderBtTable === "function") renderBtTable();
+  }
   if (scenario === "history") {
     loadInvoiceHistory();
   }
@@ -975,6 +1476,8 @@ function executeSwitchScenario(scenario) {
     applySellerSettingsToInputs(getSellerSettings());
     renderSavedPartiesConfig();
     renderPromptConfigUI();
+    renderSynonymsTable();
+    renderTaxRatesConfig();
     checkLogoStatus();
   }
   if (scenario === "v2") {
@@ -2130,7 +2633,7 @@ if (generateManualPdfBtn) {
             <div>
               <div style="font-size: 0.95rem; font-weight: 700; color: #10b981;">ZUGFeRD PDF/A-3 Invoice Created Successfully!</div>
               <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
-                Visual PDF layout synthesized (${chosenLayout === "layout2" ? "Layout 2: Odelo Corporate" : "Layout 1: Modern Studio"}), factur-x.xml embedded with ${lineItems.length} items, and verified via Mustangproject.
+                Visual PDF layout synthesized (${chosenLayout === "layout3" ? "Layout 3: Most Complete Format" : chosenLayout === "layout2" ? "Layout 2: Odelo Corporate" : "Layout 1: Modern Studio"}), factur-x.xml embedded with ${lineItems.length} items, and verified via Mustangproject.
               </div>
             </div>
           </div>
@@ -2408,22 +2911,15 @@ function editHistoryInvoice(index) {
   }
 
   const inv = item.invoice_data;
-  const isV2 = item.generator === "v2" || item.source_type === "v2" || item.source_type === "v2_manual";
 
-  if (isV2) {
-    // Switch to Studio v2 tab
-    switchScenario("v2");
-    if (typeof populateV2FromHistory === "function") {
-      populateV2FromHistory(inv, item.layout);
-    }
-    // Scroll smoothly to top of form
-    const v2Container = document.getElementById("scenario-v2-container");
-    if (v2Container) v2Container.scrollIntoView({ behavior: "smooth" });
-    return;
+  // Switch directly to Studio v2 tab
+  switchScenario("v2");
+  if (typeof populateV2FromHistory === "function") {
+    populateV2FromHistory(inv, item.layout, item.lang);
   }
-
-  // Otherwise switch to Classic Manual Form tab
-  switchScenario("manual");
+  const v2Container = document.getElementById("scenario-v2-container");
+  if (v2Container) v2Container.scrollIntoView({ behavior: "smooth" });
+  return;
 
 
   // Populate Header Data
@@ -2579,44 +3075,48 @@ const XML_FIELD_MAP = {
   "docxTotNet": ["<ram:LineTotalAmount>"],
   "docxTotGrand": ["<ram:GrandTotalAmount>"],
 
-  // Studio v2
-  "v2InvNumber": ["<ram:ID>", "</ram:ID>"],
-  "v2DocTypeSelect": ["<ram:TypeCode>", "</ram:TypeCode>"],
-  "v2IssueDate": ["<ram:IssueDateTime>", "</ram:IssueDateTime>", "<udt:DateTimeString"],
-  "v2DueDate": ["<ram:DueDateDateTime>", "</ram:DueDateDateTime>", "<ram:SpecifiedTradePaymentTerms>"],
-  "v2Currency": ["<ram:InvoiceCurrencyCode>", "</ram:InvoiceCurrencyCode>"],
-  "v2BuyerRef": ["<ram:BuyerReference>", "</ram:BuyerReference>"],
-  "v2PurchaseOrder": ["<ram:BuyerOrderReferencedDocument>", "<ram:IssuerAssignedID>"],
-  "v2PrecedingInvNumber": ["<ram:InvoiceReferencedDocument>", "<ram:IssuerAssignedID>"],
-  "v2PrecedingInvDate": ["<ram:InvoiceReferencedDocument>", "<ram:FormattedIssueDateTime>"],
-  "v2PrepaidAmount": ["<ram:TotalPrepaidAmount>"],
-  "v2PayTerms": ["<ram:SpecifiedTradePaymentTerms>", "<ram:Description>"],
-  "v2ExemptionReason": ["<ram:ExemptionReason>"],
-  "v2SellerName": ["<ram:SellerTradeParty>", "<ram:Name>"],
-  "v2SellerVat": ["<ram:SellerTradeParty>", "schemeID=\"VA\">"],
-  "v2SellerStreet": ["<ram:SellerTradeParty>", "<ram:LineOne>"],
-  "v2SellerPostcode": ["<ram:SellerTradeParty>", "<ram:PostcodeCode>"],
-  "v2SellerCity": ["<ram:SellerTradeParty>", "<ram:CityName>"],
-  "v2SellerCountry": ["<ram:SellerTradeParty>", "<ram:CountryID>"],
-  "v2SellerPhone": ["<ram:SellerTradeParty>", "<ram:CompleteNumber>"],
-  "v2SellerEmail": ["<ram:SellerTradeParty>", "<ram:URIID>"],
-  "v2BuyerName": ["<ram:BuyerTradeParty>", "<ram:Name>"],
-  "v2BuyerVat": ["<ram:BuyerTradeParty>", "schemeID=\"VA\">"],
-  "v2BuyerStreet": ["<ram:BuyerTradeParty>", "<ram:LineOne>"],
-  "v2BuyerPostcode": ["<ram:BuyerTradeParty>", "<ram:PostcodeCode>"],
-  "v2BuyerCity": ["<ram:BuyerTradeParty>", "<ram:CityName>"],
-  "v2BuyerCountry": ["<ram:BuyerTradeParty>", "<ram:CountryID>"],
-  "v2DelivName": ["<ram:ShipToTradeParty>", "<ram:Name>"],
-  "v2DelivDate": ["<ram:ActualDeliverySupplyChainEvent>", "<ram:OccurrenceDateTime>"],
-  "v2DelivStreet": ["<ram:ShipToTradeParty>", "<ram:LineOne>"],
-  "v2DelivCity": ["<ram:ShipToTradeParty>", "<ram:CityName>"],
-  "v2DelivPostcode": ["<ram:ShipToTradeParty>", "<ram:PostcodeCode>"],
-  "v2PayIban": ["<ram:PayeePartyCreditorFinancialAccount>", "<ram:IBANID>"],
+  // Studio v2 (both UN/CEFACT CII & OASIS UBL 2.1 tags)
+  "v2InvNumber": ["<ram:ID>", "</ram:ID>", "<cbc:ID>", "</cbc:ID>"],
+  "v2DocTypeSelect": ["<ram:TypeCode>", "</ram:TypeCode>", "<cbc:InvoiceTypeCode>"],
+  "v2IssueDate": ["<ram:IssueDateTime>", "</ram:IssueDateTime>", "<udt:DateTimeString", "<cbc:IssueDate>"],
+  "v2DueDate": ["<ram:DueDateDateTime>", "</ram:DueDateDateTime>", "<ram:SpecifiedTradePaymentTerms>", "<cbc:DueDate>"],
+  "v2Currency": ["<ram:InvoiceCurrencyCode>", "</ram:InvoiceCurrencyCode>", "<cbc:DocumentCurrencyCode>"],
+  "v2BuyerRef": ["<ram:BuyerReference>", "</ram:BuyerReference>", "<cbc:BuyerReference>"],
+  "v2PurchaseOrder": ["<ram:BuyerOrderReferencedDocument>", "<ram:IssuerAssignedID>", "<cac:OrderReference>", "<cbc:ID>"],
+  "v2PrecedingInvNumber": ["<ram:InvoiceReferencedDocument>", "<ram:IssuerAssignedID>", "<cac:BillingReference>"],
+  "v2PrecedingInvDate": ["<ram:InvoiceReferencedDocument>", "<ram:FormattedIssueDateTime>", "<cbc:IssueDate>"],
+  "v2PrepaidAmount": ["<ram:TotalPrepaidAmount>", "<cbc:PrepaidAmount>"],
+  "v2PayTerms": ["<ram:SpecifiedTradePaymentTerms>", "<ram:Description>", "<cac:PaymentTerms>"],
+  "v2ExemptionReason": ["<ram:ExemptionReason>", "<cbc:TaxExemptionReason>"],
+  "v2SellerName": ["<ram:SellerTradeParty>", "<ram:Name>", "<cac:AccountingSupplierParty>", "<cbc:RegistrationName>"],
+  "v2SellerVat": ["<ram:SellerTradeParty>", "schemeID=\"VA\">", "<cac:AccountingSupplierParty>", "<cbc:CompanyID>"],
+  "v2SellerStreet": ["<ram:SellerTradeParty>", "<ram:LineOne>", "<cac:AccountingSupplierParty>", "<cbc:StreetName>"],
+  "v2SellerPostcode": ["<ram:SellerTradeParty>", "<ram:PostcodeCode>", "<cac:AccountingSupplierParty>", "<cbc:PostalZone>"],
+  "v2SellerCity": ["<ram:SellerTradeParty>", "<ram:CityName>", "<cac:AccountingSupplierParty>", "<cbc:CityName>"],
+  "v2SellerCountry": ["<ram:SellerTradeParty>", "<ram:CountryID>", "<cac:AccountingSupplierParty>", "<cbc:IdentificationCode>"],
+  "v2SellerContactName": ["<ram:SellerTradeParty>", "<ram:DefinedTradeContact>", "<ram:PersonName>", "<cac:AccountingSupplierParty>", "<cac:Contact>", "<cbc:Name>"],
+  "v2SellerPhone": ["<ram:SellerTradeParty>", "<ram:CompleteNumber>", "<cac:AccountingSupplierParty>", "<cbc:Telephone>"],
+  "v2SellerEmail": ["<ram:SellerTradeParty>", "<ram:URIID>", "<cac:AccountingSupplierParty>", "<cbc:ElectronicMail>"],
+  "v2BuyerName": ["<ram:BuyerTradeParty>", "<ram:Name>", "<cac:AccountingCustomerParty>", "<cbc:RegistrationName>"],
+  "v2BuyerVat": ["<ram:BuyerTradeParty>", "schemeID=\"VA\">", "<cac:AccountingCustomerParty>", "<cbc:CompanyID>"],
+  "v2BuyerStreet": ["<ram:BuyerTradeParty>", "<ram:LineOne>", "<cac:AccountingCustomerParty>", "<cbc:StreetName>"],
+  "v2BuyerPostcode": ["<ram:BuyerTradeParty>", "<ram:PostcodeCode>", "<cac:AccountingCustomerParty>", "<cbc:PostalZone>"],
+  "v2BuyerCity": ["<ram:BuyerTradeParty>", "<ram:CityName>", "<cac:AccountingCustomerParty>", "<cbc:CityName>"],
+  "v2BuyerCountry": ["<ram:BuyerTradeParty>", "<ram:CountryID>", "<cac:AccountingCustomerParty>", "<cbc:IdentificationCode>"],
+  "v2BuyerContactName": ["<ram:BuyerTradeParty>", "<ram:DefinedTradeContact>", "<ram:PersonName>", "<cac:AccountingCustomerParty>", "<cac:Contact>", "<cbc:Name>"],
+  "v2BuyerPhone": ["<ram:BuyerTradeParty>", "<ram:CompleteNumber>", "<cac:AccountingCustomerParty>", "<cbc:Telephone>"],
+  "v2BuyerEmail": ["<ram:BuyerTradeParty>", "<ram:URIID>", "<cac:AccountingCustomerParty>", "<cbc:ElectronicMail>"],
+  "v2DelivName": ["<ram:ShipToTradeParty>", "<ram:Name>", "<cac:DeliveryParty>", "<cbc:Name>"],
+  "v2DelivDate": ["<ram:ActualDeliverySupplyChainEvent>", "<ram:OccurrenceDateTime>", "<cbc:ActualDeliveryDate>"],
+  "v2DelivStreet": ["<ram:ShipToTradeParty>", "<ram:LineOne>", "<cac:DeliveryParty>", "<cbc:StreetName>"],
+  "v2DelivCity": ["<ram:ShipToTradeParty>", "<ram:CityName>", "<cac:DeliveryParty>", "<cbc:CityName>"],
+  "v2DelivPostcode": ["<ram:ShipToTradeParty>", "<ram:PostcodeCode>", "<cac:DeliveryParty>", "<cbc:PostalZone>"],
+  "v2PayIban": ["<ram:PayeePartyCreditorFinancialAccount>", "<ram:IBANID>", "<cac:PayeeFinancialAccount>", "<cbc:ID>"],
   "v2PayBic": ["<ram:PayeeSpecifiedCreditorFinancialInstitution>", "<ram:BICID>"]
 };
 
 // Highlighting execution function
-function highlightXmlForInput(inputEl) {
+function highlightXmlForInput(inputEl, shouldScroll = false) {
   if (!inputEl) return;
   const inputId = inputEl.id;
   const val = inputEl.value ? String(inputEl.value).trim() : "";
@@ -2628,12 +3128,9 @@ function highlightXmlForInput(inputEl) {
 
   if (v2Container && v2Container.style.display !== "none") {
     viewer = document.getElementById("v2XmlViewer");
-    // If v2 XML card is hidden, automatically open it when user clicks input
-    if (v2Card && v2Card.style.display === "none") {
+    if (v2Card && (v2Card.style.display === "none" || v2Card.classList.contains("hidden"))) {
       v2Card.style.display = "block";
-      if (typeof updateV2LiveXml === "function") {
-        updateV2LiveXml();
-      }
+      v2Card.classList.remove("hidden");
     }
   } else {
     // Check v1 viewers
@@ -2657,7 +3154,17 @@ function highlightXmlForInput(inputEl) {
   const raw = viewer.dataset.rawXml;
   if (!raw || raw.trim().startsWith("<!--") || raw.length < 20) return;
 
-  const targetTags = XML_FIELD_MAP[inputId] || [];
+  let targetTags = XML_FIELD_MAP[inputId] || [];
+  if (targetTags.length === 0 && inputId) {
+    if (inputId.startsWith("v2DiscountReason_")) targetTags = ["<ram:SpecifiedTradeAllowanceCharge>", "<ram:Reason>", "<cac:AllowanceCharge>", "<cbc:AllowanceChargeReason>"];
+    else if (inputId.startsWith("v2DiscountPct_")) targetTags = ["<ram:CalculationPercent>", "<cbc:MultiplierFactorNumeric>"];
+    else if (inputId.startsWith("v2DiscountAmount_")) targetTags = ["<ram:ActualAmount>", "<cac:AllowanceCharge>", "<cbc:Amount"];
+    else if (inputId.startsWith("v2ItemName_")) targetTags = ["<ram:SpecifiedTradeProduct>", "<ram:Name>", "<cac:InvoiceLine>", "<cac:Item>", "<cbc:Name>"];
+    else if (inputId.startsWith("v2ItemQty_")) targetTags = ["<ram:BilledQuantity>", "<cbc:InvoicedQuantity>"];
+    else if (inputId.startsWith("v2ItemUnit_")) targetTags = ["unitCode=", "@unitCode"];
+    else if (inputId.startsWith("v2ItemPrice_")) targetTags = ["<ram:ChargeAmount>", "<cac:Price>", "<cbc:PriceAmount>"];
+    else if (inputId.startsWith("v2ItemTax_")) targetTags = ["<ram:CategoryCode>", "<ram:RateApplicablePercent>", "<cac:ClassifiedTaxCategory>", "<cbc:Percent>"];
+  }
   let matched = false;
 
   // Build escaped HTML representation with marked matches
@@ -2687,11 +3194,17 @@ function highlightXmlForInput(inputEl) {
 
   if (matched) {
     viewer.innerHTML = html;
+    // Smooth scroll the XML card into user's view if explicitly requested
+    if (shouldScroll && v2Card) {
+      v2Card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
     // Smooth scroll the first match into view inside the code-viewer
     const firstMark = viewer.querySelector("mark");
     if (firstMark) {
       firstMark.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+  } else if (shouldScroll && v2Card) {
+    v2Card.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 }
 window.highlightXmlForInput = highlightXmlForInput;
@@ -2700,40 +3213,569 @@ function escapeRegex(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Bind listeners to all tracked inputs across v1 and v2
-function attachXmlHighlightListeners() {
-  document.addEventListener("focusin", (e) => {
-    const target = e.target;
-    if (target && target.tagName && (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA")) {
-      target.classList.add("input-xml-active");
-      highlightXmlForInput(target);
+// Function to explicitly jump to and highlight field XML on demand (e.g. via ? button)
+function jumpToXmlForField(fieldId) {
+  const el = document.getElementById(fieldId);
+  if (!el) return;
+
+  const v2Card = document.getElementById("v2XmlCard");
+  const v2Container = document.getElementById("scenario-v2-container");
+
+  // Ensure Studio v2 is shown
+  if (v2Container && v2Container.style.display === "none") {
+    if (typeof switchScenario === "function") switchScenario("v2");
+  }
+
+  // Open the XML Card if closed
+  if (v2Card && (v2Card.style.display === "none" || v2Card.classList.contains("hidden"))) {
+    v2Card.style.display = "block";
+    v2Card.classList.remove("hidden");
+  }
+
+  // Generate or refresh live XML, then highlight and scroll to matched tag
+  if (typeof updateV2LiveXml === "function") {
+    updateV2LiveXml().then(() => {
+      highlightXmlForInput(el, true);
+    });
+  } else {
+    highlightXmlForInput(el, true);
+  }
+}
+window.jumpToXmlForField = jumpToXmlForField;
+
+// =========================================================================
+// EN 16931 BUSINESS TERM (BT-X) METADATA MAP FOR STUDIO V2
+// Maps each form input ID to its standard Business Term, legal title, and XML path
+// =========================================================================
+
+// =========================================================================
+// EN 16931 BUSINESS TERM (BT-X) METADATA MAP FOR STUDIO V2
+// Maps each form input ID to standard BT, legal title, XML path, and requirement rules per format:
+// xr: XRechnung (German B2G), peppol: Peppol BIS 3.0, zugferd: ZUGFeRD / Factur-X 2.3
+// =========================================================================
+
+let v2ActiveTargetFormat = "zugferd";
+
+const V2_BT_FIELD_MAP = {
+  // Document Details
+  "v2DocTypeSelect": {
+    bt: "BT-3",
+    name: "Invoice type code",
+    name_de: "Rechnungsartcode",
+    desc: "Specifies the document type code (e.g. 380 = Commercial Invoice, 381 = Credit Note, 384 = Corrected Invoice, 220 = Order-X).",
+    xml: "rsm:ExchangedDocument/ram:TypeCode",
+    req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2InvNumber": {
+    bt: "BT-1",
+    name: "Invoice number",
+    name_de: "Rechnungsnummer",
+    desc: "Unique sequential commercial document identifier issued by the seller.",
+    xml: "rsm:ExchangedDocument/ram:ID",
+    req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2IssueDate": {
+    bt: "BT-2",
+    name: "Invoice issue date",
+    name_de: "Rechnungsdatum",
+    desc: "The date when the invoice was legally issued (YYYY-MM-DD).",
+    xml: "rsm:ExchangedDocument/ram:IssueDateTime",
+    req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2Currency": {
+    bt: "BT-5",
+    name: "Invoice currency code",
+    name_de: "Rechnungswährungscode",
+    desc: "ISO 4217 3-letter currency code in which amounts are billed (EUR, USD, CHF, GBP).",
+    xml: ".../ram:InvoiceCurrencyCode",
+    req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2DueDate": {
+    bt: "BT-9",
+    name: "Payment due date",
+    name_de: "Fälligkeitsdatum der Zahlung",
+    desc: "The date when net payment is legally due by the debtor.",
+    xml: ".../ram:SpecifiedTradePaymentTerms/ram:DueDateDateTime",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2PayMethod": {
+    bt: "BT-81",
+    name: "Payment means type code",
+    name_de: "Zahlungsmittelcode",
+    desc: "Code indicating how payment should be made (58 = SEPA transfer, 30 = Credit transfer, 48 = Bank card, 10 = Cash).",
+    xml: ".../ram:SpecifiedTradeSettlementPaymentMeans/ram:TypeCode",
+    req_xr: true, req_peppol: true, req_zugferd: false
+  },
+  "v2PayIban": {
+    bt: "BT-84",
+    name: "Payment account identifier (IBAN)",
+    name_de: "Zahlungskonto-Kennung (IBAN)",
+    desc: "The International Bank Account Number to which the invoice amount must be transferred.",
+    xml: ".../ram:PayeePartyCreditorFinancialAccount/ram:IBANID",
+    req_xr: true, req_peppol: true, req_zugferd: false
+  },
+  "v2PayBic": {
+    bt: "BT-86",
+    name: "Bank BIC / SWIFT code",
+    name_de: "Bank-Identifikator (BIC / SWIFT)",
+    desc: "BIC identifier of the payment service provider.",
+    xml: ".../ram:PayeeSpecifiedCreditorFinancialInstitution/ram:BICID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2PurchaseOrder": {
+    bt: "BT-13",
+    name: "Purchase order reference (PO)",
+    name_de: "Bestellnummer (PO)",
+    desc: "Buyer-issued purchase order or contract order number.",
+    xml: ".../ram:BuyerOrderReferencedDocument/ram:IssuerAssignedID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2BuyerRef": {
+    bt: "BT-10",
+    name: "Buyer reference (Leitweg-ID)",
+    name_de: "Leitweg-ID / Käuferreferenz",
+    desc: "Buyer reference identifier, internal cost center, or German public sector Leitweg-ID for B2G routing.",
+    xml: ".../ram:BuyerReference",
+    req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2PrepaidAmount": {
+    bt: "BT-113",
+    name: "Prepaid amount",
+    name_de: "Gezahlter Betrag / Anzahlung",
+    desc: "Sum of amounts already paid in advance or deducted prior to issuing the invoice.",
+    xml: ".../ram:TotalPrepaidAmount",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2PayTerms": {
+    bt: "BT-83",
+    name: "Payment terms / Skonto",
+    name_de: "Zahlungsbedingungen (Skonto)",
+    desc: "Detailed conditions of payment, early settlement cash discounts (Skonto), and penalty interest.",
+    xml: ".../ram:SpecifiedTradePaymentTerms/ram:Description",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2ServiceStart": {
+    bt: "BT-73",
+    name: "Invoicing period start date",
+    name_de: "Beginn des Leistungszeitraums",
+    desc: "Date when delivery or service provision began.",
+    xml: ".../ram:BillingSpecifiedPeriod/ram:StartDateTime",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2ServiceEnd": {
+    bt: "BT-74",
+    name: "Invoicing period end date",
+    name_de: "Ende des Leistungszeitraums",
+    desc: "Date when delivery or service provision concluded.",
+    xml: ".../ram:BillingSpecifiedPeriod/ram:EndDateTime",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2PrecedingInvNumber": {
+    bt: "BT-25",
+    name: "Preceding invoice reference",
+    name_de: "Vorherige Rechnungsnummer",
+    desc: "Identification number of the earlier invoice that is being credited or corrected.",
+    xml: ".../ram:InvoiceReferencedDocument/ram:IssuerAssignedID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2PrecedingInvDate": {
+    bt: "BT-26",
+    name: "Preceding invoice issue date",
+    name_de: "Rechnungsdatum der vorherigen Rechnung",
+    desc: "Issue date of the invoice that this credit note or correction refers to.",
+    xml: ".../ram:InvoiceReferencedDocument/ram:FormattedIssueDateTime",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+
+  // Seller Details
+  "v2SellerName": {
+    bt: "BT-27",
+    name: "Seller full legal name",
+    name_de: "Name des Verkäufers",
+    desc: "The full legal and registered commercial trade name of the selling company.",
+    xml: ".../ram:SellerTradeParty/ram:Name",
+    req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2SellerVat": {
+    bt: "BT-31",
+    name: "Seller VAT identifier",
+    name_de: "Umsatzsteuer-Identifikationsnummer des Verkäufers",
+    desc: "Value Added Tax identification number of the seller (e.g. DE123456789).",
+    xml: ".../ram:SellerTradeParty/ram:SpecifiedTaxRegistration (VA)",
+    req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2SellerTaxNumber": {
+    bt: "BT-32",
+    name: "Seller tax registration ID (Steuernummer)",
+    name_de: "Steuernummer des Verkäufers (FC)",
+    desc: "Local tax number or commercial register court number (e.g. 99022/20844).",
+    xml: ".../ram:SellerTradeParty/ram:SpecifiedTaxRegistration (FC)",
+    req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2SellerStreet": {
+    bt: "BT-35",
+    name: "Seller address line 1",
+    name_de: "Straße des Verkäufers",
+    desc: "Street name and building number of the seller's registered legal seat.",
+    xml: ".../ram:SellerTradeParty/.../ram:LineOne",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2SellerPostcode": {
+    bt: "BT-38",
+    name: "Seller post code",
+    name_de: "Postleitzahl des Verkäufers",
+    desc: "Postal zip code of the seller address.",
+    xml: ".../ram:SellerTradeParty/.../ram:PostcodeCode",
+    req_xr: true, req_peppol: true, req_zugferd: false
+  },
+  "v2SellerCity": {
+    bt: "BT-37",
+    name: "Seller city / municipality",
+    name_de: "Ort des Verkäufers",
+    desc: "City or town of the seller address.",
+    xml: ".../ram:SellerTradeParty/.../ram:CityName",
+    req_xr: true, req_peppol: true, req_zugferd: false
+  },
+  "v2SellerCountry": {
+    bt: "BT-40",
+    name: "Seller country code",
+    name_de: "Ländercode des Verkäufers",
+    desc: "ISO 3166-1 2-letter country code of the seller (e.g. DE, SI, FR).",
+    xml: ".../ram:SellerTradeParty/.../ram:CountryID",
+    req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2SellerContactName": {
+    bt: "BT-41",
+    name: "Seller contact point / person",
+    name_de: "Kontaktstelle / Ansprechpartner des Verkäufers",
+    desc: "Name of the contact person or department at the seller.",
+    xml: ".../ram:DefinedTradeContact/ram:PersonName",
+    req_xr: true, req_peppol: true, req_zugferd: false
+  },
+  "v2SellerPhone": {
+    bt: "BT-42",
+    name: "Seller contact telephone",
+    name_de: "Telefonnummer des Verkäufers",
+    desc: "Direct contact telephone number of the invoicing department.",
+    xml: ".../ram:DefinedTradeContact/ram:TelephoneUniversalCommunication/ram:CompleteNumber",
+    req_xr: true, req_peppol: true, req_zugferd: false
+  },
+  "v2SellerEmail": {
+    bt: "BT-43",
+    name: "Seller contact email",
+    name_de: "E-Mail-Adresse des Verkäufers",
+    desc: "Billing email address for inquiries.",
+    xml: ".../ram:DefinedTradeContact/ram:EmailURIUniversalCommunication/ram:URIID",
+    req_xr: true, req_peppol: true, req_zugferd: false
+  },
+
+  // Buyer Details
+  "v2BuyerName": {
+    bt: "BT-44",
+    name: "Buyer full legal name",
+    name_de: "Name des Erwerbers / Käufers",
+    desc: "Full legal entity name or individual name of the purchasing customer.",
+    xml: ".../ram:BuyerTradeParty/ram:Name",
+    req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2BuyerVat": {
+    bt: "BT-48",
+    name: "Buyer VAT identifier",
+    name_de: "Umsatzsteuer-Identifikationsnummer des Erwerbers",
+    desc: "Customer's Value Added Tax ID (e.g. SI52093808 or DE987654321).",
+    xml: ".../ram:BuyerTradeParty/ram:SpecifiedTaxRegistration (VA)",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2BuyerStreet": {
+    bt: "BT-50",
+    name: "Buyer address line 1",
+    name_de: "Straße des Erwerbers",
+    desc: "Street name and house number of the buyer.",
+    xml: ".../ram:BuyerTradeParty/.../ram:LineOne",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2BuyerPostcode": {
+    bt: "BT-53",
+    name: "Buyer post code",
+    name_de: "Postleitzahl des Erwerbers",
+    desc: "Postal zip code of the buyer's destination.",
+    xml: ".../ram:BuyerTradeParty/.../ram:PostcodeCode",
+    req_xr: true, req_peppol: true, req_zugferd: false
+  },
+  "v2BuyerCity": {
+    bt: "BT-52",
+    name: "Buyer city",
+    name_de: "Ort des Erwerbers",
+    desc: "City or town of the buyer address.",
+    xml: ".../ram:BuyerTradeParty/.../ram:CityName",
+    req_xr: true, req_peppol: true, req_zugferd: false
+  },
+  "v2BuyerCountry": {
+    bt: "BT-55",
+    name: "Buyer country code",
+    name_de: "Ländercode des Erwerbers",
+    desc: "ISO 3166-1 2-letter country code of the buyer.",
+    xml: ".../ram:BuyerTradeParty/.../ram:CountryID",
+    req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2BuyerContactName": {
+    bt: "BT-56",
+    name: "Buyer contact point / person",
+    name_de: "Kontaktstelle / Ansprechpartner des Erwerbers",
+    desc: "Name of the contact person or department at the buyer.",
+    xml: ".../ram:BuyerTradeParty/ram:DefinedTradeContact/ram:PersonName",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2BuyerPhone": {
+    bt: "BT-57",
+    name: "Buyer contact telephone number",
+    name_de: "Telefonnummer des Erwerbers",
+    desc: "Telephone contact number of the buyer contact point.",
+    xml: ".../ram:BuyerTradeParty/.../ram:TelephoneUniversalCommunication",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2BuyerEmail": {
+    bt: "BT-58",
+    name: "Buyer contact email address",
+    name_de: "E-Mail-Adresse des Erwerbers",
+    desc: "Email address of the buyer contact point.",
+    xml: ".../ram:BuyerTradeParty/.../ram:EmailURIUniversalCommunication",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+
+  // Delivery / Ship-to
+  "v2DelivName": {
+    bt: "BT-70",
+    name: "Deliver-to party name",
+    name_de: "Name des Empfängers / Lieferorts",
+    desc: "Name of the actual physical recipient or site if different from buyer.",
+    xml: ".../ram:ShipToTradeParty/ram:Name",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2DelivLocationId": {
+    bt: "BT-71",
+    name: "Deliver-to location identifier (GLN)",
+    name_de: "Lieferort-Kennung (Abladestelle / GLN)",
+    desc: "Global Location Number (GLN) of the destination warehouse.",
+    xml: ".../ram:ShipToTradeParty/ram:ID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2DelivDate": {
+    bt: "BT-72",
+    name: "Actual delivery date",
+    name_de: "Tatsächliches Lieferdatum",
+    desc: "Date when goods were received or service fulfilled.",
+    xml: ".../ram:ActualDeliverySupplyChainEvent/ram:OccurrenceDateTime",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2DelivDespatchRef": {
+    bt: "BT-16",
+    name: "Despatch advice reference (Delivery Note #)",
+    name_de: "Lieferscheinnummer (Despatch Advice)",
+    desc: "Reference number of the physical delivery packing slip / Lieferschein.",
+    xml: ".../ram:DespatchAdviceReferencedDocument/ram:IssuerAssignedID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2DelivStreet": {
+    bt: "BT-75",
+    name: "Deliver-to street address",
+    name_de: "Straße des Lieferorts",
+    desc: "Street address where goods are unloaded.",
+    xml: ".../ram:ShipToTradeParty/.../ram:LineOne",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2DelivPostcode": {
+    bt: "BT-78",
+    name: "Deliver-to post code",
+    name_de: "Postleitzahl des Lieferorts",
+    desc: "Zip code of the delivery location.",
+    xml: ".../ram:ShipToTradeParty/.../ram:PostcodeCode",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2DelivCity": {
+    bt: "BT-77",
+    name: "Deliver-to city",
+    name_de: "Ort des Lieferorts",
+    desc: "City of the physical unloading point.",
+    xml: ".../ram:ShipToTradeParty/.../ram:CityName",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2DelivCountry": {
+    bt: "BT-80",
+    name: "Deliver-to country code",
+    name_de: "Ländercode des Lieferorts",
+    desc: "ISO 3166-1 2-letter country code of delivery destination.",
+    xml: ".../ram:ShipToTradeParty/.../ram:CountryID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+
+  // Tax Exemption Reason
+  "v2ExemptionReason": {
+    bt: "BT-120",
+    name: "Tax exemption reason text",
+    name_de: "Grund für die Steuerbefreiung",
+    desc: "Legal justification text when VAT is 0% (e.g. Reverse Charge § 13b UStG, Intra-Community supply).",
+    xml: ".../ram:ApplicableTradeTax/ram:ExemptionReason",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  }
+};
+
+function isBtFieldMandatory(btInfo, formatKey) {
+  if (!btInfo) return false;
+  if (formatKey === "xrechnung") return Boolean(btInfo.req_xr);
+  if (formatKey === "peppol" || formatKey === "ubl") return Boolean(btInfo.req_peppol);
+  if (formatKey === "eslog") return Boolean(btInfo.req_peppol || btInfo.req_zugferd);
+  return Boolean(btInfo.req_zugferd);
+}
+
+function handleV2FormatChange(format) {
+  v2ActiveTargetFormat = format || "zugferd";
+
+  // Update tabs active state
+  ["zugferd", "xrechnung", "peppol", "eslog", "ubl"].forEach(f => {
+    const btn = document.getElementById(`v2FmtBtn-${f}`);
+    if (btn) {
+      if (f === v2ActiveTargetFormat) btn.classList.add("active");
+      else btn.classList.remove("active");
     }
   });
 
-  document.addEventListener("focusout", (e) => {
-    const target = e.target;
-    if (target && target.classList) {
-      target.classList.remove("input-xml-active");
-    }
-  });
+  // Update asterisks and tooltip badges across all form fields
+  updateMandatoryAsterisks();
 
-  // Re-highlight on input change if viewer is open
-  document.addEventListener("input", (e) => {
-    const target = e.target;
-    if (target && (target.tagName === "INPUT" || target.tagName === "SELECT")) {
-      if (XML_FIELD_MAP[target.id]) {
-        // Debounce slightly
-        clearTimeout(target._hlTimeout);
-        target._hlTimeout = setTimeout(() => {
-          highlightXmlForInput(target);
-        }, 150);
+  // If live XML viewer is visible, automatically regenerate for the new format
+  if (typeof updateV2LiveXml === "function") {
+    const v2Card = document.getElementById("v2XmlCard");
+    if (v2Card && v2Card.style.display !== "none" && !v2Card.classList.contains("hidden")) {
+      updateV2LiveXml();
+    }
+  }
+}
+window.handleV2FormatChange = handleV2FormatChange;
+
+function updateMandatoryAsterisks() {
+  const formFields = document.querySelectorAll(".v2-field");
+  formFields.forEach(fieldDiv => {
+    const input = fieldDiv.querySelector("input, select, textarea");
+    if (!input || !input.id) return;
+    const btInfo = V2_BT_FIELD_MAP[input.id];
+    if (!btInfo) return;
+
+    const isMand = isBtFieldMandatory(btInfo, v2ActiveTargetFormat);
+
+    // Update or insert star element
+    const starEl = fieldDiv.querySelector(".v2-req-star");
+    if (starEl) {
+      if (isMand) starEl.classList.remove("hidden");
+      else starEl.classList.add("hidden");
+    }
+
+    // Update status badge inside tooltip
+    const tooltipStatus = fieldDiv.querySelector(".v2-bt-tooltip-status");
+    if (tooltipStatus) {
+      if (isMand) {
+        tooltipStatus.className = "v2-bt-tooltip-status req";
+        tooltipStatus.textContent = `● Mandatory in ${v2ActiveTargetFormat.toUpperCase()}`;
+      } else {
+        tooltipStatus.className = "v2-bt-tooltip-status opt";
+        tooltipStatus.textContent = `Optional in ${v2ActiveTargetFormat.toUpperCase()}`;
       }
     }
   });
 }
+window.updateMandatoryAsterisks = updateMandatoryAsterisks;
 
-// Run attachment on load
+// Initialize BT-X labels, dynamic asterisks, tooltips, and question mark buttons
+function initXmlQuestionButtons() {
+  const formFields = document.querySelectorAll(".v2-field");
+  formFields.forEach(fieldDiv => {
+    const input = fieldDiv.querySelector("input, select, textarea");
+    const label = fieldDiv.querySelector(".v2-label");
+    if (!input || !label || !input.id) return;
+
+    const btInfo = V2_BT_FIELD_MAP[input.id];
+    const hasXmlMap = Boolean(XML_FIELD_MAP[input.id]);
+
+    // Build or ensure left wrapper for label title & BT badge
+    let leftWrap = label.querySelector(".v2-label-left");
+    if (!leftWrap) {
+      const childNodes = Array.from(label.childNodes);
+      leftWrap = document.createElement("span");
+      leftWrap.className = "v2-label-left";
+
+      // Move existing label title text (stripping hardcoded asterisks)
+      childNodes.forEach(node => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const cleanText = node.textContent.replace(/\s*\*\s*$/, "").trim();
+          if (cleanText) leftWrap.appendChild(document.createTextNode(cleanText + " "));
+          label.removeChild(node);
+        } else if (node.tagName && !node.classList.contains("v2-label-link") && !node.classList.contains("v2-xml-help-btn")) {
+          leftWrap.appendChild(node);
+        }
+      });
+
+      // Add dynamic star element
+      const star = document.createElement("span");
+      star.className = "v2-req-star hidden";
+      star.textContent = "*";
+      leftWrap.appendChild(star);
+
+      label.insertBefore(leftWrap, label.firstChild);
+    }
+
+    // 1. Inject BT-X Badge with Rich Tooltip
+    if (btInfo && !leftWrap.querySelector(`.v2-bt-badge[data-bt="${btInfo.bt}"]`)) {
+      const badge = document.createElement("span");
+      badge.className = "v2-bt-badge";
+      badge.dataset.bt = btInfo.bt;
+      badge.textContent = btInfo.bt;
+
+      const isMand = isBtFieldMandatory(btInfo, v2ActiveTargetFormat);
+      const tooltip = document.createElement("div");
+      tooltip.className = "v2-bt-tooltip";
+      const titleDisplay = btInfo.name_de 
+        ? `${btInfo.bt}: ${escapeHtml(btInfo.name_de)} (${escapeHtml(btInfo.name)})`
+        : `${btInfo.bt}: ${escapeHtml(btInfo.name)}`;
+      tooltip.innerHTML = `
+        <span class="v2-bt-tooltip-title">${titleDisplay}</span>
+        <div>${escapeHtml(btInfo.desc)}</div>
+        <span class="v2-bt-tooltip-xml">XML: ${escapeHtml(btInfo.xml)}</span>
+        <span class="v2-bt-tooltip-status ${isMand ? 'req' : 'opt'}">${isMand ? '● Mandatory Standard Field / Pflichtfeld' : 'Optional / Bedingt'}</span>
+      `;
+
+      badge.appendChild(tooltip);
+      leftWrap.appendChild(badge);
+    }
+
+    // 2. Inject Questionmark (?) XML Jump Button
+    if (hasXmlMap && !label.querySelector(`.v2-xml-help-btn[data-field="${input.id}"]`)) {
+      const qBtn = document.createElement("button");
+      qBtn.type = "button";
+      qBtn.className = "v2-xml-help-btn";
+      qBtn.dataset.field = input.id;
+      qBtn.title = `Jump to ${btInfo ? btInfo.bt + ' in ' : ''}factur-x.xml`;
+      qBtn.textContent = "?";
+      qBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        jumpToXmlForField(input.id);
+      };
+
+      label.appendChild(qBtn);
+    }
+  });
+
+  updateMandatoryAsterisks();
+}
+window.initXmlQuestionButtons = initXmlQuestionButtons;
+
+// Document ready
 document.addEventListener("DOMContentLoaded", () => {
-  attachXmlHighlightListeners();
+  initXmlQuestionButtons();
+});
+
+// Document ready
+document.addEventListener("DOMContentLoaded", () => {
+  initXmlQuestionButtons();
 });
 

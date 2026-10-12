@@ -34,6 +34,9 @@ def extract_raw_text_from_doc(file_path: str) -> str:
     ext = os.path.splitext(file_path)[1].lower()
     if ext == ".docx":
         return extract_raw_text_from_docx(file_path)
+    elif ext == ".xml":
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            return f.read()
     return extract_raw_text_from_pdf(file_path)
 
 SYSTEM_PROMPT = """You are an expert accounting system and invoice parser specialized in European standard EN 16931 and ZUGFeRD / Factur-X specifications.
@@ -56,12 +59,57 @@ Instructions:
    Keys: 'invoice_number', 'issue_date', 'currency', 'buyer_reference', 'seller_name', 'seller_vat', 'seller_street', 'seller_city', 'buyer_name', 'buyer_vat', 'buyer_street', 'buyer_city', 'iban', 'bic', 'total_net', 'total_tax', 'total_grand', 'total_due'.
 """
 
+def build_synonyms_guide(synonyms_dict: Optional[dict] = None) -> str:
+    """Format configured synonyms into structured prompt guidelines."""
+    if not synonyms_dict:
+        try:
+            from backend.app import load_system_settings
+            settings = load_system_settings()
+            synonyms_dict = settings.get("extraction_synonyms", {})
+        except Exception:
+            synonyms_dict = {}
+
+    if not synonyms_dict:
+        return ""
+
+    lines = [
+        "\n\n### MULTILINGUAL RECOGNITION GUIDE (Look for these exact printed headers / labels across languages):"
+    ]
+    for bt, data in synonyms_dict.items():
+        field_name = data.get("field", "")
+        en_tags = ", ".join(data.get("en", []))
+        de_tags = ", ".join(data.get("de", []))
+        sl_tags = ", ".join(data.get("sl", []))
+        line_parts = []
+        if en_tags:
+            line_parts.append(f"EN: [{en_tags}]")
+        if de_tags:
+            line_parts.append(f"DE: [{de_tags}]")
+        if sl_tags:
+            line_parts.append(f"SI: [{sl_tags}]")
+        parts_str = " | ".join(line_parts)
+        lines.append(f"- {bt} (`{field_name}`): {parts_str}")
+
+    lines.append(
+        "\nIMPORTANT FOR TAX / VAT / DDV RECOGNITION ACROSS EUROPE:\n"
+        "- Do NOT assume German 19% MwSt for all invoices! Different countries have different standard and reduced rates.\n"
+        "- Read each line's exact printed tax rate (e.g. from column 'DDV %', 'DDV', 'Stopnja', 'MwSt %', 'USt %', 'TVA', 'IVA', 'Moms').\n"
+        "- Example rates: Slovenia (22%, 9.5%, 5%), Croatia (25%, 13%), Denmark (25%), Germany (19%, 7%), Austria (20%, 10%), Switzerland (8.1%, 2.6%).\n"
+        "- If a line or document specifies an explicit tax rate (such as 25.0%, 22.0%, 12.0%, 9.5%, 0.0%), extract that EXACT number into `tax_percent`.\n"
+        "- Set `tax_category_code` accordingly: 'S' for standard/reduced positive rates, 'AE' for reverse charge ('obrnjena davčna obveznost' / 'Steuerschuldnerschaft'), 'E' for exempt ('oproščeno'), 'Z' for zero rated.\n"
+        "- When 'Sklic' or 'Model' (e.g., 'SI00 ...', 'SI12 ...') is present on Slovenian invoices, extract it into payment_terms / payment reference.\n"
+        "- Identify Seller ('Izdajatelj' / 'Prodajalec' / 'Lieferant') vs Buyer ('Kupec' / 'Prejemnik' / 'Rechnungsempfänger') accurately."
+    )
+    return "\n".join(lines)
+
 def extract_invoice_data(file_path: str, api_key: Optional[str] = None, system_prompt: Optional[str] = None):
     api_key = api_key or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OpenAI API Key is required. Please set OPENAI_API_KEY in environment or pass it in.")
     
-    prompt_to_use = (system_prompt and system_prompt.strip()) or SYSTEM_PROMPT
+    base_prompt = (system_prompt and system_prompt.strip()) or SYSTEM_PROMPT
+    synonyms_guide = build_synonyms_guide()
+    prompt_to_use = base_prompt + synonyms_guide
 
     client = OpenAI(api_key=api_key)
     raw_text = extract_raw_text_from_doc(file_path)

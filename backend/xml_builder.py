@@ -7,27 +7,30 @@ from backend.models import InvoiceData
 def clean_date(d_str: str) -> str:
     """Format any date string as YYYYMMDD for CII DateTimeString format 102."""
     if not d_str:
-        return datetime.now().strftime("%Y%m%d")
-    digits = re.sub(r"[^\d]", "", d_str)
+        return ""
+    digits = re.sub(r"[^\d]", "", str(d_str))
     if len(digits) == 8:
         # Check if dd.mm.yyyy or yyyymmdd
-        if d_str.find(".") != -1:
-            parts = [p.strip() for p in d_str.split(".") if p.strip()]
+        if "." in str(d_str):
+            parts = [p.strip() for p in str(d_str).split(".") if p.strip()]
             if len(parts) == 3 and len(parts[2]) == 4:
                 return f"{parts[2]}{int(parts[1]):02d}{int(parts[0]):02d}"
         return digits
-    elif len(digits) >= 8 and "-" in d_str:
-        parts = [p.strip() for p in d_str.split("-") if p.strip()]
+    elif len(digits) >= 8 and "-" in str(d_str):
+        parts = [p.strip() for p in str(d_str).split("-") if p.strip()]
         if len(parts) == 3 and len(parts[0]) == 4:
             return f"{parts[0]}{int(parts[1]):02d}{int(parts[2]):02d}"
-    return datetime.now().strftime("%Y%m%d")
+    return digits if len(digits) == 8 else ""
 
 def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     """
     Generate compliant factur-x.xml (ZUGFeRD 2.x / UN/CEFACT CII 16B).
     EN16931 guideline: urn:cen.eu:en16931:2017
+    e-SLOG 2.0 guideline: urn:cen.eu:en16931:2017#compliant#urn:eslog.si:2.0
     """
-    if profile == "EN16931":
+    if profile.upper() in ["ESLOG2", "ESLOG_2_0", "ESLOG"]:
+        guideline_id = "urn:cen.eu:en16931:2017#compliant#urn:eslog.si:2.0"
+    elif profile == "EN16931":
         guideline_id = "urn:cen.eu:en16931:2017"
     elif profile == "COMFORT":
         guideline_id = "urn:cen.eu:en16931:2017"
@@ -58,7 +61,7 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     else:
         cleaned_buyer_ref = raw_buyer_ref
 
-    buyer_ref = cleaned_buyer_ref or "N/A"
+    buyer_ref = cleaned_buyer_ref or ""
 
     # Clean seller address to prevent postcode concatenating into CityName
     s_postcode = (inv.seller.postcode or "").strip()
@@ -155,6 +158,15 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     payment_means_xml = ""
     if s_iban:
         bic_xml = f"<ram:BICID>{s_bic}</ram:BICID>" if s_bic else ""
+        # Check for Slovenian payment reference (Sklic / Reference)
+        sklic_xml = ""
+        if profile.upper() in ["ESLOG2", "ESLOG_2_0", "ESLOG"] or inv.seller.country_code == "SI":
+            ref_val = (inv.payment.payment_terms or inv.invoice_number or "").strip()
+            # If model is present or plain invoice number
+            if ref_val:
+                sklic_xml = f"""\n        <ram:PayeePartyCreditorFinancialAccount>
+          <ram:IBANID>{s_iban}</ram:IBANID>
+        </ram:PayeePartyCreditorFinancialAccount>"""
         payment_means_xml = f"""      <ram:SpecifiedTradeSettlementPaymentMeans>
         <ram:TypeCode>{inv.payment.payment_means_code or "58"}</ram:TypeCode>
         <ram:PayeePartyCreditorFinancialAccount>
@@ -210,7 +222,7 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
           <ram:ID schemeID="VA">{b_vat}</ram:ID>
         </ram:SpecifiedTaxRegistration>\n"""
 
-    # Seller contact
+    # Seller contact (BG-6 / BT-41, BT-42, BT-43)
     seller_contact_xml = ""
     if inv.seller.contact_name or inv.seller.contact_phone or inv.seller.contact_email:
         name_x = f"<ram:PersonName>{escape(inv.seller.contact_name)}</ram:PersonName>\n          " if inv.seller.contact_name else ""
@@ -222,6 +234,20 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
           </ram:EmailURIUniversalCommunication>\n          """ if inv.seller.contact_email else ""
         seller_contact_xml = f"""        <ram:DefinedTradeContact>
           {name_x}{phone_x}{email_x}
+        </ram:DefinedTradeContact>\n"""
+
+    # Buyer contact (BG-9 / BT-56, BT-57, BT-58)
+    buyer_contact_xml = ""
+    if inv.buyer.contact_name or inv.buyer.contact_phone or inv.buyer.contact_email:
+        b_name_x = f"<ram:PersonName>{escape(inv.buyer.contact_name)}</ram:PersonName>\n          " if inv.buyer.contact_name else ""
+        b_phone_x = f"""<ram:TelephoneUniversalCommunication>
+            <ram:CompleteNumber>{escape(inv.buyer.contact_phone)}</ram:CompleteNumber>
+          </ram:TelephoneUniversalCommunication>\n          """ if inv.buyer.contact_phone else ""
+        b_email_x = f"""<ram:EmailURIUniversalCommunication>
+            <ram:URIID>{escape(inv.buyer.contact_email)}</ram:URIID>
+          </ram:EmailURIUniversalCommunication>\n          """ if inv.buyer.contact_email else ""
+        buyer_contact_xml = f"""        <ram:DefinedTradeContact>
+          {b_name_x}{b_phone_x}{b_email_x}
         </ram:DefinedTradeContact>\n"""
 
     # Buyer order / Purchase Order reference (BT-13 & BT-14)
@@ -337,9 +363,10 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     if inv.prepaid_amount and inv.prepaid_amount > 0:
         prepaid_xml = f"        <ram:TotalPrepaidAmount>{inv.prepaid_amount:.2f}</ram:TotalPrepaidAmount>\n"
 
-    # Document Discounts (SpecifiedTradeAllowanceCharge)
+    # Document Allowances and Charges (SpecifiedTradeAllowanceCharge)
     allowance_charges_xml = ""
     total_allowance_amt = 0.0
+    total_charge_amt = 0.0
     if inv.discounts:
         # Determine dominant tax category & percent from items or default to 19% S
         dom_tax_cat = "S"
@@ -352,12 +379,18 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
             amt = float(disc.amount or 0.0)
             if amt <= 0.0:
                 continue
-            total_allowance_amt += amt
-            reason_txt = escape(disc.reason or "Discount / Rebate")
+            is_charge = bool(getattr(disc, "charge_indicator", False))
+            if is_charge:
+                total_charge_amt += amt
+            else:
+                total_allowance_amt += amt
+
+            reason_txt = escape(disc.reason or ("Charge" if is_charge else "Discount / Rebate"))
+            indicator_val = "true" if is_charge else "false"
             pct_xml = f"        <ram:CalculationPercent>{disc.percentage:.2f}</ram:CalculationPercent>\n" if disc.percentage is not None and disc.percentage > 0 else ""
             allowance_charges_xml += f"""      <ram:SpecifiedTradeAllowanceCharge>
         <ram:ChargeIndicator>
-          <udt:Indicator>false</udt:Indicator>
+          <udt:Indicator>{indicator_val}</udt:Indicator>
         </ram:ChargeIndicator>
 {pct_xml}        <ram:ActualAmount>{amt:.2f}</ram:ActualAmount>
         <ram:Reason>{reason_txt}</ram:Reason>
@@ -371,6 +404,9 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     allowance_total_xml = ""
     if total_allowance_amt > 0:
         allowance_total_xml = f"        <ram:AllowanceTotalAmount>{total_allowance_amt:.2f}</ram:AllowanceTotalAmount>\n"
+    charge_total_xml = ""
+    if total_charge_amt > 0:
+        charge_total_xml = f"        <ram:ChargeTotalAmount>{total_charge_amt:.2f}</ram:ChargeTotalAmount>\n"
 
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice xmlns:a="urn:un:unece:uncefact:data:standard:QualifiedDataType:100" xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:10" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
@@ -400,7 +436,7 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
 {seller_tax_xml}      </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
         <ram:Name>{escape(inv.buyer.name)}</ram:Name>
-        <ram:PostalTradeAddress>
+{buyer_contact_xml}        <ram:PostalTradeAddress>
           <ram:PostcodeCode>{escape(b_postcode)}</ram:PostcodeCode>
           <ram:LineOne>{escape(inv.buyer.street or "")}</ram:LineOne>
           <ram:CityName>{escape(b_city)}</ram:CityName>
@@ -413,7 +449,7 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
       <ram:InvoiceCurrencyCode>{inv.currency or "EUR"}</ram:InvoiceCurrencyCode>
 {billing_period_xml}{payment_means_xml}{tax_breakdown_xml}{allowance_charges_xml}{payment_terms_xml}      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
         <ram:LineTotalAmount>{inv.line_net_total:.2f}</ram:LineTotalAmount>
-{allowance_total_xml}        <ram:TaxBasisTotalAmount>{(inv.line_net_total - total_allowance_amt):.2f}</ram:TaxBasisTotalAmount>
+{charge_total_xml}{allowance_total_xml}        <ram:TaxBasisTotalAmount>{(inv.line_net_total - total_allowance_amt + total_charge_amt):.2f}</ram:TaxBasisTotalAmount>
         <ram:TaxTotalAmount currencyID="{inv.currency or "EUR"}">{inv.tax_total:.2f}</ram:TaxTotalAmount>
         <ram:GrandTotalAmount>{inv.grand_total:.2f}</ram:GrandTotalAmount>
 {prepaid_xml}        <ram:DuePayableAmount>{inv.due_payable_amount:.2f}</ram:DuePayableAmount>

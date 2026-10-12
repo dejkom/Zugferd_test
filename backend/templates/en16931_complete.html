@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="{{ lang_code|default('sl') }}">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ t('doc_title_invoice') }} - {{ inv.invoice_number }}</title>
+  <style>
+    /* --- SISTEMSKA IN TISKARSKA PRAVILA (PAGED MEDIA) --- */
+    @page {
+      size: A4 portrait;
+      margin: 12mm 15mm 15mm 15mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 9.2pt;
+      line-height: 1.35;
+      color: #1a202c;
+      background-color: #ffffff;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* A4 list */
+    .page-sheet {
+      width: 100%;
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 0;
+      background: #ffffff;
+      position: relative;
+    }
+
+    .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+
+    /* Tehnične značke (BT / BG badge) */
+    .tag {
+      display: inline-block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 6.8pt;
+      font-weight: 700;
+      color: #6366f1;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      border-radius: 3px;
+      padding: 0 3px;
+      margin-right: 2px;
+      vertical-align: middle;
+      line-height: 1.2;
+    }
+    body.hide-tags .tag { display: none !important; }
+
+    /* Layout mreža */
+    .row { display: flex; width: 100%; }
+    .col-7 { width: 58%; }
+    .col-5 { width: 42%; }
+
+    /* Glava */
+    .header-box {
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+    .brand-title {
+      font-size: 15pt;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+    .doc-type-badge {
+      display: inline-block;
+      font-size: 13.5pt;
+      font-weight: 800;
+      color: {% if is_credit_note %}#b91c1c{% else %}#1e3a8a{% endif %};
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .doc-number {
+      font-size: 12.5pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 2px;
+    }
+
+    /* Stranke */
+    .parties-section {
+      display: flex;
+      gap: 18px;
+      margin-bottom: 14px;
+    }
+    .party-card {
+      flex: 1;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 5px;
+      padding: 10px 12px;
+    }
+    .party-card-title {
+      font-size: 7.2pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 3px;
+    }
+    .party-name {
+      font-size: 9.8pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+
+    /* Referenčna matrika */
+    .reference-bar {
+      display: grid;
+      grid-template-columns: repeat({{ ref_columns|default(4) }}, 1fr);
+      gap: 8px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      padding: 8px 10px;
+      margin-bottom: 14px;
+    }
+    .ref-item-title {
+      font-size: 6.8pt;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+    }
+    .ref-item-val {
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: #0f172a;
+      word-break: break-all;
+    }
+
+    /* Opozorila / Info pasice */
+    .alert-banner {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-left: 4px solid #f59e0b;
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 8.2pt;
+      margin-bottom: 12px;
+    }
+    .alert-factoring {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-left: 4px solid #2563eb;
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 8.2pt;
+      margin-bottom: 12px;
+    }
+
+    /* Tabela postavk */
+    table.items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+    }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
+    table.items-table th {
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 7.2pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 6px 6px;
+      border: 1px solid #0f172a;
+      letter-spacing: 0.3px;
+    }
+    table.items-table td {
+      padding: 6px 6px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+      font-size: 8.3pt;
+    }
+    table.items-table tbody tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+    .item-title {
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .item-subtext {
+      font-size: 7.2pt;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    /* Povzetek in DDV */
+    .totals-container {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 14px;
+      page-break-inside: avoid;
+    }
+    .vat-panel { flex: 1.1; }
+    .totals-panel { flex: 0.9; }
+
+    table.compact-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table.compact-table th {
+      background: #e2e8f0;
+      font-size: 7.2pt;
+      font-weight: 700;
+      padding: 4px 6px;
+      color: #334155;
+      text-align: left;
+    }
+    table.compact-table td {
+      padding: 4px 6px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 8.3pt;
+    }
+
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .summary-table td {
+      padding: 3px 6px;
+      font-size: 8.3pt;
+    }
+    .summary-row-bold {
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .grand-total-box {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 8px 10px;
+      border-radius: 4px;
+      margin-top: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .grand-total-label {
+      font-size: 9.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .grand-total-amount {
+      font-size: 13pt;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Plačilna navodila */
+    .payment-box {
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      padding: 8px 12px;
+      background: #fafafa;
+      margin-bottom: 14px;
+      page-break-inside: avoid;
+    }
+    .payment-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    /* Noga */
+    .footer {
+      border-top: 1px solid #cbd5e1;
+      padding-top: 8px;
+      font-size: 6.8pt;
+      color: #64748b;
+      display: flex;
+      justify-content: space-between;
+      page-break-inside: avoid;
+    }
+  </style>
+</head>
+<body class="{% if hide_tags %}hide-tags{% endif %}">
+
+  <div class="page-sheet">
+
+    <!-- BLOK 1: GLAVA DOKUMENTA -->
+    <div class="header-box">
+      <div class="row">
+        <div class="col-7">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            {% if logo_base64 %}
+            <img src="{{ logo_base64 }}" alt="Logo" style="max-height: 48px; max-width: 140px; object-fit: contain;">
+            {% endif %}
+            <div>
+              <div class="brand-title"><span class="tag">BT-27</span>{{ inv.seller.name }}</div>
+              {% if inv.seller.trading_name and inv.seller.trading_name != inv.seller.name %}
+              <div style="font-size: 8.5pt; font-weight: 600; color: #475569;"><span class="tag">BT-28</span>{{ inv.seller.trading_name }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div style="font-size: 8.5pt; color: #475569; margin-top: 4px;">
+            <span class="tag">BT-35</span>{{ inv.seller.street or '' }}, 
+            <span class="tag">BT-37</span>{{ inv.seller.postcode or '' }} <span class="tag">BT-38</span>{{ inv.seller.city or '' }}, 
+            <span class="tag">BT-40</span>{{ inv.seller.country_code or 'SI' }}
+          </div>
+          <div style="font-size: 8.5pt; color: #334155; margin-top: 2px;">
+            {% if inv.seller.vat_id %}
+            <span data-i18n="vat_id">{{ t('vat_id') }}</span>: <strong><span class="tag">BT-31</span>{{ inv.seller.vat_id }}</strong>
+            {% endif %}
+            {% if inv.seller.tax_number or inv.seller.tax_registration_id %}
+            {% if inv.seller.vat_id %} | {% endif %}
+            <span data-i18n="reg_no">{{ t('reg_no') }}</span>: <span class="tag">BT-32</span>{{ inv.seller.tax_number or inv.seller.tax_registration_id }}
+            {% endif %}
+          </div>
+          {% if inv.seller.court_registry or footer_config.seller_court %}
+          <div style="font-size: 7.2pt; color: #64748b; margin-top: 2px;">
+            <span class="tag">BT-30</span><span data-i18n="court_reg">{{ inv.seller.court_registry or footer_config.seller_court or t('court_reg') }}</span>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="col-5 num">
+          <div class="doc-type-badge" id="docTypeLabel">
+            <span class="tag">BT-3</span><span data-i18n="doc_title">{{ doc_type_title }}</span>
+          </div>
+          <div class="doc-number"><span class="tag">BT-1</span># {{ inv.invoice_number }}</div>
+          
+          <table style="margin-left: auto; margin-top: 6px; font-size: 8.3pt;">
+            <tr>
+              <td style="color: #64748b; padding-right: 8px;"><span class="tag">BT-2</span><span data-i18n="issue_date">{{ t('issue_date') }}</span>:</td>
+              <td class="num"><strong>{{ inv.issue_date|format_date }}</strong></td>
+            </tr>
+            {% if effective_delivery_date %}
+            <tr>
+              <td style="color: #64748b; padding-right: 8px;"><span class="tag">BT-72</span><span data-i18n="delivery_date">{{ t('delivery_date') }}</span>:</td>
+              <td class="num">{{ effective_delivery_date|format_date }}</td>
+            </tr>
+            {% endif %}
+            {% if inv.due_date %}
+            <tr>
+              <td style="color: #b91c1c; font-weight: 600; padding-right: 8px;"><span class="tag">BT-9</span><span data-i18n="due_date">{{ t('due_date') }}</span>:</td>
+              <td class="num" style="color: #b91c1c; font-weight: 700;"><strong>{{ inv.due_date|format_date }}</strong></td>
+            </tr>
+            {% endif %}
+            <tr>
+              <td style="color: #64748b; padding-right: 8px;"><span class="tag">BT-5</span><span data-i18n="currency">{{ t('currency') }}</span>:</td>
+              <td class="num"><strong>{{ inv.currency or 'EUR' }}</strong></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- POGOJNO [BG-3]: REFERENCA NA PREDHODNI RAČUN (BT-3 == 381 ali 384) -->
+    {% if is_credit_note and inv.preceding_invoice_number %}
+    <div class="alert-banner">
+      <strong><span class="tag">BG-3</span><span data-i18n="preceding_title">{{ t('preceding_title') }}</span>:</strong>
+      <div style="margin-top: 2px;">
+        <span data-i18n="preceding_ref_text">{{ t('preceding_ref_text') }}</span>
+        <strong><span class="tag">BT-25</span>{{ inv.preceding_invoice_number }}</strong>
+        {% if inv.preceding_invoice_date %} (<span data-i18n="date_label">{{ t('date_label') }}</span>: <span class="tag">BT-26</span>{{ inv.preceding_invoice_date|format_date }}){% endif %}.
+        {% if inv.credit_note_reason %} {{ inv.credit_note_reason }}{% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- BLOK 2: STRANKE (KUPEC, KONTAKTI, PREVZEMNIK) -->
+    <div class="parties-section">
+      <!-- KUPEC (BG-7) -->
+      <div class="party-card">
+        <div class="party-card-title"><span class="tag">BG-7</span><span data-i18n="buyer_title">{{ t('buyer_title') }}</span></div>
+        <div class="party-name"><span class="tag">BT-44</span>{{ inv.buyer.name }}</div>
+        {% if inv.buyer.trading_name and inv.buyer.trading_name != inv.buyer.name %}
+        <div style="font-size: 8.5pt; font-weight: 600; color: #475569;"><span class="tag">BT-45</span>{{ inv.buyer.trading_name }}</div>
+        {% endif %}
+        <div style="font-size: 8.5pt; color: #334155;">
+          <span class="tag">BT-50</span>{{ inv.buyer.street or '' }}<br>
+          <span class="tag">BT-52</span>{{ inv.buyer.postcode or '' }} <span class="tag">BT-53</span>{{ inv.buyer.city or '' }}, <span class="tag">BT-55</span>{{ inv.buyer.country_code or 'SI' }}
+        </div>
+        {% if inv.buyer.vat_id %}
+        <div style="font-size: 8.5pt; margin-top: 4px;">
+          <span data-i18n="vat_id">{{ t('vat_id') }}</span>: <strong><span class="tag">BT-48</span>{{ inv.buyer.vat_id }}</strong>
+        </div>
+        {% endif %}
+        
+        <!-- POGOJNO [BG-9]: KONTAKT KUPCA -->
+        {% if has_buyer_contact %}
+        <div style="margin-top: 6px; padding-top: 4px; border-top: 1px dashed #cbd5e1; font-size: 7.8pt; color: #475569;">
+          <span class="tag">BG-9</span><strong><span data-i18n="contact_buyer">{{ t('contact_buyer') }}</span>:</strong>
+          {% if inv.buyer.contact_name %}<span class="tag">BT-56</span>{{ inv.buyer.contact_name }}{% endif %}
+          {% if inv.buyer.contact_phone %} | <span data-i18n="tel_label">{{ t('tel_label') }}</span>: <span class="tag">BT-57</span>{{ inv.buyer.contact_phone }}{% endif %}
+          {% if inv.buyer.contact_email %} | <span data-i18n="email_label">{{ t('email_label') }}</span>: <span class="tag">BT-58</span>{{ inv.buyer.contact_email }}{% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- PRODAJALEC KONTAKT & POGOJNO DOSTAVA -->
+      <div class="party-card">
+        <div class="party-card-title"><span class="tag">BG-6</span><span data-i18n="seller_contact_title">{{ t('seller_contact_title') }}</span></div>
+        <div style="font-size: 8.5pt; color: #334155;">
+          <span data-i18n="rep_label">{{ t('rep_label') }}</span>: <strong><span class="tag">BT-41</span>{{ inv.seller.contact_name or 'Oddelek prodaje / Sales' }}</strong><br>
+          {% if inv.seller.contact_phone %}<span data-i18n="tel_label">{{ t('tel_label') }}</span>: <span class="tag">BT-42</span>{{ inv.seller.contact_phone }}<br>{% endif %}
+          {% if inv.seller.contact_email %}<span data-i18n="email_label">{{ t('email_label') }}</span>: <span class="tag">BT-43</span>{{ inv.seller.contact_email }}<br>{% endif %}
+        </div>
+
+        <!-- POGOJNO [BG-13]: RAZKLADALNO MESTO / PREVZEMNIK -->
+        {% if has_delivery %}
+        <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #cbd5e1;">
+          <div class="party-card-title" style="color: #0369a1; border-color: #bae6fd;">
+            <span class="tag">BG-13</span><span data-i18n="delivery_title">{{ t('delivery_title') }}</span>
+          </div>
+          <div style="font-size: 8pt; color: #0f172a; font-weight: 600;">
+            <span class="tag">BT-70</span>{{ inv.delivery.recipient_name or inv.buyer.name }}
+          </div>
+          <div style="font-size: 7.8pt; color: #475569;">
+            {% if inv.delivery.street %}<span class="tag">BT-75</span>{{ inv.delivery.street }}, {% endif %}
+            {% if inv.delivery.postcode or inv.delivery.city %}<span class="tag">BT-77</span>{{ inv.delivery.postcode }} {{ inv.delivery.city }}, {% endif %}
+            <span class="tag">BT-80</span>{{ inv.delivery.country_code or 'SI' }}
+            {% if inv.delivery.location_id %} | GLN: <span class="tag">BT-71</span>{{ inv.delivery.location_id }}{% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- BLOK 3: REFERENČNA MATRIKA -->
+    {% if references %}
+    <div class="reference-bar" style="grid-template-columns: repeat({{ references|length }}, 1fr);">
+      {% for ref in references %}
+      <div>
+        <div class="ref-item-title"><span class="tag">{{ ref.tag }}</span>{{ ref.label }}</div>
+        <div class="ref-item-val">{{ ref.value }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- POGOJNO [BG-10]: FAKTORING / ODSTOP TERJATVE -->
+    {% if has_factoring %}
+    <div class="alert-factoring">
+      <strong><span class="tag">BG-10</span><span data-i18n="factoring_notice_title">{{ t('factoring_notice_title') }}</span>:</strong><br>
+      <span data-i18n="factoring_text">{{ t('factoring_text') }}</span>
+      <strong><span class="tag">BT-59</span>{{ factoring.name }}</strong>
+      {% if factoring.vat_id %} (<span data-i18n="vat_id">{{ t('vat_id') }}</span>: <span class="tag">BT-61</span>{{ factoring.vat_id }}){% endif %}.
+      <span data-i18n="factoring_settle">{{ t('factoring_settle') }}</span> <strong>{{ factoring.iban }}</strong> (BIC: {{ factoring.bic or '' }}).
+    </div>
+    {% endif %}
+
+    <!-- BLOK 4: TABELA POSTAVK (BG-25) -->
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width: 25px; text-align: center;"><span class="tag">BT-126</span>#</th>
+          <th><span class="tag">BT-153</span><span data-i18n="th_item">{{ t('th_item') }}</span></th>
+          <th class="num" style="width: 55px;"><span class="tag">BT-129</span><span data-i18n="th_qty">{{ t('th_qty') }}</span></th>
+          <th style="width: 35px; text-align: center;"><span class="tag">BT-130</span><span data-i18n="th_unit">{{ t('th_unit') }}</span></th>
+          <th class="num" style="width: 75px;"><span class="tag">BT-146</span><span data-i18n="th_price">{{ t('th_price') }}</span></th>
+          <th class="num" style="width: 50px;"><span class="tag">BT-147</span><span data-i18n="th_disc">{{ t('th_disc') }}</span></th>
+          <th class="num" style="width: 45px;"><span class="tag">BT-152</span><span data-i18n="th_vat">{{ t('th_vat') }}</span></th>
+          <th class="num" style="width: 90px;"><span class="tag">BT-131</span><span data-i18n="th_total">{{ t('th_total') }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in inv.items %}
+        <tr>
+          <td style="text-align: center;">{{ item.line_id or loop.index }}</td>
+          <td>
+            <div class="item-title">{{ item.name }}</div>
+            {% if item.description %}
+            <div class="item-subtext" style="color: #475569;">{{ item.description }}</div>
+            {% endif %}
+            
+            <!-- Identifikatorji postavk EN 16931 -->
+            {% set sub_identifiers = [] %}
+            {% if item.seller_item_id %}
+              {% set _ = sub_identifiers.append('<span class="tag">BT-155</span>Art. ID: <strong>' ~ item.seller_item_id ~ '</strong>') %}
+            {% endif %}
+            {% if item.buyer_item_id %}
+              {% set _ = sub_identifiers.append('<span class="tag">BT-156</span>Buyer Art: <strong>' ~ item.buyer_item_id ~ '</strong>') %}
+            {% endif %}
+            {% if item.standard_item_id %}
+              {% set _ = sub_identifiers.append('<span class="tag">BT-157</span>EAN: ' ~ item.standard_item_id) %}
+            {% endif %}
+            {% if item.item_serial_number %}
+              {% set _ = sub_identifiers.append('<span class="tag">BT-128</span>S/N: ' ~ item.item_serial_number) %}
+            {% endif %}
+            {% if item.order_line_reference %}
+              {% set _ = sub_identifiers.append('<span class="tag">BT-132</span>PO Line: ' ~ item.order_line_reference) %}
+            {% endif %}
+            {% if item.item_attribute %}
+              {% set _ = sub_identifiers.append('<span class="tag">BG-32</span>Spec: ' ~ item.item_attribute) %}
+            {% endif %}
+
+            {% if sub_identifiers %}
+            <div class="item-subtext">
+              {{ sub_identifiers|join(' | ')|safe }}
+            </div>
+            {% endif %}
+          </td>
+          <td class="num">{{ item.quantity|format_num(2) }}</td>
+          <td style="text-align: center;">{{ item.unit_code or 'C62' }}</td>
+          <td class="num">{{ item.unit_price|format_price }}</td>
+          <td class="num">{% if item.discount_amount and item.discount_amount > 0 %}{{ item.discount_amount|format_num(2) }}{% else %}0,00{% endif %}</td>
+          <td class="num">{{ item.tax_percent|format_num(1) }}%</td>
+          <td class="num">{{ item.line_total_amount|format_num(2) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- BLOK 5: POVZETEK, DDV IN SKUPNI ZNESKI -->
+    <div class="totals-container">
+      
+      <!-- LEVA STRAN: DDV IN PLAČILNI POGOJI -->
+      <div class="vat-panel">
+        <div style="font-size: 7.8pt; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 4px;">
+          <span class="tag">BG-23</span><span data-i18n="vat_breakdown_title">{{ t('vat_breakdown_title') }}</span>
+        </div>
+        <table class="compact-table">
+          <thead>
+            <tr>
+              <th><span class="tag">BT-118</span><span data-i18n="th_cat">{{ t('th_cat') }}</span></th>
+              <th class="num"><span class="tag">BT-152</span><span data-i18n="th_rate">{{ t('th_rate') }}</span></th>
+              <th class="num"><span class="tag">BT-116</span><span data-i18n="th_base">{{ t('th_base') }}</span></th>
+              <th class="num"><span class="tag">BT-117</span><span data-i18n="th_vat_amount">{{ t('th_vat_amount') }}</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for vat in vat_breakdown_list %}
+            <tr>
+              <td>{{ vat.category_label }} ({{ vat.category }})</td>
+              <td class="num">{{ vat.rate|format_num(2) }} %</td>
+              <td class="num">{{ vat.basis|format_num(2) }}</td>
+              <td class="num">{{ vat.tax|format_num(2) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <!-- POGOJNO [BT-120/121]: KLAVZULA O OPROSTITVI DDV -->
+        {% if has_exemption %}
+        <div style="margin-top: 6px; font-size: 7.3pt; color: #b91c1c; font-style: italic;">
+          <span class="tag">BT-120</span><span data-i18n="reverse_charge_clause">{{ exemption_text }}</span>
+        </div>
+        {% endif %}
+
+        {% if inv.payment.payment_terms or inv.notes %}
+        <div style="margin-top: 10px; font-size: 7.8pt; color: #475569;">
+          {% if inv.payment.payment_terms %}
+          <strong><span class="tag">BT-20</span><span data-i18n="terms_label">{{ t('terms_label') }}</span>:</strong> 
+          <span data-i18n="terms_text">{{ inv.payment.payment_terms }}</span><br/>
+          {% endif %}
+          {% if inv.notes %}
+          <div style="margin-top: 4px;">
+            <span class="tag">BT-22</span><strong><span data-i18n="notes_label">{{ t('notes_label') }}</span>:</strong> {{ inv.notes|join('; ') }}
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- DESNA STRAN: FINANČNI REKAPITULAT (BG-22) -->
+      <div class="totals-panel">
+        <table class="summary-table">
+          <tr>
+            <td><span class="tag">BT-106</span><span data-i18n="tot_line_net">{{ t('tot_line_net') }}</span>:</td>
+            <td class="num summary-row-bold">{{ inv.line_net_total|format_num(2) }} {{ inv.currency or 'EUR' }}</td>
+          </tr>
+          {% if sum_allowance > 0 %}
+          <tr>
+            <td><span class="tag">BT-107</span><span data-i18n="tot_allowance">{{ t('tot_allowance') }}</span> (<span class="tag">BG-20</span>):</td>
+            <td class="num" style="color: #15803d;">- {{ sum_allowance|format_num(2) }} {{ inv.currency or 'EUR' }}</td>
+          </tr>
+          {% endif %}
+          {% if sum_charge > 0 %}
+          <tr>
+            <td><span class="tag">BT-108</span><span data-i18n="tot_charges">{{ t('tot_charges') }}</span> (<span class="tag">BG-21</span>):</td>
+            <td class="num" style="color: #0284c7;">+ {{ sum_charge|format_num(2) }} {{ inv.currency or 'EUR' }}</td>
+          </tr>
+          {% endif %}
+          <tr style="border-top: 1px solid #e2e8f0;">
+            <td><span class="tag">BT-109</span><span data-i18n="tot_tax_base">{{ t('tot_tax_base') }}</span>:</td>
+            <td class="num summary-row-bold">{{ tax_basis_total|format_num(2) }} {{ inv.currency or 'EUR' }}</td>
+          </tr>
+          <tr>
+            <td><span class="tag">BT-110</span><span data-i18n="tot_vat">{{ t('tot_vat') }}</span>:</td>
+            <td class="num summary-row-bold">{{ inv.tax_total|format_num(2) }} {{ inv.currency or 'EUR' }}</td>
+          </tr>
+          <tr style="border-top: 1px solid #cbd5e1;">
+            <td class="summary-row-bold"><span class="tag">BT-115</span><span data-i18n="tot_incl_vat">{{ t('tot_incl_vat') }}</span>:</td>
+            <td class="num summary-row-bold">{{ inv.grand_total|format_num(2) }} {{ inv.currency or 'EUR' }}</td>
+          </tr>
+          
+          <!-- POGOJNO [BT-113]: PREDPLAČILO -->
+          {% if inv.prepaid_amount and inv.prepaid_amount > 0 %}
+          <tr>
+            <td style="color: #b91c1c;"><span class="tag">BT-113</span><span data-i18n="tot_prepaid">{{ t('tot_prepaid') }}</span>:</td>
+            <td class="num" style="color: #b91c1c; font-weight: 700;">- {{ inv.prepaid_amount|format_num(2) }} {{ inv.currency or 'EUR' }}</td>
+          </tr>
+          {% endif %}
+        </table>
+
+        <!-- ZNESEK ZA PLAČILO (BT-115) -->
+        <div class="grand-total-box">
+          <div class="grand-total-label">
+            <span class="tag" style="color: #ffffff; background: #334155; border-color: #475569;">BT-115</span>
+            <span data-i18n="tot_due">{{ t('tot_due') }}</span>
+          </div>
+          <div class="grand-total-amount">{{ inv.due_payable_amount|format_num(2) }} {{ inv.currency or 'EUR' }}</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BLOK 6: PLAČILNA NAVODILA (BG-16) -->
+    <div class="payment-box">
+      <div style="font-size: 7.8pt; font-weight: 700; color: #475569; text-transform: uppercase;">
+        <span class="tag">BG-16</span><span data-i18n="pay_inst_title">{{ t('pay_inst_title') }}</span> | 
+        <span data-i18n="pay_method">{{ t('pay_method') }}</span>: <span class="tag">BT-81</span>{{ inv.payment.payment_means_name or 'SEPA Credit Transfer' }}
+      </div>
+      <div class="payment-grid">
+        <div>
+          <div style="font-size: 7.2pt; color: #64748b;"><span class="tag">BT-84</span>IBAN TRR</div>
+          <div style="font-size: 8.8pt; font-weight: 700; color: #0f172a;">
+            {% if has_factoring %}{{ factoring.iban }}{% else %}{{ inv.payment.iban or 'N/A' }}{% endif %}
+          </div>
+        </div>
+        <div>
+          <div style="font-size: 7.2pt; color: #64748b;"><span class="tag">BT-86</span>BIC / SWIFT</div>
+          <div style="font-size: 8.8pt; font-weight: 700; color: #0f172a;">
+            {% if has_factoring %}{{ factoring.bic or '' }}{% else %}{{ inv.payment.bic or 'N/A' }}{% endif %}
+          </div>
+        </div>
+        <div>
+          <div style="font-size: 7.2pt; color: #64748b;"><span class="tag">BT-83</span><span data-i18n="pay_ref">{{ t('pay_ref') }}</span></div>
+          <div style="font-size: 8.8pt; font-weight: 700; color: #0f172a;">
+            {{ inv.payment.payment_reference or ('SI00 ' ~ inv.invoice_number) }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BLOK 7: NOGA DOKUMENTA -->
+    <div class="footer">
+      <div>
+        <strong>{{ inv.seller.name }}</strong>
+        {% if footer_config.seller_managing_directors %} | Poslovodja: {{ footer_config.seller_managing_directors }}{% endif %}
+        {% if inv.seller.court_registry %} | {{ inv.seller.court_registry }}{% endif %}
+      </div>
+      <div>
+        {{ footer_config.seller_website or 'www.podjetje.si' }} | {{ inv.seller.contact_email or 'info@podjetje.si' }}
+      </div>
+      <div>
+        <span data-i18n="footer_page">{{ t('footer_page') }}</span> 1 / 1
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

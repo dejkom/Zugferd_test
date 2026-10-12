@@ -1,0 +1,522 @@
+/* =========================================================================
+   OVERVIEW & EN 16931 VALIDATOR STANDARDS STYLES
+   ========================================================================= */
+
+.ov-hero {
+  background: linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(139,92,246,0.05) 50%, rgba(16,185,129,0.05) 100%);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 16px;
+  padding: 2.25rem 2rem;
+  margin-bottom: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.ov-hero::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(37,99,235,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.ov-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  background: rgba(37,99,235,0.12);
+  color: #2563eb;
+  border: 1px solid rgba(37,99,235,0.25);
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+}
+
+[data-theme="dark"] .ov-badge-pill {
+  color: #60a5fa;
+  background: rgba(59,130,246,0.18);
+  border-color: rgba(59,130,246,0.3);
+}
+
+.ov-hero-title {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1.25;
+  margin-bottom: 0.65rem;
+  letter-spacing: -0.02em;
+}
+
+.ov-hero-desc {
+  font-size: 0.96rem;
+  color: var(--text-muted);
+  max-width: 820px;
+  line-height: 1.6;
+}
+
+.ov-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* Feature 4-column cards */
+.ov-features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.ov-feature-card {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.ov-feature-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(37,99,235,0.4);
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06);
+}
+
+.ov-feat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  background: rgba(37,99,235,0.1);
+  color: #2563eb;
+}
+
+.ov-feature-card h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.ov-feature-card p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* 3-Step Flow Row */
+.ov-flow-card {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.ov-flow-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ov-steps-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  .ov-steps-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+.ov-step-item {
+  background: var(--bg-input);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 10px;
+  padding: 1.15rem;
+  display: flex;
+  gap: 0.85rem;
+}
+
+.ov-step-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.88rem;
+  flex-shrink: 0;
+}
+
+.ov-step-content h5 {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0 0 0.35rem 0;
+}
+
+.ov-step-content p {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* =========================================================================
+   EN 16931 / BT VALIDATOR REFERENCE SECTION & TABLE
+   ========================================================================= */
+
+.bt-portal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px -2px rgba(0,0,0,0.04);
+}
+
+.bt-portal-header {
+  padding: 1.5rem 1.75rem 1.25rem;
+  border-bottom: 1px solid var(--bg-card-border);
+  background: var(--bg-secondary);
+}
+
+.bt-portal-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.bt-portal-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 900px;
+}
+
+.bt-controls-bar {
+  padding: 1rem 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  border-bottom: 1px solid var(--bg-card-border);
+  background: var(--bg-card);
+  flex-wrap: wrap;
+}
+
+.bt-search-box {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+  max-width: 420px;
+}
+
+.bt-search-box svg {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.bt-search-input {
+  width: 100%;
+  padding: 0.55rem 0.85rem 0.55rem 2.25rem;
+  border-radius: 8px;
+  border: 1px solid var(--bg-card-border);
+  background: var(--bg-input);
+  color: var(--text-main);
+  font-size: 0.85rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bt-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.bt-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.bt-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  user-select: none;
+}
+
+.bt-toggle-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.bt-group-select {
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--bg-card-border);
+  background: var(--bg-input);
+  color: var(--text-main);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.bt-counter-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  border: 1px solid var(--bg-card-border);
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+/* Format Tags / Pills Bar */
+.bt-fmts-strip {
+  padding: 0.65rem 1.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(0,0,0,0.015);
+  border-bottom: 1px solid var(--bg-card-border);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.bt-fmt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.76rem;
+  border: 1px solid transparent;
+}
+
+.bt-fmt-badge.xr {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.bt-fmt-badge.peppol {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+.bt-fmt-badge.zugferd {
+  background: rgba(147, 51, 234, 0.1);
+  color: #7c3aed;
+  border-color: rgba(147, 51, 234, 0.25);
+}
+
+/* Table Style */
+.bt-table-wrapper {
+  overflow-x: auto;
+  max-height: 680px;
+  position: relative;
+}
+
+.bt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  text-align: left;
+}
+
+.bt-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--bg-card-border);
+}
+
+.bt-table th {
+  padding: 0.85rem 1rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.bt-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--bg-card-border);
+  vertical-align: middle;
+}
+
+.bt-table tr:hover td {
+  background: rgba(37, 99, 235, 0.035);
+}
+
+.bt-code-cell {
+  font-family: 'Fira Code', monospace;
+  font-weight: 700;
+  color: #2563eb;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .bt-code-cell {
+  color: #60a5fa;
+}
+
+.bt-name-cell {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.bt-group-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: rgba(0,0,0,0.04);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 3px;
+}
+
+[data-theme="dark"] .bt-group-badge {
+  background: rgba(255,255,255,0.06);
+}
+
+/* Format marks */
+.bt-check-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #10b981;
+}
+
+.bt-check-blue {
+  color: #2563eb;
+}
+
+.bt-dash-icon {
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 1rem;
+  opacity: 0.6;
+}
+
+.bt-mand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+[data-theme="dark"] .bt-mand-badge {
+  color: #34d399;
+}
+
+.bt-opt-badge {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-dim);
+}
+
+.bt-map-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.6rem;
+  background: rgba(37,99,235,0.08);
+  border: 1px solid rgba(37,99,235,0.2);
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #2563eb;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .bt-map-badge {
+  color: #60a5fa;
+  border-color: rgba(96,165,250,0.3);
+}
+
+.bt-map-badge:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.bt-xml-path {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 3px;
+}
+
+/* Empty state */
+.bt-empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}

@@ -459,3 +459,215 @@
   border-color: #f59e0b !important;
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35) !important;
 }
+
+/* Question mark (?) XML Jump button */
+.v2-xml-help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  color: #2563eb;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  margin-left: 5px;
+  transition: all 0.2s ease;
+  vertical-align: middle;
+}
+
+.v2-xml-help-btn:hover {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+
+[data-theme="dark"] .v2-xml-help-btn {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .v2-xml-help-btn:hover {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+/* =========================================================================
+   BT-X BADGES & INTERACTIVE TOOLTIPS
+   ========================================================================= */
+
+.v2-label-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.v2-bt-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  color: #2563eb;
+  cursor: help;
+  user-select: none;
+  line-height: 1.25;
+  transition: all 0.2s ease;
+}
+
+.v2-bt-badge:hover {
+  background: rgba(37, 99, 235, 0.16);
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
+
+[data-theme="dark"] .v2-bt-badge {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .v2-bt-badge:hover {
+  background: rgba(59, 130, 246, 0.28);
+  color: #bfdbfe;
+}
+
+/* Tooltip popup */
+.v2-bt-badge .v2-bt-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.45);
+  padding: 0.55rem 0.75rem;
+  border-radius: 7px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.73rem;
+  font-weight: 400;
+  text-align: left;
+  white-space: normal;
+  width: max-content;
+  max-width: 260px;
+  z-index: 9999;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  line-height: 1.4;
+}
+
+/* Downward arrow */
+.v2-bt-badge .v2-bt-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: #0f172a transparent transparent transparent;
+}
+
+.v2-bt-badge:hover .v2-bt-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.v2-bt-tooltip-title {
+  font-weight: 700;
+  color: #60a5fa;
+  margin-bottom: 2px;
+  font-size: 0.75rem;
+  display: block;
+}
+
+.v2-bt-tooltip-xml {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.67rem;
+  color: #94a3b8;
+  margin-top: 4px;
+  display: block;
+  word-break: break-all;
+}
+
+.v2-bt-tooltip-status {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-top: 4px;
+}
+
+.v2-bt-tooltip-status.req {
+  background: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+
+.v2-bt-tooltip-status.opt {
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+}
+
+/* Format selector buttons */
+.v2-format-btn {
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.v2-format-btn:hover {
+  color: var(--text-main);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.v2-format-btn.active {
+  background: var(--bg-card) !important;
+  color: var(--accent) !important;
+  border-color: rgba(37, 99, 235, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="dark"] .v2-format-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .v2-format-btn.active {
+  background: rgba(37, 99, 235, 0.2) !important;
+  border-color: rgba(96, 165, 250, 0.4) !important;
+  color: #93c5fd !important;
+}
+
+/* Dynamic Mandatory Asterisk */
+.v2-req-star {
+  color: #ef4444;
+  font-weight: 800;
+  margin-left: 2px;
+  display: inline-block;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.v2-req-star.hidden {
+  display: none !important;
+}
+
+
