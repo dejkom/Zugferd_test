@@ -573,6 +573,14 @@ DEFAULT_SETTINGS = {
             "de": ["Lieferschein-Nr.", "Lieferscheinnummer", "LS-Nr."],
             "sl": ["Številka dobavnice", "Dobavnica št.", "Dobavnica", "Št. dobavnice"]
         },
+        "BT-29": {
+            "bt": "BT-29",
+            "field": "seller_identifier",
+            "name": "Seller identifier / Supplier code",
+            "en": ["Supplier Code", "Seller ID", "Vendor #", "Vendor Number", "Supplier No."],
+            "de": ["Lieferantennummer", "Lieferanten-Nr.", "Lieferanten-Nummer", "Lieferanten ID"],
+            "sl": ["Koda dobavitelja", "Šifra dobavitelja", "Številka dobavitelja", "Dobavitelj št."]
+        },
         "BT-44": {
             "bt": "BT-44",
             "field": "buyer_name",
@@ -746,7 +754,12 @@ def load_system_settings() -> dict:
                 if "active_prompt_id" not in res or not res["active_prompt_id"]:
                     res["active_prompt_id"] = "trilingual_dictionary"
                 if "extraction_synonyms" not in res or not res["extraction_synonyms"]:
-                    res["extraction_synonyms"] = DEFAULT_SETTINGS["extraction_synonyms"]
+                    res["extraction_synonyms"] = DEFAULT_SETTINGS["extraction_synonyms"].copy()
+                else:
+                    # Merge any missing default synonym definitions (e.g. newly added BT fields like BT-29)
+                    for s_k, s_v in DEFAULT_SETTINGS["extraction_synonyms"].items():
+                        if s_k not in res["extraction_synonyms"]:
+                            res["extraction_synonyms"][s_k] = s_v
                 if "tax_rates" not in res or not res["tax_rates"]:
                     res["tax_rates"] = DEFAULT_SETTINGS["tax_rates"]
                 return res

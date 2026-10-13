@@ -31,7 +31,8 @@
         <button class="nav-tab-btn active" id="tab-overview" onclick="switchScenario('overview')">
           <span>📖 Overview & Standards</span>
         </button>
-        <button class="nav-tab-btn" id="tab-v2" onclick="switchScenario('v2')" style="background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.3); color: #2563eb; font-weight: 700;">
+        <button class="nav-tab-btn" id="tab-v2" onclick="switchScenario('v2')"
+          style="background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.3); color: #2563eb; font-weight: 700;">
           <span>⚡ Studio v2</span>
         </button>
         <button class="nav-tab-btn" id="tab-history" onclick="switchScenario('history')">
@@ -53,21 +54,26 @@
 
     <!-- ================= SCENARIO OVERVIEW: SYSTEM ARCHITECTURE & EN 16931 STANDARDS VALIDATOR ================= -->
     <div id="scenario-overview-container">
-      
+
       <!-- Hero Section -->
       <div class="ov-hero">
         <div class="ov-badge-pill">
           <span>🛡️ EU EN 16931 & ISO 19005-3 Certified</span>
         </div>
-        <h2 class="ov-hero-title">ZUGFeRD & Factur-X Studio v2 <span style="font-size: 0.65em; opacity: 0.85; font-weight: normal;">/ E-Rechnungs-Studio</span></h2>
+        <h2 class="ov-hero-title">ZUGFeRD & Factur-X Studio v2 <span
+            style="font-size: 0.65em; opacity: 0.85; font-weight: normal;">/ E-Rechnungs-Studio</span></h2>
         <p class="ov-hero-desc">
-          Welcome to the compliant electronic invoicing engine. Studio v2 generates hybrid PDF/A-3 documents with embedded, machine-readable Cross-Industry Invoicing (CII) XML compliant with <strong>EN 16931</strong>, <strong>ZUGFeRD 2.3</strong>, <strong>Factur-X</strong>, and <strong>Order-X</strong>.
+          Welcome to the compliant electronic invoicing engine. Studio v2 generates hybrid PDF/A-3 documents with
+          embedded, machine-readable Cross-Industry Invoicing (CII) XML compliant with <strong>EN 16931</strong>,
+          <strong>ZUGFeRD 2.3</strong>, <strong>Factur-X</strong>, and <strong>Order-X</strong>.
         </p>
         <div class="ov-hero-actions">
-          <button class="btn btn-primary" onclick="switchScenario('v2')" style="padding: 0.75rem 1.6rem; font-size: 0.95rem; font-weight: 700;">
+          <button class="btn btn-primary" onclick="switchScenario('v2')"
+            style="padding: 0.75rem 1.6rem; font-size: 0.95rem; font-weight: 700;">
             <span>⚡ Open Studio v2 Generator / Generator starten</span>
           </button>
-          <a href="#en16931-validator-table" class="btn btn-secondary" style="padding: 0.75rem 1.25rem; font-size: 0.95rem;">
+          <a href="#en16931-validator-table" class="btn btn-secondary"
+            style="padding: 0.75rem 1.25rem; font-size: 0.95rem;">
             <span>🔍 Browse Mandatory Fields (BT Table) / Pflichtfelder-Tabelle</span>
           </a>
         </div>
@@ -78,22 +84,26 @@
         <div class="ov-feature-card">
           <div class="ov-feat-icon">📑</div>
           <h4>6 Document Profiles / Profile</h4>
-          <p>Generate Commercial Invoices (380 / Rechnung), Credit Notes (381 / Gutschrift), Corrected Invoices (384 / Korrektur), Partial (326 / Teilrechnung), Prepayment (386), and Order-X (220).</p>
+          <p>Generate Commercial Invoices (380 / Rechnung), Credit Notes (381 / Gutschrift), Corrected Invoices (384 /
+            Korrektur), Partial (326 / Teilrechnung), Prepayment (386), and Order-X (220).</p>
         </div>
         <div class="ov-feature-card">
           <div class="ov-feat-icon">🤖</div>
           <h4>AI Document Extraction / Extraktion</h4>
-          <p>Drop existing PDF or Word invoices to automatically extract parties, items, bank data, and totals straight into compliant fields.</p>
+          <p>Drop existing PDF or Word invoices to automatically extract parties, items, bank data, and totals straight
+            into compliant fields.</p>
         </div>
         <div class="ov-feature-card">
           <div class="ov-feat-icon">🛡️</div>
           <h4>Mustangproject Validation / Validierung</h4>
-          <p>Embedded XML and PDF/A-3 containers are strictly verified using the official European Mustangproject Java validator engine.</p>
+          <p>Embedded XML and PDF/A-3 containers are strictly verified using the official European Mustangproject Java
+            validator engine.</p>
         </div>
         <div class="ov-feature-card">
           <div class="ov-feat-icon">⚡</div>
           <h4>Real-time Calculations / Berechnung</h4>
-          <p>Live VAT split per tax rate (19% standard, 0% reverse charge, etc.), line total summation, rounding guards, and Skonto cash discounts.</p>
+          <p>Live VAT split per tax rate (19% standard, 0% reverse charge, etc.), line total summation, rounding guards,
+            and Skonto cash discounts.</p>
         </div>
       </div>
 
@@ -107,21 +117,24 @@
             <div class="ov-step-num">1</div>
             <div class="ov-step-content">
               <h5>Input or Auto-Extract</h5>
-              <p>Type your invoice details in the guided form or drop a legacy PDF/DOCX to let AI prefill parties, tax IDs, and line items.</p>
+              <p>Type your invoice details in the guided form or drop a legacy PDF/DOCX to let AI prefill parties, tax
+                IDs, and line items.</p>
             </div>
           </div>
           <div class="ov-step-item">
             <div class="ov-step-num">2</div>
             <div class="ov-step-content">
               <h5>EN 16931 Compliance Check</h5>
-              <p>Studio v2 ensures all mandatory Business Terms (BT-1, BT-27, BT-44, BT-112, etc.) are present and properly formatted.</p>
+              <p>Studio v2 ensures all mandatory Business Terms (BT-1, BT-27, BT-44, BT-112, etc.) are present and
+                properly formatted.</p>
             </div>
           </div>
           <div class="ov-step-item">
             <div class="ov-step-num">3</div>
             <div class="ov-step-content">
               <h5>Compile Hybrid PDF/A-3</h5>
-              <p>The system renders a professional layout and embeds the valid <code>factur-x.xml</code> attachment directly into the PDF/A-3 file.</p>
+              <p>The system renders a professional layout and embeds the valid <code>factur-x.xml</code> attachment
+                directly into the PDF/A-3 file.</p>
             </div>
           </div>
         </div>
@@ -131,21 +144,27 @@
       <div class="bt-portal-card" id="en16931-validator-table">
         <div class="bt-portal-header">
           <div class="bt-portal-title">
-            <span>📋 European Standard EN 16931 — Mandatory &amp; Business Term (BT) Directory <span style="font-size: 0.85em; opacity: 0.85; font-weight: normal;">/ Pflichtfelder-Vergleich</span></span>
+            <span>📋 European Standard EN 16931 — Mandatory &amp; Business Term (BT) Directory <span
+                style="font-size: 0.85em; opacity: 0.85; font-weight: normal;">/ Pflichtfelder-Vergleich</span></span>
           </div>
           <div class="bt-portal-subtitle">
-            Compare which fields are legally mandatory across <strong>XRechnung</strong>, <strong>Peppol BIS</strong>, and <strong>ZUGFeRD / Factur-X</strong> (gemäß DIN EN 16931-1 &amp; invoice-portal.de), and how each Business Term maps directly to input fields and XML tags inside Studio v2.
+            Compare which fields are legally mandatory across <strong>XRechnung</strong>, <strong>Peppol BIS</strong>,
+            and <strong>ZUGFeRD / Factur-X</strong> (gemäß DIN EN 16931-1 &amp; invoice-portal.de), and how each
+            Business Term maps directly to input fields and XML tags inside Studio v2.
           </div>
         </div>
 
         <!-- Filter Controls (Matching invoice-portal.de) -->
         <div class="bt-controls-bar">
           <div class="bt-search-box">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="6.5"></circle>
               <path d="m16 16 4.5 4.5"></path>
             </svg>
-            <input type="text" id="btSearchInput" class="bt-search-input" placeholder="Search field / Feldname (DE/EN), BT-#, XML (z.B. BT-1, Rechnungsnummer, IBAN)..." autocomplete="off">
+            <input type="text" id="btSearchInput" class="bt-search-input"
+              placeholder="Search field / Feldname (DE/EN), BT-#, XML (z.B. BT-1, Rechnungsnummer, IBAN)..."
+              autocomplete="off">
           </div>
 
           <div class="bt-filter-actions">
@@ -164,7 +183,8 @@
 
         <!-- Formats Legend Bar -->
         <div class="bt-fmts-strip">
-          <span style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.72rem;">Formats Supported / Unterstützte Formate:</span>
+          <span style="font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.72rem;">Formats
+            Supported / Unterstützte Formate:</span>
           <span class="bt-fmt-badge xr">● XRechnung (Germany B2G)</span>
           <span class="bt-fmt-badge peppol">● Peppol BIS Billing 3.0</span>
           <span class="bt-fmt-badge zugferd">● ZUGFeRD / Factur-X 2.3</span>
@@ -192,7 +212,8 @@
       </div>
 
       <div style="margin-top: 1.5rem; text-align: center;">
-        <button class="btn btn-primary" onclick="switchScenario('v2')" style="padding: 0.85rem 2.2rem; font-size: 1rem; font-weight: 700;">
+        <button class="btn btn-primary" onclick="switchScenario('v2')"
+          style="padding: 0.85rem 2.2rem; font-size: 1rem; font-weight: 700;">
           <span>⚡ Proceed to Studio v2 Generator ➔</span>
         </button>
       </div>
@@ -205,55 +226,71 @@
         <!-- Title & Subtitle -->
         <div class="v2-header">
           <h2>Create ZUGFeRD, Credit Notes & Order-X</h2>
-          <p>Guided, compliant e-document creator adhering to EN 16931, ZUGFeRD / Factur-X 2.x and Order-X specifications with live calculations and PDF/A-3 compilation.</p>
+          <p>Guided, compliant e-document creator adhering to EN 16931, ZUGFeRD / Factur-X 2.x and Order-X
+            specifications with live calculations and PDF/A-3 compilation.</p>
         </div>
 
         <!-- Target Electronic Invoice Format Selector (Select What You Are Creating First) -->
-        <div class="v2-card" style="border: 2px solid rgba(37,99,235,0.4); background: linear-gradient(135deg, rgba(37,99,235,0.05) 0%, rgba(139,92,246,0.03) 100%); margin-bottom: 1.25rem;">
+        <div class="v2-card"
+          style="border: 2px solid rgba(37,99,235,0.4); background: linear-gradient(135deg, rgba(37,99,235,0.05) 0%, rgba(139,92,246,0.03) 100%); margin-bottom: 1.25rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
             <div>
               <div style="display: flex; align-items: center; gap: 0.5rem;">
                 <span style="font-size: 1.25rem;">🎯</span>
                 <strong style="font-size: 1rem; color: var(--text-main);">1. Select Target E-Invoice Format</strong>
-                <span class="tag" style="background: rgba(37,99,235,0.15); color: #3b82f6; font-size: 0.72rem; font-weight: 700;">REQUIRED FIRST STEP</span>
+                <span class="tag"
+                  style="background: rgba(37,99,235,0.15); color: #3b82f6; font-size: 0.72rem; font-weight: 700;">REQUIRED
+                  FIRST STEP</span>
               </div>
               <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 3px;">
-                Mandatory fields and red asterisks (<span style="color:#ef4444; font-weight:800;">*</span>) adjust immediately to match the legal standard of your selected format.
+                Mandatory fields and red asterisks (<span style="color:#ef4444; font-weight:800;">*</span>) adjust
+                immediately to match the legal standard of your selected format.
               </div>
             </div>
 
-            <div class="v2-format-tabs" style="display: flex; align-items: center; gap: 0.4rem; background: var(--bg-input); padding: 4px; border-radius: 10px; border: 1px solid var(--bg-card-border); flex-wrap: wrap;">
+            <div class="v2-format-tabs"
+              style="display: flex; align-items: center; gap: 0.4rem; background: var(--bg-input); padding: 4px; border-radius: 10px; border: 1px solid var(--bg-card-border); flex-wrap: wrap;">
               <label class="v2-format-option" style="cursor: pointer; margin: 0;">
-                <input type="radio" name="v2TargetFormat" value="zugferd" checked onchange="handleV2FormatChange(this.value)" style="display: none;">
-                <span class="v2-format-btn active" id="v2FmtBtn-zugferd" style="display: flex; align-items: center; gap: 6px; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
+                <input type="radio" name="v2TargetFormat" value="zugferd" checked
+                  onchange="handleV2FormatChange(this.value)" style="display: none;">
+                <span class="v2-format-btn active" id="v2FmtBtn-zugferd"
+                  style="display: flex; align-items: center; gap: 6px; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
                   <span>🟣 ZUGFeRD / Factur-X 2.3</span>
                 </span>
               </label>
 
               <label class="v2-format-option" style="cursor: pointer; margin: 0;">
-                <input type="radio" name="v2TargetFormat" value="xrechnung" onchange="handleV2FormatChange(this.value)" style="display: none;">
-                <span class="v2-format-btn" id="v2FmtBtn-xrechnung" style="display: flex; align-items: center; gap: 6px; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
+                <input type="radio" name="v2TargetFormat" value="xrechnung" onchange="handleV2FormatChange(this.value)"
+                  style="display: none;">
+                <span class="v2-format-btn" id="v2FmtBtn-xrechnung"
+                  style="display: flex; align-items: center; gap: 6px; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
                   <span>🟢 XRechnung (CII)</span>
                 </span>
               </label>
 
               <label class="v2-format-option" style="cursor: pointer; margin: 0;">
-                <input type="radio" name="v2TargetFormat" value="peppol" onchange="handleV2FormatChange(this.value)" style="display: none;">
-                <span class="v2-format-btn" id="v2FmtBtn-peppol" style="display: flex; align-items: center; gap: 6px; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
+                <input type="radio" name="v2TargetFormat" value="peppol" onchange="handleV2FormatChange(this.value)"
+                  style="display: none;">
+                <span class="v2-format-btn" id="v2FmtBtn-peppol"
+                  style="display: flex; align-items: center; gap: 6px; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
                   <span>🔵 Peppol BIS 3.0 (UBL)</span>
                 </span>
               </label>
 
               <label class="v2-format-option" style="cursor: pointer; margin: 0;">
-                <input type="radio" name="v2TargetFormat" value="eslog" onchange="handleV2FormatChange(this.value)" style="display: none;">
-                <span class="v2-format-btn" id="v2FmtBtn-eslog" style="display: flex; align-items: center; gap: 6px; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
+                <input type="radio" name="v2TargetFormat" value="eslog" onchange="handleV2FormatChange(this.value)"
+                  style="display: none;">
+                <span class="v2-format-btn" id="v2FmtBtn-eslog"
+                  style="display: flex; align-items: center; gap: 6px; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
                   <span>🇸🇮 e-SLOG 2.0 (CII)</span>
                 </span>
               </label>
 
               <label class="v2-format-option" style="cursor: pointer; margin: 0;">
-                <input type="radio" name="v2TargetFormat" value="ubl" onchange="handleV2FormatChange(this.value)" style="display: none;">
-                <span class="v2-format-btn" id="v2FmtBtn-ubl" style="display: flex; align-items: center; gap: 6px; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
+                <input type="radio" name="v2TargetFormat" value="ubl" onchange="handleV2FormatChange(this.value)"
+                  style="display: none;">
+                <span class="v2-format-btn" id="v2FmtBtn-ubl"
+                  style="display: flex; align-items: center; gap: 6px; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
                   <span>🟠 UBL 2.1 (EN 16931)</span>
                 </span>
               </label>
@@ -266,13 +303,15 @@
           <div class="v2-prefill-icon">⚡</div>
           <div class="v2-prefill-text">
             <div class="v2-prefill-title" id="v2PrefillTitle">Have an existing invoice or XML document?</div>
-            <div class="v2-prefill-desc" id="v2PrefillDesc">Click or drag & drop a PDF, Word (DOCX), or e-SLOG / UBL (.XML) file here to prefill the form automatically.</div>
+            <div class="v2-prefill-desc" id="v2PrefillDesc">Click or drag & drop a PDF, Word (DOCX), or e-SLOG / UBL
+              (.XML) file here to prefill the form automatically.</div>
           </div>
           <div class="v2-prefill-badge">
             <span>✨ Auto-Fill</span>
           </div>
         </label>
-        <input type="file" id="v2PrefillFileInput" accept=".pdf,.docx,.xml" style="display: none;" onchange="onV2FileInputChanged(this)">
+        <input type="file" id="v2PrefillFileInput" accept=".pdf,.docx,.xml" style="display: none;"
+          onchange="onV2FileInputChanged(this)">
 
         <!-- Validation Alert Banner -->
         <div class="v2-alert-banner" id="v2AlertBanner" style="display: none;">
@@ -284,26 +323,34 @@
         <div class="v2-card">
           <div class="v2-card-header">
             <div class="v2-card-title">
-              <span>📄 Document Details <span style="font-size: 0.8em; opacity: 0.8; font-weight: normal;">/ Dokumentangaben</span></span>
-              <span class="tag" id="v2DocTypeLabel" style="font-size: 0.72rem; text-transform: uppercase;">Commercial Invoice</span>
+              <span>📄 Document Details <span style="font-size: 0.8em; opacity: 0.8; font-weight: normal;">/
+                  Dokumentangaben</span></span>
+              <span class="tag" id="v2DocTypeLabel" style="font-size: 0.72rem; text-transform: uppercase;">Commercial
+                Invoice</span>
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <button type="button" class="btn btn-secondary" style="padding: 0.28rem 0.65rem; font-size: 0.76rem; border-color: rgba(37,99,235,0.3);" onclick="toggleV2XmlPreview()">
+              <button type="button" class="btn btn-secondary"
+                style="padding: 0.28rem 0.65rem; font-size: 0.76rem; border-color: rgba(37,99,235,0.3);"
+                onclick="toggleV2XmlPreview()">
                 <span>🔍 Live XML</span>
               </button>
-              <select id="v2LayoutSelect" class="v2-select" style="padding: 0.3rem 0.6rem; font-size: 0.78rem; width: auto;" title="Visual PDF invoice template">
+              <select id="v2LayoutSelect" class="v2-select"
+                style="padding: 0.3rem 0.6rem; font-size: 0.78rem; width: auto;" title="Visual PDF invoice template">
                 <option value="original" selected>Layout: Original Format</option>
                 <option value="layout1">Layout 1: Modern Studio</option>
                 <option value="layout2">Layout 2: Odelo Corporate</option>
                 <option value="layout3">Layout 3: Most complete format</option>
               </select>
-              <select id="v2LangSelect" class="v2-select" style="padding: 0.3rem 0.6rem; font-size: 0.78rem; width: auto;" title="Invoice language for Layout 3">
+              <select id="v2LangSelect" class="v2-select"
+                style="padding: 0.3rem 0.6rem; font-size: 0.78rem; width: auto;" title="Invoice language for Layout 3">
                 <option value="multi" selected>🌐 Multilingual (SL/EN/DE)</option>
                 <option value="sl">🇸🇮 Slovenian (SL)</option>
                 <option value="en">🇬🇧 English (EN)</option>
                 <option value="de">🇩🇪 German (DE)</option>
               </select>
-              <label for="v2ShowBtTags" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.76rem; font-weight: 600; cursor: pointer; padding: 0.28rem 0.55rem; background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 6px; user-select: none; white-space: nowrap; color: var(--text-main);" title="Show or hide BT-X / BG-X semantic badge tags in generated PDF for visual mapping inspection">
+              <label for="v2ShowBtTags"
+                style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.76rem; font-weight: 600; cursor: pointer; padding: 0.28rem 0.55rem; background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 6px; user-select: none; white-space: nowrap; color: var(--text-main);"
+                title="Show or hide BT-X / BG-X semantic badge tags in generated PDF for visual mapping inspection">
                 <input type="checkbox" id="v2ShowBtTags" style="cursor: pointer; accent-color: var(--accent-primary);">
                 <span>🏷️ BT-X in PDF</span>
               </label>
@@ -343,11 +390,11 @@
 
           <div class="v2-grid-3" style="margin-top: 1rem;">
             <div class="v2-field">
-              <label class="v2-label">Payment Due Date / Fälligkeitsdatum <span class="v2-bt-badge" data-bt="BT-9">BT-9</span></label>
+              <label class="v2-label">Payment Due Date / Fälligkeitsdatum</label>
               <input type="date" id="v2DueDate" class="v2-input">
             </div>
             <div class="v2-field">
-              <label class="v2-label">Payment Method / Zahlungsart <span class="v2-bt-badge" data-bt="BT-81">BT-81</span></label>
+              <label class="v2-label">Payment Method / Zahlungsart</label>
               <select id="v2PayMethod" class="v2-select">
                 <option value="58" selected>SEPA Credit Transfer (58 / Überweisung)</option>
                 <option value="30">Credit Transfer (30 / Banküberweisung)</option>
@@ -356,24 +403,30 @@
               </select>
             </div>
             <div class="v2-field">
-              <label class="v2-label">
-                <span>Remittance Ref / Sklic / Verwendungszweck <span class="v2-bt-badge" data-bt="BT-83">BT-83</span></span>
-              </label>
-              <input type="text" id="v2PayReference" class="v2-input" placeholder="e.g. RF18539007547034 or SI00 2026-001">
+              <label class="v2-label">Remittance Ref / Verwendungszweck</label>
+              <input type="text" id="v2PayReference" class="v2-input"
+                placeholder="e.g. RF18539007547034 or SI00 2026-001">
             </div>
           </div>
 
           <!-- Multiple Bank Accounts (BG-17) & BIC -->
-          <div style="margin-top: 1rem; background: var(--bg-input); padding: 0.75rem; border-radius: 6px; border: 1px dashed var(--bg-card-border);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div
+            style="margin-top: 1rem; background: var(--bg-input); padding: 0.75rem; border-radius: 6px; border: 1px dashed var(--bg-card-border);">
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
               <label class="v2-label" style="margin: 0; font-weight: 600;">
-                🏦 Payment Accounts (BG-17) / Bankverbindungen (<span style="font-size: 0.75rem;">BT-84 IBAN, BT-85 Bank, BT-86 BIC</span>)
+                🏦 Payment Accounts (BG-17) / Bankverbindungen (<span style="font-size: 0.75rem;">BT-84 IBAN, BT-85
+                  Bank, BT-86 BIC</span>)
               </label>
               <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <select id="v2BankPresetSelect" class="v2-select" style="padding: 0.2rem 0.5rem; font-size: 0.74rem; max-width: 260px;" onfocus="updateV2BankPresetDropdown()" onpointerdown="updateV2BankPresetDropdown()" onchange="insertV2BankPreset(this.value)">
+                <select id="v2BankPresetSelect" class="v2-select"
+                  style="padding: 0.2rem 0.5rem; font-size: 0.74rem; max-width: 260px;"
+                  onfocus="updateV2BankPresetDropdown()" onpointerdown="updateV2BankPresetDropdown()"
+                  onchange="insertV2BankPreset(this.value)">
                   <option value="">-- Insert Configured Bank --</option>
                 </select>
-                <button type="button" class="btn btn-secondary" onclick="addV2BankAccount()" style="padding: 0.2rem 0.55rem; font-size: 0.74rem;">
+                <button type="button" class="btn btn-secondary" onclick="addV2BankAccount()"
+                  style="padding: 0.2rem 0.55rem; font-size: 0.74rem;">
                   + Add Bank Account
                 </button>
               </div>
@@ -385,22 +438,25 @@
 
           <!-- Factoring / Third-Party Payee Toggle (BG-10) -->
           <div style="margin-top: 0.75rem;">
-            <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2FactoringSection', 'v2FactoringChev')">
+            <button type="button" class="v2-accordion-btn"
+              onclick="toggleV2Section('v2FactoringSection', 'v2FactoringChev')">
               <span id="v2FactoringChev">▼</span>
               <span>🏢 Payee differs from Seller / Factoring (BG-10 / Dritter Zahlungsempfänger)</span>
             </button>
-            <div id="v2FactoringSection" style="display: none; margin-top: 0.75rem; background: rgba(59, 130, 246, 0.03); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; padding: 0.75rem;">
+            <div id="v2FactoringSection"
+              style="display: none; margin-top: 0.75rem; background: rgba(59, 130, 246, 0.03); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; padding: 0.75rem;">
               <div class="v2-grid-3">
                 <div class="v2-field">
-                  <label class="v2-label">Payee Name (BT-59) / Name des Factoring-Empfängers</label>
-                  <input type="text" id="v2FactoringName" class="v2-input" placeholder="e.g. Eurofactor AG / NL Factoring BV">
+                  <label class="v2-label">Payee Name / Name des Factoring-Empfängers</label>
+                  <input type="text" id="v2FactoringName" class="v2-input"
+                    placeholder="e.g. Eurofactor AG / NL Factoring BV">
                 </div>
                 <div class="v2-field">
-                  <label class="v2-label">Payee ID (BT-60) / Empfänger-Kennung</label>
+                  <label class="v2-label">Payee ID / Empfänger-Kennung</label>
                   <input type="text" id="v2FactoringId" class="v2-input" placeholder="e.g. FACTOR-77219">
                 </div>
                 <div class="v2-field">
-                  <label class="v2-label">Payee VAT ID (BT-61) / USt-IdNr.</label>
+                  <label class="v2-label">Payee VAT ID / USt-IdNr.</label>
                   <input type="text" id="v2FactoringVat" class="v2-input" placeholder="e.g. DE129273941">
                 </div>
               </div>
@@ -409,50 +465,54 @@
 
           <!-- Advanced Collapsible Section (PO, Sales Order, Contract, Cost Center, Invoicing Period, Prepaid, Payment Terms) -->
           <div style="margin-top: 1rem; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem;">
-            <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2AdvancedDocSection', 'v2AdvChevron')">
+            <button type="button" class="v2-accordion-btn"
+              onclick="toggleV2Section('v2AdvancedDocSection', 'v2AdvChevron')">
               <span id="v2AdvChevron">▼</span>
-              <span>Advanced Document Details (Orders, Contract, Cost Center, Billing Period) / Zusätzliche Referenzen</span>
+              <span>Advanced Document Details (Orders, Contract, Cost Center, Billing Period) / Zusätzliche
+                Referenzen</span>
             </button>
             <div id="v2AdvancedDocSection" style="display: none; margin-top: 0.75rem;">
               <div class="v2-grid-4">
                 <div class="v2-field">
-                  <label class="v2-label">Purchase Order (PO / BT-13)</label>
+                  <label class="v2-label">Purchase Order (PO)</label>
                   <input type="text" id="v2PurchaseOrder" class="v2-input" placeholder="e.g. 11462833">
                 </div>
                 <div class="v2-field">
-                  <label class="v2-label">Sales Order Ref (BT-14 / Intern)</label>
+                  <label class="v2-label">Sales Order Ref / Intern</label>
                   <input type="text" id="v2SalesOrder" class="v2-input" placeholder="e.g. SO-2026-9041">
                 </div>
                 <div class="v2-field">
-                  <label class="v2-label">Contract / Agreement (BT-12)</label>
+                  <label class="v2-label">Contract / Agreement</label>
                   <input type="text" id="v2ContractRef" class="v2-input" placeholder="e.g. F465RG1">
                 </div>
                 <div class="v2-field">
-                  <label class="v2-label">Buyer Reference / Leitweg-ID (BT-10)</label>
+                  <label class="v2-label">Buyer Reference / Leitweg-ID</label>
                   <input type="text" id="v2BuyerRef" class="v2-input" placeholder="e.g. EP53 or 04011000-12345-67">
                 </div>
               </div>
               <div class="v2-grid-4" style="margin-top: 0.75rem;">
                 <div class="v2-field">
-                  <label class="v2-label">Cost Center / Buyer Acct (BT-19)</label>
+                  <label class="v2-label">Cost Center / Buyer Acct</label>
                   <input type="text" id="v2CostCenter" class="v2-input" placeholder="e.g. CC-PROD-401">
                 </div>
                 <div class="v2-field">
-                  <label class="v2-label">Billing Period Start (BT-73)</label>
+                  <label class="v2-label">Billing Period Start</label>
                   <input type="date" id="v2ServiceStart" class="v2-input">
                 </div>
                 <div class="v2-field">
-                  <label class="v2-label">Billing Period End (BT-74)</label>
+                  <label class="v2-label">Billing Period End</label>
                   <input type="date" id="v2ServiceEnd" class="v2-input">
                 </div>
                 <div class="v2-field">
-                  <label class="v2-label">Already Paid / Gezahlt (BT-113 €)</label>
-                  <input type="number" step="0.01" id="v2PrepaidAmount" class="v2-input" placeholder="0.00" oninput="recalcV2Totals()">
+                  <label class="v2-label">Already Paid / Gezahlt (€)</label>
+                  <input type="number" step="0.01" id="v2PrepaidAmount" class="v2-input" placeholder="0.00"
+                    oninput="recalcV2Totals()">
                 </div>
               </div>
               <div class="v2-field" style="margin-top: 0.75rem;">
-                <label class="v2-label">Payment Terms Note / Zahlungsbedingungen (BT-20)</label>
-                <input type="text" id="v2PayTerms" class="v2-input" placeholder="e.g. Payable within 30 days without deductions / Zahlbar innerhalb 30 Tagen">
+                <label class="v2-label">Payment Terms Note / Zahlungsbedingungen</label>
+                <input type="text" id="v2PayTerms" class="v2-input"
+                  placeholder="e.g. Payable within 30 days without deductions / Zahlbar innerhalb 30 Tagen">
               </div>
 
               <!-- Document Notes (BT-22: IncludedNote) Dynamic Section -->
@@ -460,13 +520,16 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                   <div>
                     <label class="v2-label" style="margin-bottom: 0.15rem; font-weight: 600;">
-                      📝 Invoice Notes &amp; Legal Notices / Rechnungshinweise (<span style="font-family: monospace; font-size: 0.76rem;">&lt;ram:IncludedNote&gt;</span> / BT-22)
+                      📝 Invoice Notes &amp; Legal Notices / Rechnungshinweise <span class="v2-bt-badge"
+                        data-bt="BT-22">BT-22</span>
                     </label>
                     <div style="font-size: 0.73rem; color: var(--text-muted);">
-                      Each line generates a distinct legal note in Factur-X/ZUGFeRD XML (e.g. performance notice, delivery terms, or tax notes).
+                      Each line generates a distinct legal note in Factur-X/ZUGFeRD XML (e.g. performance notice,
+                      delivery terms, or tax notes).
                     </div>
                   </div>
-                  <button type="button" class="btn btn-secondary" onclick="addV2InvoiceNote()" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; white-space: nowrap;">
+                  <button type="button" class="btn btn-secondary" onclick="addV2InvoiceNote()"
+                    style="padding: 0.25rem 0.65rem; font-size: 0.75rem; white-space: nowrap;">
                     <span>+ Add Note</span>
                   </button>
                 </div>
@@ -479,16 +542,18 @@
         </div>
 
         <!-- Preceding Document Reference Card (Visible for Credit Note 381 & Corrected 384) -->
-        <div class="v2-card" id="v2CreditNoteCard" style="display: none; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.02);">
+        <div class="v2-card" id="v2CreditNoteCard"
+          style="display: none; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.02);">
           <div class="v2-card-header">
             <div class="v2-card-title">
               <span style="color: #ef4444;">↩️ Preceding Invoice Reference / Vorherige Rechnung</span>
-              <span class="tag" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">Required for Credit Notes</span>
+              <span class="tag" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">Required for Credit
+                Notes</span>
             </div>
           </div>
           <div class="v2-grid-4">
             <div class="v2-field">
-              <label class="v2-label">Preceding Invoice Number / Rechnungsnummer (BT-25) <span class="v2-req-star">*</span></label>
+              <label class="v2-label">Preceding Invoice Number / Rechnungsnummer</label>
               <input type="text" id="v2PrecedingInvNumber" class="v2-input" placeholder="e.g. INV-2025-089">
             </div>
             <div class="v2-field">
@@ -518,14 +583,21 @@
                 <span>🏢 Seller (From) / Verkäufer</span>
               </div>
               <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.74rem;" onclick="saveV2Party('seller')" title="Save this seller to configuration for future reuse">💾 Save / Speichern</button>
-                <button type="button" class="v2-label-link" onclick="populateV2SellerDefaults(true)">Reset to Config</button>
+                <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.74rem;"
+                  onclick="saveV2Party('seller')" title="Save this seller to configuration for future reuse">💾 Save /
+                  Speichern</button>
+                <button type="button" class="v2-label-link" onclick="populateV2SellerDefaults(true)">Reset to
+                  Config</button>
               </div>
             </div>
             <!-- Saved Sellers Dropdown -->
-            <div style="margin-bottom: 0.75rem; background: var(--bg-input); padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px dashed var(--bg-card-border); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
-              <span style="font-size: 0.74rem; color: var(--text-muted); white-space: nowrap;">📁 Saved Sellers / Gespeicherte Verkäufer:</span>
-              <select id="v2SavedSellerSelect" class="v2-select" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; width: 100%;" onchange="selectV2SavedParty('seller', this.value)">
+            <div
+              style="margin-bottom: 0.75rem; background: var(--bg-input); padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px dashed var(--bg-card-border); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+              <span style="font-size: 0.74rem; color: var(--text-muted); white-space: nowrap;">📁 Saved Sellers /
+                Gespeicherte Verkäufer:</span>
+              <select id="v2SavedSellerSelect" class="v2-select"
+                style="padding: 0.25rem 0.5rem; font-size: 0.75rem; width: 100%;"
+                onchange="selectV2SavedParty('seller', this.value)">
                 <option value="">-- Select saved company / Firma wählen --</option>
               </select>
             </div>
@@ -534,14 +606,18 @@
                 <label class="v2-label">Company Name / Firmenname</label>
                 <input type="text" id="v2SellerName" class="v2-input" placeholder="e.g. Acme Solutions Ltd">
               </div>
-              <div class="v2-grid-2">
+              <div class="v2-grid-3">
                 <div class="v2-field">
                   <label class="v2-label">VAT ID / USt-IdNr.</label>
                   <input type="text" id="v2SellerVat" class="v2-input" placeholder="e.g. DE123456789">
                 </div>
                 <div class="v2-field">
-                  <label class="v2-label">Local Tax Number / Steuernummer (FC)</label>
+                  <label class="v2-label">Local Tax Number (FC)</label>
                   <input type="text" id="v2SellerTaxNumber" class="v2-input" placeholder="e.g. 99022/20844">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Supplier Code / Seller ID</label>
+                  <input type="text" id="v2SellerIdentifier" class="v2-input" placeholder="e.g. 104825 or SUP-01">
                 </div>
               </div>
               <div class="v2-field">
@@ -571,18 +647,20 @@
                 </div>
               </div>
               <!-- Seller Legal Disclosures & Peppol Address (BT-30, BT-33, BT-34) -->
-              <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2SellerLegalSec', 'v2SellerLegalChev')">
+              <button type="button" class="v2-accordion-btn"
+                onclick="toggleV2Section('v2SellerLegalSec', 'v2SellerLegalChev')">
                 <span id="v2SellerLegalChev">▼</span>
-                <span>Legal Disclosures &amp; Peppol Routing (BT-30, BT-33, BT-34) / Register &amp; Geschäftsführer</span>
+                <span>Legal Disclosures &amp; Peppol Routing / Register &amp; Geschäftsführer</span>
               </button>
-              <div id="v2SellerLegalSec" style="display: none; background: rgba(0,0,0,0.02); padding: 0.6rem; border-radius: 6px; border: 1px dashed var(--bg-card-border);">
+              <div id="v2SellerLegalSec"
+                style="display: none; background: rgba(0,0,0,0.02); padding: 0.6rem; border-radius: 6px; border: 1px dashed var(--bg-card-border);">
                 <div class="v2-grid-2">
                   <div class="v2-field">
-                    <label class="v2-label">Commercial Register No. / Handelsregister (BT-30)</label>
+                    <label class="v2-label">Commercial Register No. / Handelsregister</label>
                     <input type="text" id="v2SellerRegId" class="v2-input" placeholder="e.g. HRB 736903 Stuttgart">
                   </div>
                   <div class="v2-field">
-                    <label class="v2-label">Peppol Endpoint ID / EAS (BT-34)</label>
+                    <label class="v2-label">Peppol Endpoint ID / EAS</label>
                     <div style="display: flex; gap: 0.4rem;">
                       <select id="v2SellerEndpointScheme" class="v2-select" style="width: 5.5rem;">
                         <option value="0088">0088 (GLN)</option>
@@ -591,18 +669,21 @@
                         <option value="0208">0208 (BE CBE)</option>
                         <option value="0009">0009 (FR SIRET)</option>
                       </select>
-                      <input type="text" id="v2SellerEndpointId" class="v2-input" style="flex: 1;" placeholder="e.g. DE123456789 or 4012345000009">
+                      <input type="text" id="v2SellerEndpointId" class="v2-input" style="flex: 1;"
+                        placeholder="e.g. DE123456789 or 4012345000009">
                     </div>
                   </div>
                 </div>
                 <div class="v2-field" style="margin-top: 0.5rem;">
-                  <label class="v2-label">Additional Legal Info / Geschäftsführer / Court (§ 35a GmbHG / BT-33)</label>
-                  <input type="text" id="v2SellerLegalInfo" class="v2-input" placeholder="e.g. Amtsgericht Stuttgart, Geschäftsführer: Dr. Max Mustermann, Erika Musterfrau">
+                  <label class="v2-label">Additional Legal Info / Geschäftsführer / Court (§ 35a GmbHG)</label>
+                  <input type="text" id="v2SellerLegalInfo" class="v2-input"
+                    placeholder="e.g. Amtsgericht Stuttgart, Geschäftsführer: Dr. Max Mustermann, Erika Musterfrau">
                 </div>
               </div>
 
               <!-- Contact details toggle -->
-              <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2SellerContactSec', 'v2SellerContactChev')">
+              <button type="button" class="v2-accordion-btn"
+                onclick="toggleV2Section('v2SellerContactSec', 'v2SellerContactChev')">
                 <span id="v2SellerContactChev">▼</span>
                 <span>Contact Details (Person, Phone, Email) / Kontaktdaten</span>
               </button>
@@ -632,13 +713,19 @@
                 <span>👤 Buyer (To) / Erwerber (Käufer)</span>
               </div>
               <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.74rem;" onclick="saveV2Party('buyer')" title="Save this buyer to configuration for future reuse">💾 Save / Speichern</button>
+                <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.74rem;"
+                  onclick="saveV2Party('buyer')" title="Save this buyer to configuration for future reuse">💾 Save /
+                  Speichern</button>
               </div>
             </div>
             <!-- Saved Buyers Dropdown -->
-            <div style="margin-bottom: 0.75rem; background: var(--bg-input); padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px dashed var(--bg-card-border); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
-              <span style="font-size: 0.74rem; color: var(--text-muted); white-space: nowrap;">📁 Saved Buyers / Gespeicherte Kunden:</span>
-              <select id="v2SavedBuyerSelect" class="v2-select" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; width: 100%;" onchange="selectV2SavedParty('buyer', this.value)">
+            <div
+              style="margin-bottom: 0.75rem; background: var(--bg-input); padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px dashed var(--bg-card-border); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+              <span style="font-size: 0.74rem; color: var(--text-muted); white-space: nowrap;">📁 Saved Buyers /
+                Gespeicherte Kunden:</span>
+              <select id="v2SavedBuyerSelect" class="v2-select"
+                style="padding: 0.25rem 0.5rem; font-size: 0.75rem; width: 100%;"
+                onchange="selectV2SavedParty('buyer', this.value)">
                 <option value="">-- Select saved customer / Kunde wählen --</option>
               </select>
             </div>
@@ -679,13 +766,15 @@
               </div>
 
               <!-- Buyer Peppol Routing (BT-49) -->
-              <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2BuyerEndpointSec', 'v2BuyerEndpointChev')">
+              <button type="button" class="v2-accordion-btn"
+                onclick="toggleV2Section('v2BuyerEndpointSec', 'v2BuyerEndpointChev')">
                 <span id="v2BuyerEndpointChev">▼</span>
-                <span>Peppol Electronic Address (BT-49 / EAS)</span>
+                <span>Peppol Electronic Address / EAS</span>
               </button>
-              <div id="v2BuyerEndpointSec" style="display: none; background: rgba(0,0,0,0.02); padding: 0.6rem; border-radius: 6px; border: 1px dashed var(--bg-card-border);">
+              <div id="v2BuyerEndpointSec"
+                style="display: none; background: rgba(0,0,0,0.02); padding: 0.6rem; border-radius: 6px; border: 1px dashed var(--bg-card-border);">
                 <div class="v2-field">
-                  <label class="v2-label">Buyer Peppol Endpoint ID / Scheme (BT-49)</label>
+                  <label class="v2-label">Buyer Peppol Endpoint ID / Scheme</label>
                   <div style="display: flex; gap: 0.4rem;">
                     <select id="v2BuyerEndpointScheme" class="v2-select" style="width: 5.5rem;">
                       <option value="0088">0088 (GLN)</option>
@@ -694,12 +783,14 @@
                       <option value="0208">0208 (BE CBE)</option>
                       <option value="0009">0009 (FR SIRET)</option>
                     </select>
-                    <input type="text" id="v2BuyerEndpointId" class="v2-input" style="flex: 1;" placeholder="e.g. DE987654321 or 4012345000009">
+                    <input type="text" id="v2BuyerEndpointId" class="v2-input" style="flex: 1;"
+                      placeholder="e.g. DE987654321 or 4012345000009">
                   </div>
                 </div>
               </div>
               <!-- Buyer contact details toggle (BT-56, BT-57, BT-58) -->
-              <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2BuyerContactSec', 'v2BuyerContactChev')">
+              <button type="button" class="v2-accordion-btn"
+                onclick="toggleV2Section('v2BuyerContactSec', 'v2BuyerContactChev')">
                 <span id="v2BuyerContactChev">▼</span>
                 <span>Contact Details (Person, Phone, Email) / Kontaktdaten</span>
               </button>
@@ -725,7 +816,8 @@
 
         <!-- 3. Delivery Details Card (Collapsible) -->
         <div class="v2-card" style="margin-top: 1.5rem;">
-          <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2DeliverySection', 'v2DelivChev')" style="width: 100%; justify-content: space-between;">
+          <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2DeliverySection', 'v2DelivChev')"
+            style="width: 100%; justify-content: space-between;">
             <span class="v2-card-title">
               <span>🚚 Delivery &amp; Shipping Information / Lieferangaben</span>
               <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">(optional)</span>
@@ -736,25 +828,27 @@
             <div class="v2-grid-4">
               <div class="v2-field">
                 <label class="v2-label">Ship-to Party / Name des Empfängers</label>
-                <input type="text" id="v2DelivName" class="v2-input" placeholder="e.g. Mercedes-Benz AG Werk Sindelfingen">
+                <input type="text" id="v2DelivName" class="v2-input"
+                  placeholder="e.g. Mercedes-Benz AG Werk Sindelfingen">
               </div>
               <div class="v2-field">
-                <label class="v2-label">Ship-to Location ID / Abladestelle (GLN / BT-71)</label>
+                <label class="v2-label">Ship-to Location ID / Abladestelle (GLN)</label>
                 <div style="display: flex; gap: 0.4rem;">
                   <select id="v2DelivLocationScheme" class="v2-select" style="width: 5.5rem;">
                     <option value="0088" selected>0088 (GLN)</option>
                     <option value="0160">0160 (GTIN)</option>
                     <option value="ZZZ">ZZZ (Mutually defined)</option>
                   </select>
-                  <input type="text" id="v2DelivLocationId" class="v2-input" style="flex: 1;" placeholder="e.g. 4012345000009 or Tor 3">
+                  <input type="text" id="v2DelivLocationId" class="v2-input" style="flex: 1;"
+                    placeholder="e.g. 4012345000009 or Tor 3">
                 </div>
               </div>
               <div class="v2-field">
-                <label class="v2-label">Actual Delivery Date / Lieferdatum (BT-72)</label>
+                <label class="v2-label">Actual Delivery Date / Lieferdatum</label>
                 <input type="date" id="v2DelivDate" class="v2-input">
               </div>
               <div class="v2-field">
-                <label class="v2-label">Despatch Advice Ref / Lieferschein-Nr. (BT-16)</label>
+                <label class="v2-label">Despatch Advice Ref / Lieferschein-Nr.</label>
                 <input type="text" id="v2DelivDespatchRef" class="v2-input" placeholder="e.g. LS-2026-9042">
               </div>
             </div>
@@ -793,7 +887,8 @@
             <div class="v2-card-title">
               <span>📦 Line Items</span>
             </div>
-            <button type="button" class="btn btn-secondary" onclick="addV2LineItem()" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
+            <button type="button" class="btn btn-secondary" onclick="addV2LineItem()"
+              style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
               <span>+ Add Line</span>
             </button>
           </div>
@@ -808,21 +903,26 @@
           <div class="v2-card-header">
             <div class="v2-card-title">
               <span>🏷️ Document Discounts &amp; Charges / Nachlässe &amp; Zuschläge</span>
-              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(document-level allowances BT-92 or charges BT-99 e.g. packaging, freight, early payment)</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(document-level
+                allowances or charges e.g. packaging, freight, early payment)</span>
             </div>
             <div style="display: flex; gap: 0.5rem;">
-              <button type="button" class="btn btn-secondary" onclick="addV2DocumentDiscount(false)" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
+              <button type="button" class="btn btn-secondary" onclick="addV2DocumentDiscount(false)"
+                style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
                 <span>+ Add Discount / Nachlass</span>
               </button>
-              <button type="button" class="btn btn-secondary" onclick="addV2DocumentDiscount(true)" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
+              <button type="button" class="btn btn-secondary" onclick="addV2DocumentDiscount(true)"
+                style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
                 <span>+ Add Charge / Zuschlag</span>
               </button>
             </div>
           </div>
 
           <div id="v2DiscountsContainer">
-            <div id="v2NoDiscountsMsg" style="font-size: 0.8rem; color: var(--text-muted); font-style: italic; padding: 0.5rem 0;">
-              No document-level discounts or charges applied. Click "+ Add Discount" or "+ Add Charge" to add allowances/surcharges.
+            <div id="v2NoDiscountsMsg"
+              style="font-size: 0.8rem; color: var(--text-muted); font-style: italic; padding: 0.5rem 0;">
+              No document-level discounts or charges applied. Click "+ Add Discount" or "+ Add Charge" to add
+              allowances/surcharges.
             </div>
           </div>
         </div>
@@ -839,14 +939,16 @@
             <!-- Dynamically rendered per tax group -->
           </div>
 
-          <div id="v2ExemptionCard" style="display: none; margin-top: 1rem; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem; background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px; padding: 0.75rem;">
+          <div id="v2ExemptionCard"
+            style="display: none; margin-top: 1rem; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem; background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px; padding: 0.75rem;">
             <div class="v2-grid-2">
               <div class="v2-field">
-                <label class="v2-label">VAT Exemption Reason (BT-120 / Freitext) <span class="v2-req-star">*</span></label>
-                <input type="text" id="v2ExemptionReason" class="v2-input" placeholder="e.g. Reverse charge / Steuerschuldnerschaft des Leistungsempfängers">
+                <label class="v2-label">VAT Exemption Reason (Freitext) <span class="v2-req-star">*</span></label>
+                <input type="text" id="v2ExemptionReason" class="v2-input"
+                  placeholder="e.g. Reverse charge / Steuerschuldnerschaft des Leistungsempfängers">
               </div>
               <div class="v2-field">
-                <label class="v2-label">VAT Exemption Reason Code (BT-121 / Code) <span class="v2-req-star">*</span></label>
+                <label class="v2-label">VAT Exemption Reason Code <span class="v2-req-star">*</span></label>
                 <select id="v2ExemptionReasonCode" class="v2-select">
                   <option value="">-- Select CEF VATEX Code --</option>
                   <option value="VATEX-EU-AE">VATEX-EU-AE (Reverse charge / Art. 194/196)</option>
@@ -864,7 +966,8 @@
         <!-- 7. Totals Strip -->
         <div class="v2-totals-strip">
           <div>
-            <div class="v2-total-item-label" style="display: flex; align-items: center; gap: 4px; justify-content: center;">
+            <div class="v2-total-item-label"
+              style="display: flex; align-items: center; gap: 4px; justify-content: center;">
               <span>Total (Net) / Netto</span>
               <span class="v2-bt-badge" data-bt="BT-106">BT-106
                 <div class="v2-bt-tooltip">
@@ -878,7 +981,8 @@
             <div class="v2-total-item-value" id="v2TotalNet">€0.00</div>
           </div>
           <div id="v2TotalDiscountWrapper" style="display: none;">
-            <div class="v2-total-item-label" style="display: flex; align-items: center; gap: 4px; justify-content: center;">
+            <div class="v2-total-item-label"
+              style="display: flex; align-items: center; gap: 4px; justify-content: center;">
               <span>Discount / Nachlass</span>
               <span class="v2-bt-badge" data-bt="BT-107">BT-107
                 <div class="v2-bt-tooltip">
@@ -892,7 +996,8 @@
             <div class="v2-total-item-value" id="v2TotalDiscount" style="color: #ef4444;">-€0.00</div>
           </div>
           <div id="v2TotalChargeWrapper" style="display: none;">
-            <div class="v2-total-item-label" style="display: flex; align-items: center; gap: 4px; justify-content: center;">
+            <div class="v2-total-item-label"
+              style="display: flex; align-items: center; gap: 4px; justify-content: center;">
               <span>Charge / Zuschlag</span>
               <span class="v2-bt-badge" data-bt="BT-108">BT-108
                 <div class="v2-bt-tooltip">
@@ -906,11 +1011,13 @@
             <div class="v2-total-item-value" id="v2TotalCharge" style="color: #10b981;">+€0.00</div>
           </div>
           <div>
-            <div class="v2-total-item-label" style="display: flex; align-items: center; gap: 4px; justify-content: center;">
+            <div class="v2-total-item-label"
+              style="display: flex; align-items: center; gap: 4px; justify-content: center;">
               <span>Total (VAT) / Steuer</span>
               <span class="v2-bt-badge" data-bt="BT-110">BT-110
                 <div class="v2-bt-tooltip">
-                  <span class="v2-bt-tooltip-title">BT-110: Invoice total VAT amount / Gesamtbetrag der Umsatzsteuer</span>
+                  <span class="v2-bt-tooltip-title">BT-110: Invoice total VAT amount / Gesamtbetrag der
+                    Umsatzsteuer</span>
                   <div>Total tax amount across all VAT breakdown rates.</div>
                   <span class="v2-bt-tooltip-xml">XML: .../ram:TaxTotalAmount</span>
                   <span class="v2-bt-tooltip-status req">● Mandatory Standard Field</span>
@@ -920,7 +1027,8 @@
             <div class="v2-total-item-value" id="v2TotalVat">€0.00</div>
           </div>
           <div>
-            <div class="v2-total-item-label" style="display: flex; align-items: center; gap: 4px; justify-content: center;">
+            <div class="v2-total-item-label"
+              style="display: flex; align-items: center; gap: 4px; justify-content: center;">
               <span>Grand Total / Brutto</span>
               <span class="v2-bt-badge" data-bt="BT-112">BT-112
                 <div class="v2-bt-tooltip">
@@ -934,7 +1042,8 @@
             <div class="v2-total-item-value accent" id="v2GrandTotal">€0.00</div>
           </div>
           <div>
-            <div class="v2-total-item-label" style="display: flex; align-items: center; gap: 4px; justify-content: center;">
+            <div class="v2-total-item-label"
+              style="display: flex; align-items: center; gap: 4px; justify-content: center;">
               <span>Amount Due / Fälliger Betrag</span>
               <span class="v2-bt-badge" data-bt="BT-115">BT-115
                 <div class="v2-bt-tooltip">
@@ -952,111 +1061,121 @@
         <!-- 7. Actions Bar -->
         <div class="v2-actions-bar">
           <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-            <button type="button" class="btn btn-secondary" onclick="validateV2Invoice()" style="padding: 0.75rem 1.4rem; font-size: 0.95rem;">
+            <button type="button" class="btn btn-secondary" onclick="validateV2Invoice()"
+              style="padding: 0.75rem 1.4rem; font-size: 0.95rem;">
               <span>🛡️ Validate / Prüfen</span>
             </button>
-            <button type="button" class="btn btn-secondary" id="v2ViewXmlBtn" onclick="toggleV2XmlPreview()" style="padding: 0.75rem 1.4rem; font-size: 0.95rem; border-color: rgba(37,99,235,0.4);">
+            <button type="button" class="btn btn-secondary" id="v2ViewXmlBtn" onclick="toggleV2XmlPreview()"
+              style="padding: 0.75rem 1.4rem; font-size: 0.95rem; border-color: rgba(37,99,235,0.4);">
               <span>🔍 View XML / XML anzeigen</span>
             </button>
           </div>
           <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-            <button type="button" class="btn btn-secondary" id="v2DownloadXmlBtn" onclick="downloadV2RawXml()" style="padding: 0.75rem 1.4rem; font-size: 0.95rem; font-weight: 700; border-color: #10b981; color: #10b981;">
+            <button type="button" class="btn btn-secondary" id="v2DownloadXmlBtn" onclick="downloadV2RawXml()"
+              style="padding: 0.75rem 1.4rem; font-size: 0.95rem; font-weight: 700; border-color: #10b981; color: #10b981;">
               <span>📥 Download XML (.xml)</span>
             </button>
-            <button type="button" class="btn btn-primary" id="v2GenerateBtn" onclick="handleV2GenerateSubmit()" style="padding: 0.75rem 2rem; font-size: 0.98rem; font-weight: 700;">
+            <button type="button" class="btn btn-primary" id="v2GenerateBtn" onclick="handleV2GenerateSubmit()"
+              style="padding: 0.75rem 2rem; font-size: 0.98rem; font-weight: 700;">
               <span>⚡ Generate &amp; Download PDF/A-3</span>
             </button>
           </div>
         </div>
 
         <!-- 8. Generated XML Live Preview Card (Collapsible) -->
-        <div class="v2-card" id="v2XmlCard" style="display: none; margin-top: 1.5rem; border-color: rgba(37, 99, 235, 0.4);">
+        <div class="v2-card" id="v2XmlCard"
+          style="display: none; margin-top: 1.5rem; border-color: rgba(37, 99, 235, 0.4);">
           <div class="v2-card-header">
             <div class="v2-card-title">
               <span>📄 Generated Factur-X / Order-X XML Preview</span>
               <span class="tag" id="v2XmlProfileBadge">EN 16931</span>
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <span style="font-size: 0.72rem; color: var(--text-muted); font-style: italic;">💡 Clicking form fields highlights matching tags below</span>
-              <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;" onclick="copyV2XmlToClipboard()">📋 Copy XML</button>
-              <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-color: #10b981; color: #10b981;" onclick="downloadV2RawXml()">📥 Download XML</button>
-              <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;" onclick="toggleV2XmlPreview()">✕ Close</button>
+              <span style="font-size: 0.72rem; color: var(--text-muted); font-style: italic;">💡 Clicking form fields
+                highlights matching tags below</span>
+              <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;"
+                onclick="copyV2XmlToClipboard()">📋 Copy XML</button>
+              <button type="button" class="btn btn-secondary"
+                style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-color: #10b981; color: #10b981;"
+                onclick="downloadV2RawXml()">📥 Download XML</button>
+              <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;"
+                onclick="toggleV2XmlPreview()">✕ Close</button>
             </div>
           </div>
           <div class="code-viewer" id="v2XmlViewer" style="height: 520px;">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
-&lt;rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
-    xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
-    xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:100"
-    xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"&gt;
-  &lt;rsm:ExchangedDocumentContext&gt;
-    &lt;ram:GuidelineSpecifiedDocumentContextParameter&gt;
-      &lt;ram:ID&gt;urn:cen.eu:en16931:2017&lt;/ram:ID&gt;
-    &lt;/ram:GuidelineSpecifiedDocumentContextParameter&gt;
-  &lt;/rsm:ExchangedDocumentContext&gt;
-  &lt;rsm:ExchangedDocument&gt;
-    &lt;ram:ID&gt;&lt;/ram:ID&gt;
-    &lt;ram:TypeCode&gt;380&lt;/ram:TypeCode&gt;
-    &lt;ram:IssueDateTime&gt;
-      &lt;udt:DateTimeString format="102"&gt;&lt;/udt:DateTimeString&gt;
-    &lt;/ram:IssueDateTime&gt;
-  &lt;/rsm:ExchangedDocument&gt;
-  &lt;rsm:SupplyChainTradeTransaction&gt;
-    &lt;!-- IncludedSupplyChainTradeLineItem (Line items will appear here) --&gt;
-    &lt;ram:ApplicableHeaderTradeAgreement&gt;
-      &lt;ram:BuyerReference&gt;&lt;/ram:BuyerReference&gt;
-      &lt;ram:SellerTradeParty&gt;
-        &lt;ram:Name&gt;&lt;/ram:Name&gt;
-        &lt;ram:SpecifiedTaxRegistration&gt;
-          &lt;ram:ID schemeID="VA"&gt;&lt;/ram:ID&gt;
-        &lt;/ram:SpecifiedTaxRegistration&gt;
-        &lt;ram:PostalTradeAddress&gt;
-          &lt;ram:PostcodeCode&gt;&lt;/ram:PostcodeCode&gt;
-          &lt;ram:LineOne&gt;&lt;/ram:LineOne&gt;
-          &lt;ram:CityName&gt;&lt;/ram:CityName&gt;
-          &lt;ram:CountryID&gt;DE&lt;/ram:CountryID&gt;
-        &lt;/ram:PostalTradeAddress&gt;
-      &lt;/ram:SellerTradeParty&gt;
-      &lt;ram:BuyerTradeParty&gt;
-        &lt;ram:Name&gt;&lt;/ram:Name&gt;
-        &lt;ram:SpecifiedTaxRegistration&gt;
-          &lt;ram:ID schemeID="VA"&gt;&lt;/ram:ID&gt;
-        &lt;/ram:SpecifiedTaxRegistration&gt;
-        &lt;ram:PostalTradeAddress&gt;
-          &lt;ram:PostcodeCode&gt;&lt;/ram:PostcodeCode&gt;
-          &lt;ram:LineOne&gt;&lt;/ram:LineOne&gt;
-          &lt;ram:CityName&gt;&lt;/ram:CityName&gt;
-          &lt;ram:CountryID&gt;DE&lt;/ram:CountryID&gt;
-        &lt;/ram:PostalTradeAddress&gt;
-      &lt;/ram:BuyerTradeParty&gt;
-    &lt;/ram:ApplicableHeaderTradeAgreement&gt;
-    &lt;ram:ApplicableHeaderTradeDelivery&gt;
-      &lt;ram:ActualDeliverySupplyChainEvent&gt;
-        &lt;ram:OccurrenceDateTime&gt;
-          &lt;udt:DateTimeString format="102"&gt;&lt;/udt:DateTimeString&gt;
-        &lt;/ram:OccurrenceDateTime&gt;
-      &lt;/ram:ActualDeliverySupplyChainEvent&gt;
-    &lt;/ram:ApplicableHeaderTradeDelivery&gt;
-    &lt;ram:ApplicableHeaderTradeSettlement&gt;
-      &lt;ram:InvoiceCurrencyCode&gt;EUR&lt;/ram:InvoiceCurrencyCode&gt;
-      &lt;ram:SpecifiedTradeSettlementPaymentMeans&gt;
-        &lt;ram:TypeCode&gt;58&lt;/ram:TypeCode&gt;
-        &lt;ram:PayeePartyCreditorFinancialAccount&gt;
-          &lt;ram:IBANID&gt;&lt;/ram:IBANID&gt;
-        &lt;/ram:PayeePartyCreditorFinancialAccount&gt;
-        &lt;ram:PayeeSpecifiedCreditorFinancialInstitution&gt;
-          &lt;ram:BICID&gt;&lt;/ram:BICID&gt;
-        &lt;/ram:PayeeSpecifiedCreditorFinancialInstitution&gt;
-      &lt;/ram:SpecifiedTradeSettlementPaymentMeans&gt;
-      &lt;ram:SpecifiedTradeSettlementHeaderMonetarySummation&gt;
-        &lt;ram:LineTotalAmount&gt;0.00&lt;/ram:LineTotalAmount&gt;
-        &lt;ram:TaxBasisTotalAmount&gt;0.00&lt;/ram:TaxBasisTotalAmount&gt;
-        &lt;ram:TaxTotalAmount currencyID="EUR"&gt;0.00&lt;/ram:TaxTotalAmount&gt;
-        &lt;ram:GrandTotalAmount&gt;0.00&lt;/ram:GrandTotalAmount&gt;
-        &lt;ram:DuePayableAmount&gt;0.00&lt;/ram:DuePayableAmount&gt;
-      &lt;/ram:SpecifiedTradeSettlementHeaderMonetarySummation&gt;
-    &lt;/ram:ApplicableHeaderTradeSettlement&gt;
-  &lt;/rsm:SupplyChainTradeTransaction&gt;
-&lt;/rsm:CrossIndustryInvoice&gt;</div>
+            &lt;rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
+            xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
+            xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:100"
+            xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"&gt;
+            &lt;rsm:ExchangedDocumentContext&gt;
+            &lt;ram:GuidelineSpecifiedDocumentContextParameter&gt;
+            &lt;ram:ID&gt;urn:cen.eu:en16931:2017&lt;/ram:ID&gt;
+            &lt;/ram:GuidelineSpecifiedDocumentContextParameter&gt;
+            &lt;/rsm:ExchangedDocumentContext&gt;
+            &lt;rsm:ExchangedDocument&gt;
+            &lt;ram:ID&gt;&lt;/ram:ID&gt;
+            &lt;ram:TypeCode&gt;380&lt;/ram:TypeCode&gt;
+            &lt;ram:IssueDateTime&gt;
+            &lt;udt:DateTimeString format="102"&gt;&lt;/udt:DateTimeString&gt;
+            &lt;/ram:IssueDateTime&gt;
+            &lt;/rsm:ExchangedDocument&gt;
+            &lt;rsm:SupplyChainTradeTransaction&gt;
+            &lt;!-- IncludedSupplyChainTradeLineItem (Line items will appear here) --&gt;
+            &lt;ram:ApplicableHeaderTradeAgreement&gt;
+            &lt;ram:BuyerReference&gt;&lt;/ram:BuyerReference&gt;
+            &lt;ram:SellerTradeParty&gt;
+            &lt;ram:Name&gt;&lt;/ram:Name&gt;
+            &lt;ram:SpecifiedTaxRegistration&gt;
+            &lt;ram:ID schemeID="VA"&gt;&lt;/ram:ID&gt;
+            &lt;/ram:SpecifiedTaxRegistration&gt;
+            &lt;ram:PostalTradeAddress&gt;
+            &lt;ram:PostcodeCode&gt;&lt;/ram:PostcodeCode&gt;
+            &lt;ram:LineOne&gt;&lt;/ram:LineOne&gt;
+            &lt;ram:CityName&gt;&lt;/ram:CityName&gt;
+            &lt;ram:CountryID&gt;DE&lt;/ram:CountryID&gt;
+            &lt;/ram:PostalTradeAddress&gt;
+            &lt;/ram:SellerTradeParty&gt;
+            &lt;ram:BuyerTradeParty&gt;
+            &lt;ram:Name&gt;&lt;/ram:Name&gt;
+            &lt;ram:SpecifiedTaxRegistration&gt;
+            &lt;ram:ID schemeID="VA"&gt;&lt;/ram:ID&gt;
+            &lt;/ram:SpecifiedTaxRegistration&gt;
+            &lt;ram:PostalTradeAddress&gt;
+            &lt;ram:PostcodeCode&gt;&lt;/ram:PostcodeCode&gt;
+            &lt;ram:LineOne&gt;&lt;/ram:LineOne&gt;
+            &lt;ram:CityName&gt;&lt;/ram:CityName&gt;
+            &lt;ram:CountryID&gt;DE&lt;/ram:CountryID&gt;
+            &lt;/ram:PostalTradeAddress&gt;
+            &lt;/ram:BuyerTradeParty&gt;
+            &lt;/ram:ApplicableHeaderTradeAgreement&gt;
+            &lt;ram:ApplicableHeaderTradeDelivery&gt;
+            &lt;ram:ActualDeliverySupplyChainEvent&gt;
+            &lt;ram:OccurrenceDateTime&gt;
+            &lt;udt:DateTimeString format="102"&gt;&lt;/udt:DateTimeString&gt;
+            &lt;/ram:OccurrenceDateTime&gt;
+            &lt;/ram:ActualDeliverySupplyChainEvent&gt;
+            &lt;/ram:ApplicableHeaderTradeDelivery&gt;
+            &lt;ram:ApplicableHeaderTradeSettlement&gt;
+            &lt;ram:InvoiceCurrencyCode&gt;EUR&lt;/ram:InvoiceCurrencyCode&gt;
+            &lt;ram:SpecifiedTradeSettlementPaymentMeans&gt;
+            &lt;ram:TypeCode&gt;58&lt;/ram:TypeCode&gt;
+            &lt;ram:PayeePartyCreditorFinancialAccount&gt;
+            &lt;ram:IBANID&gt;&lt;/ram:IBANID&gt;
+            &lt;/ram:PayeePartyCreditorFinancialAccount&gt;
+            &lt;ram:PayeeSpecifiedCreditorFinancialInstitution&gt;
+            &lt;ram:BICID&gt;&lt;/ram:BICID&gt;
+            &lt;/ram:PayeeSpecifiedCreditorFinancialInstitution&gt;
+            &lt;/ram:SpecifiedTradeSettlementPaymentMeans&gt;
+            &lt;ram:SpecifiedTradeSettlementHeaderMonetarySummation&gt;
+            &lt;ram:LineTotalAmount&gt;0.00&lt;/ram:LineTotalAmount&gt;
+            &lt;ram:TaxBasisTotalAmount&gt;0.00&lt;/ram:TaxBasisTotalAmount&gt;
+            &lt;ram:TaxTotalAmount currencyID="EUR"&gt;0.00&lt;/ram:TaxTotalAmount&gt;
+            &lt;ram:GrandTotalAmount&gt;0.00&lt;/ram:GrandTotalAmount&gt;
+            &lt;ram:DuePayableAmount&gt;0.00&lt;/ram:DuePayableAmount&gt;
+            &lt;/ram:SpecifiedTradeSettlementHeaderMonetarySummation&gt;
+            &lt;/ram:ApplicableHeaderTradeSettlement&gt;
+            &lt;/rsm:SupplyChainTradeTransaction&gt;
+            &lt;/rsm:CrossIndustryInvoice&gt;</div>
         </div>
       </div>
     </div>
@@ -1070,56 +1189,77 @@
               <span>📜 Created Invoices History</span>
               <span class="tag" id="historyCountBadge">0 invoices</span>
             </div>
-            <button class="btn btn-secondary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;" onclick="loadInvoiceHistory()">
+            <button class="btn btn-secondary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;"
+              onclick="loadInvoiceHistory()">
               <span>🔄 Refresh</span>
             </button>
           </div>
 
           <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem;">
-            List of generated ZUGFeRD / Factur-X electronic invoices. You can re-download, inspect, or load any past invoice directly into the manual editor for adjustments and re-issuance.
+            List of generated ZUGFeRD / Factur-X electronic invoices. You can re-download, inspect, or load any past
+            invoice directly into the manual editor for adjustments and re-issuance.
           </div>
 
           <!-- History Filter & Column Toggler Toolbar -->
-          <div class="history-toolbar" style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; background: var(--bg-input); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--bg-card-border); margin-bottom: 1rem;">
+          <div class="history-toolbar"
+            style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; background: var(--bg-input); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--bg-card-border); margin-bottom: 1rem;">
             <div style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; flex: 1; min-width: 280px;">
               <div style="position: relative; flex: 1; min-width: 140px; max-width: 220px;">
-                <input type="text" id="historyFilterInv" placeholder="🔍 Filter Invoice No..." style="width: 100%; padding: 0.35rem 0.6rem 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-secondary); color: var(--text-main);" oninput="handleHistoryFilterChange()">
+                <input type="text" id="historyFilterInv" placeholder="🔍 Filter Invoice No..."
+                  style="width: 100%; padding: 0.35rem 0.6rem 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-secondary); color: var(--text-main);"
+                  oninput="handleHistoryFilterChange()">
               </div>
               <div style="position: relative; flex: 1; min-width: 140px; max-width: 220px;">
-                <input type="text" id="historyFilterBuyer" placeholder="🔍 Filter Buyer..." style="width: 100%; padding: 0.35rem 0.6rem 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-secondary); color: var(--text-main);" oninput="handleHistoryFilterChange()">
+                <input type="text" id="historyFilterBuyer" placeholder="🔍 Filter Buyer..."
+                  style="width: 100%; padding: 0.35rem 0.6rem 0.35rem 0.6rem; font-size: 0.8rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-secondary); color: var(--text-main);"
+                  oninput="handleHistoryFilterChange()">
               </div>
-              <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;" onclick="resetHistoryFilters()" title="Clear search filters">
+              <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;"
+                onclick="resetHistoryFilters()" title="Clear search filters">
                 <span>✕ Clear</span>
               </button>
             </div>
 
             <!-- Column Toggler Dropdown -->
             <div style="position: relative;" id="colTogglerContainer">
-              <button type="button" class="btn btn-secondary" id="colTogglerBtn" onclick="toggleColumnMenu(event)" style="padding: 0.35rem 0.8rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
+              <button type="button" class="btn btn-secondary" id="colTogglerBtn" onclick="toggleColumnMenu(event)"
+                style="padding: 0.35rem 0.8rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
                 <span>⚙️ Columns</span>
                 <span style="font-size: 0.65rem;">▼</span>
               </button>
-              <div id="colTogglerMenu" style="display: none; position: absolute; right: 0; top: 115%; background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); padding: 0.6rem; z-index: 100; min-width: 180px; backdrop-filter: blur(12px);">
-                <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.4rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--bg-card-border);">Toggle Columns</div>
-                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
-                  <input type="checkbox" checked onchange="toggleColumnVisibility('col-date', this.checked)"> Date & Time
+              <div id="colTogglerMenu"
+                style="display: none; position: absolute; right: 0; top: 115%; background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); padding: 0.6rem; z-index: 100; min-width: 180px; backdrop-filter: blur(12px);">
+                <div
+                  style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.4rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--bg-card-border);">
+                  Toggle Columns</div>
+                <label
+                  style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                  <input type="checkbox" checked onchange="toggleColumnVisibility('col-date', this.checked)"> Date &
+                  Time
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                <label
+                  style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
                   <input type="checkbox" checked onchange="toggleColumnVisibility('col-inv', this.checked)"> Invoice No.
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                <label
+                  style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
                   <input type="checkbox" checked onchange="toggleColumnVisibility('col-buyer', this.checked)"> Buyer
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                <label
+                  style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
                   <input type="checkbox" checked onchange="toggleColumnVisibility('col-layout', this.checked)"> Layout
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
-                  <input type="checkbox" checked onchange="toggleColumnVisibility('col-cost', this.checked)"> AI Cost / Tokens
+                <label
+                  style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                  <input type="checkbox" checked onchange="toggleColumnVisibility('col-cost', this.checked)"> AI Cost /
+                  Tokens
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                <label
+                  style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
                   <input type="checkbox" checked onchange="toggleColumnVisibility('col-total', this.checked)"> Total (€)
                 </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
+                <label
+                  style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; margin: 0.25rem 0; cursor: pointer; color: var(--text-main);">
                   <input type="checkbox" checked onchange="toggleColumnVisibility('col-status', this.checked)"> Status
                 </label>
               </div>
@@ -1131,17 +1271,20 @@
             <div>Loading invoice records...</div>
           </div>
 
-          <div id="historyEmpty" style="display: none; padding: 3rem 1rem; text-align: center; border: 1px dashed var(--bg-card-border); border-radius: 8px;">
+          <div id="historyEmpty"
+            style="display: none; padding: 3rem 1rem; text-align: center; border: 1px dashed var(--bg-card-border); border-radius: 8px;">
             <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📭</div>
             <div style="font-weight: 600; color: var(--text-main);">No invoices found</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;" id="historyEmptySubtitle">Invoices you create using the Manual Form, PDF or DOCX converter will appear here.</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;" id="historyEmptySubtitle">
+              Invoices you create using the Manual Form, PDF or DOCX converter will appear here.</div>
           </div>
 
           <div class="items-table-wrapper" id="historyTableWrapper" style="display: none;">
             <table class="items-table" style="width: 100%;">
               <thead>
                 <tr>
-                  <th class="col-date" style="width: 140px; cursor: pointer; user-select: none;" onclick="toggleHistoryDateSort()" title="Click to sort by Date & Time">
+                  <th class="col-date" style="width: 140px; cursor: pointer; user-select: none;"
+                    onclick="toggleHistoryDateSort()" title="Click to sort by Date & Time">
                     <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
                       Date & Time <span id="sortDateIcon" style="color: var(--accent); font-weight: 800;">▼</span>
                     </span>
@@ -1165,9 +1308,12 @@
     </div>
 
     <!-- PDF In-Browser Preview Modal (Popup) -->
-    <div id="pdfPreviewModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(6px); z-index: 9998; align-items: center; justify-content: center; padding: 1.5rem;">
-      <div style="background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 12px; width: 100%; max-width: 950px; height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);">
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--bg-card-border); background: var(--bg-primary);">
+    <div id="pdfPreviewModal"
+      style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.82); backdrop-filter: blur(6px); z-index: 9998; align-items: center; justify-content: center; padding: 1.5rem;">
+      <div
+        style="background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 12px; width: 100%; max-width: 950px; height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);">
+        <div
+          style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--bg-card-border); background: var(--bg-primary);">
           <div style="display: flex; align-items: center; gap: 0.6rem;">
             <span style="font-size: 1.2rem;">👁️</span>
             <div>
@@ -1176,10 +1322,12 @@
             </div>
           </div>
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <a id="pdfPreviewDownloadLink" href="#" download class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.78rem;">
+            <a id="pdfPreviewDownloadLink" href="#" download class="btn btn-secondary"
+              style="padding: 0.35rem 0.75rem; font-size: 0.78rem;">
               <span>⬇️ Download</span>
             </a>
-            <button type="button" class="btn btn-secondary" onclick="closePdfPreview()" style="padding: 0.35rem 0.75rem; font-size: 0.85rem; font-weight: 700;">
+            <button type="button" class="btn btn-secondary" onclick="closePdfPreview()"
+              style="padding: 0.35rem 0.75rem; font-size: 0.85rem; font-weight: 700;">
               <span>✕ Close</span>
             </button>
           </div>
@@ -1191,8 +1339,10 @@
     </div>
 
     <!-- PIN Protection Modal for Configuration -->
-    <div id="pinModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 9999; align-items: center; justify-content: center;">
-      <div style="background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); text-align: center;">
+    <div id="pinModal"
+      style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(5px); z-index: 9999; align-items: center; justify-content: center;">
+      <div
+        style="background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); text-align: center;">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🔒</div>
         <h3 style="margin-bottom: 0.5rem; font-size: 1.15rem; color: var(--text-main);">Authorized Access Only</h3>
         <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem;">
@@ -1203,14 +1353,15 @@
           <div style="margin-bottom: 1.25rem;">
             <input type="password" id="pinInput" maxlength="4" placeholder="••••" autocomplete="off"
               style="font-size: 1.75rem; letter-spacing: 0.4em; text-align: center; width: 160px; padding: 0.5rem; border-radius: 8px; border: 2px solid var(--accent); background: var(--bg-input); color: var(--text-main);"
-              oninput="handlePinInput(this)"
-              autofocus>
+              oninput="handlePinInput(this)" autofocus>
           </div>
-          <div id="pinError" style="display: none; color: #ef4444; font-size: 0.8rem; margin-bottom: 1rem; font-weight: 600;">
+          <div id="pinError"
+            style="display: none; color: #ef4444; font-size: 0.8rem; margin-bottom: 1rem; font-weight: 600;">
             ❌ Invalid PIN. Please try again.
           </div>
           <div style="display: flex; gap: 0.75rem; justify-content: center;">
-            <button type="button" class="btn btn-secondary" onclick="closePinModal()" style="padding: 0.5rem 1.25rem;">Cancel</button>
+            <button type="button" class="btn btn-secondary" onclick="closePinModal()"
+              style="padding: 0.5rem 1.25rem;">Cancel</button>
             <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1.25rem;">Unlock</button>
           </div>
         </form>
@@ -1230,13 +1381,17 @@
             <label>OpenAI API Key</label>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
               <input type="password" id="configApiKey" placeholder="sk-..." style="flex: 1;">
-              <button type="button" class="btn btn-secondary" id="btnTestOpenAiKey" onclick="testOpenAiKeyConnection()" style="white-space: nowrap; padding: 0.5rem 0.85rem; font-size: 0.82rem;">
+              <button type="button" class="btn btn-secondary" id="btnTestOpenAiKey" onclick="testOpenAiKeyConnection()"
+                style="white-space: nowrap; padding: 0.5rem 0.85rem; font-size: 0.82rem;">
                 ⚡ Test Key
               </button>
             </div>
-            <div id="serverApiKeyStatus" style="font-size: 0.78rem; margin-top: 5px; color: #10b981; display: none;"></div>
-            <div id="testApiKeyResult" style="font-size: 0.8rem; margin-top: 5px; display: none; font-weight: 500;"></div>
-            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Used for AI document extraction. Saved persistently to system settings and local storage.</span>
+            <div id="serverApiKeyStatus" style="font-size: 0.78rem; margin-top: 5px; color: #10b981; display: none;">
+            </div>
+            <div id="testApiKeyResult" style="font-size: 0.8rem; margin-top: 5px; display: none; font-weight: 500;">
+            </div>
+            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Used for AI document extraction.
+              Saved persistently to system settings and local storage.</span>
           </div>
 
           <div class="form-group" style="margin-top: 0.5rem;">
@@ -1251,10 +1406,13 @@
             <label>PDF Invoice Layout Template</label>
             <select id="configInvoiceLayout" onchange="toggleConfigLangGroup(this.value)">
               <option value="layout1" selected>Layout Option 1: Modern Studio (Two-column card style)</option>
-              <option value="layout2">Layout Option 2: Odelo Corporate Automotive (DIN style, top-right logo, multi-column footer)</option>
-              <option value="layout3">Layout Option 3: Most complete format (EN 16931 Paged Media, full references & badges)</option>
+              <option value="layout2">Layout Option 2: Odelo Corporate Automotive (DIN style, top-right logo,
+                multi-column footer)</option>
+              <option value="layout3">Layout Option 3: Most complete format (EN 16931 Paged Media, full references &
+                badges)</option>
             </select>
-            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Choose the visual layout used when synthesizing PDF/A-3 invoices.</span>
+            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Choose the visual layout used
+              when synthesizing PDF/A-3 invoices.</span>
           </div>
 
           <div class="form-group" id="cfgLangGroup" style="margin-top: 0.5rem; display: none;">
@@ -1265,17 +1423,21 @@
               <option value="en">🇬🇧 English (EN)</option>
               <option value="de">🇩🇪 German (DE)</option>
             </select>
-            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Select the target rendering language for customer invoices in Layout 3.</span>
+            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Select the target rendering
+              language for customer invoices in Layout 3.</span>
           </div>
 
           <!-- AI Extraction Prompt Management & Editor Section -->
           <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1.25rem; margin-top: 0.5rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
               <div>
-                <h4 style="font-size: 0.95rem; color: #a78bfa; margin: 0 0 4px 0;">🧠 AI Document Extraction Prompt Manager</h4>
-                <span style="font-size: 0.75rem; color: var(--text-dim);">Select, create, edit, or test multiple parsing prompts sent to OpenAI GPT-4o.</span>
+                <h4 style="font-size: 0.95rem; color: #a78bfa; margin: 0 0 4px 0;">🧠 AI Document Extraction Prompt
+                  Manager</h4>
+                <span style="font-size: 0.75rem; color: var(--text-dim);">Select, create, edit, or test multiple parsing
+                  prompts sent to OpenAI GPT-4o.</span>
               </div>
-              <button type="button" class="btn btn-secondary" onclick="addNewPromptTemplate()" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">
+              <button type="button" class="btn btn-secondary" onclick="addNewPromptTemplate()"
+                style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">
                 <span>+ New Prompt</span>
               </button>
             </div>
@@ -1283,39 +1445,52 @@
             <div class="form-group" style="margin-top: 0.5rem;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
                 <label style="font-weight: 700; font-size: 0.82rem; margin: 0;">Active Prompt Preset:</label>
-                <span id="promptStatusBadge" class="tag" style="background: rgba(167, 139, 250, 0.15); color: #a78bfa;">Active</span>
+                <span id="promptStatusBadge" class="tag"
+                  style="background: rgba(167, 139, 250, 0.15); color: #a78bfa;">Active</span>
               </div>
-              <select id="cfgPromptSelect" onchange="handlePromptSelectionChange(this.value)" style="width: 100%; padding: 0.5rem 0.75rem; font-size: 0.85rem; border-radius: 8px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main);">
+              <select id="cfgPromptSelect" onchange="handlePromptSelectionChange(this.value)"
+                style="width: 100%; padding: 0.5rem 0.75rem; font-size: 0.85rem; border-radius: 8px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main);">
                 <!-- Populated dynamically -->
               </select>
             </div>
 
-            <div style="background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
+            <div
+              style="background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px; padding: 0.85rem; margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
               <div class="form-row">
                 <div class="form-group" style="flex: 2;">
                   <label style="font-size: 0.75rem; color: var(--text-muted);">Preset Name</label>
-                  <input type="text" id="cfgPromptName" placeholder="e.g. Standard EN 16931 Parser" style="font-size: 0.82rem;">
+                  <input type="text" id="cfgPromptName" placeholder="e.g. Standard EN 16931 Parser"
+                    style="font-size: 0.82rem;">
                 </div>
                 <div class="form-group" style="flex: 3;">
                   <label style="font-size: 0.75rem; color: var(--text-muted);">Description / Purpose</label>
-                  <input type="text" id="cfgPromptDesc" placeholder="e.g. Optimized for DACH invoices with reverse-charge" style="font-size: 0.82rem;">
+                  <input type="text" id="cfgPromptDesc"
+                    placeholder="e.g. Optimized for DACH invoices with reverse-charge" style="font-size: 0.82rem;">
                 </div>
               </div>
 
               <div class="form-group">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                  <label style="font-size: 0.75rem; color: var(--text-muted);">System Prompt Instructions (Markdown / Text):</label>
-                  <button type="button" class="btn btn-secondary" onclick="resetActivePromptToDefault()" style="padding: 2px 7px; font-size: 0.7rem;" title="Reset this prompt back to default European standard">↺ Reset to Default</button>
+                <div
+                  style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                  <label style="font-size: 0.75rem; color: var(--text-muted);">System Prompt Instructions (Markdown /
+                    Text):</label>
+                  <button type="button" class="btn btn-secondary" onclick="resetActivePromptToDefault()"
+                    style="padding: 2px 7px; font-size: 0.7rem;"
+                    title="Reset this prompt back to default European standard">↺ Reset to Default</button>
                 </div>
-                <textarea id="cfgPromptContent" rows="11" style="width: 100%; font-family: 'Fira Code', monospace; font-size: 0.75rem; line-height: 1.45; padding: 0.75rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--code-bg); color: var(--text-main); resize: vertical; box-sizing: border-box;" placeholder="Enter system instructions for GPT-4o parser..."></textarea>
+                <textarea id="cfgPromptContent" rows="11"
+                  style="width: 100%; font-family: 'Fira Code', monospace; font-size: 0.75rem; line-height: 1.45; padding: 0.75rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--code-bg); color: var(--text-main); resize: vertical; box-sizing: border-box;"
+                  placeholder="Enter system instructions for GPT-4o parser..."></textarea>
               </div>
 
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button type="button" class="btn btn-secondary" id="btnDeletePrompt" onclick="deleteActivePrompt()" style="color: #ef4444; padding: 0.35rem 0.75rem; font-size: 0.75rem;">
+                <button type="button" class="btn btn-secondary" id="btnDeletePrompt" onclick="deleteActivePrompt()"
+                  style="color: #ef4444; padding: 0.35rem 0.75rem; font-size: 0.75rem;">
                   <span>🗑️ Delete Preset</span>
                 </button>
                 <div style="display: flex; gap: 0.5rem;">
-                  <button type="button" class="btn btn-secondary" onclick="savePromptPresetOnly()" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">
+                  <button type="button" class="btn btn-secondary" onclick="savePromptPresetOnly()"
+                    style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">
                     <span>💾 Save Prompt Changes</span>
                   </button>
                 </div>
@@ -1325,35 +1500,51 @@
 
           <!-- Multilingual Extraction Keywords & Synonyms Dictionary (Chips Editor) -->
           <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1.25rem; margin-top: 0.75rem;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div
+              style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
               <div>
-                <h4 style="font-size: 0.95rem; color: #10b981; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+                <h4
+                  style="font-size: 0.95rem; color: #10b981; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
                   <span>🏷️ Multilingual AI Keyword &amp; Synonym Dictionary</span>
-                  <span class="tag" id="synonymsCountBadge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.7rem;">18 Terms Active</span>
-                  <span class="tag" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; font-size: 0.7rem;">EN / DE / SI</span>
+                  <span class="tag" id="synonymsCountBadge"
+                    style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.7rem;">18 Terms
+                    Active</span>
+                  <span class="tag" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; font-size: 0.7rem;">EN
+                    / DE / SI</span>
                 </h4>
                 <div style="font-size: 0.75rem; color: var(--text-dim);">
-                  Define phrases and abbreviations the AI looks for on invoices. Add tags by typing and pressing <kbd style="background: var(--bg-card); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--bg-card-border);">Enter</kbd> or <kbd style="background: var(--bg-card); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--bg-card-border);">,</kbd>.
+                  Define phrases and abbreviations the AI looks for on invoices. Add tags by typing and pressing <kbd
+                    style="background: var(--bg-card); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--bg-card-border);">Enter</kbd>
+                  or <kbd
+                    style="background: var(--bg-card); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--bg-card-border);">,</kbd>.
                 </div>
               </div>
               <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                <input type="text" id="synonymsFilterInput" placeholder="🔍 Filter BT-X or field..." oninput="filterSynonymsTable(this.value)" style="padding: 0.35rem 0.65rem; font-size: 0.78rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); width: 190px;">
-                <button type="button" class="btn btn-secondary" onclick="addNewSynonymRow()" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
+                <input type="text" id="synonymsFilterInput" placeholder="🔍 Filter BT-X or field..."
+                  oninput="filterSynonymsTable(this.value)"
+                  style="padding: 0.35rem 0.65rem; font-size: 0.78rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); width: 190px;">
+                <button type="button" class="btn btn-secondary" onclick="addNewSynonymRow()"
+                  style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
                   <span>+ Add BT Field</span>
                 </button>
-                <button type="button" class="btn btn-secondary" onclick="resetSynonymsToDefaults()" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;" title="Reset keywords back to default standard">
+                <button type="button" class="btn btn-secondary" onclick="resetSynonymsToDefaults()"
+                  style="padding: 0.35rem 0.75rem; font-size: 0.75rem;" title="Reset keywords back to default standard">
                   <span>↺ Reset Keywords</span>
                 </button>
-                <button type="button" class="btn btn-primary" onclick="saveSynonymsConfig()" style="padding: 0.35rem 0.95rem; font-size: 0.78rem; background: #10b981;">
+                <button type="button" class="btn btn-primary" onclick="saveSynonymsConfig()"
+                  style="padding: 0.35rem 0.95rem; font-size: 0.78rem; background: #10b981;">
                   <span>💾 Save Keywords</span>
                 </button>
               </div>
             </div>
 
-            <div style="overflow-x: auto; background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px;">
-              <table class="synonyms-table" style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
+            <div
+              style="overflow-x: auto; background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px;">
+              <table class="synonyms-table"
+                style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
                 <thead>
-                  <tr style="background: rgba(0,0,0,0.15); border-bottom: 1px solid var(--bg-card-border); color: var(--text-muted);">
+                  <tr
+                    style="background: rgba(0,0,0,0.15); border-bottom: 1px solid var(--bg-card-border); color: var(--text-muted);">
                     <th style="padding: 0.65rem 0.85rem; width: 75px;">BT-X</th>
                     <th style="padding: 0.65rem 0.85rem; width: 160px;">Field Name</th>
                     <th style="padding: 0.65rem 0.85rem; width: 28%;">🇬🇧 English Keywords</th>
@@ -1370,30 +1561,39 @@
 
           <!-- Tax / VAT / DDV Rates Configuration Section -->
           <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1.25rem; margin-top: 0.5rem;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; gap: 1rem; flex-wrap: wrap;">
+            <div
+              style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; gap: 1rem; flex-wrap: wrap;">
               <div>
-                <h4 style="font-size: 0.95rem; color: #10b981; margin: 0 0 4px 0;">💶 VAT / Tax (DDV / MwSt) Rates &amp; Country Settings</h4>
+                <h4 style="font-size: 0.95rem; color: #10b981; margin: 0 0 4px 0;">💶 VAT / Tax (DDV / MwSt) Rates &amp;
+                  Country Settings</h4>
                 <span style="font-size: 0.75rem; color: var(--text-dim);">
-                  Define tax rates per country (Slovenian 22%/9.5%/5%, German 19%/7%, Croatian 25%, etc.) used by Studio v2 and AI extraction.
+                  Define tax rates per country (Slovenian 22%/9.5%/5%, German 19%/7%, Croatian 25%, etc.) used by Studio
+                  v2 and AI extraction.
                 </span>
               </div>
               <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <button type="button" class="btn btn-secondary" onclick="addNewTaxRateRow()" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
+                <button type="button" class="btn btn-secondary" onclick="addNewTaxRateRow()"
+                  style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
                   <span>+ Add Tax Rate</span>
                 </button>
-                <button type="button" class="btn btn-secondary" onclick="resetTaxRatesToDefaults()" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;" title="Reset tax rates back to European standard">
+                <button type="button" class="btn btn-secondary" onclick="resetTaxRatesToDefaults()"
+                  style="padding: 0.35rem 0.75rem; font-size: 0.75rem;"
+                  title="Reset tax rates back to European standard">
                   <span>↺ Reset Rates</span>
                 </button>
-                <button type="button" class="btn btn-primary" onclick="saveTaxRatesConfig()" style="padding: 0.35rem 0.95rem; font-size: 0.78rem; background: #10b981;">
+                <button type="button" class="btn btn-primary" onclick="saveTaxRatesConfig()"
+                  style="padding: 0.35rem 0.95rem; font-size: 0.78rem; background: #10b981;">
                   <span>💾 Save Tax Rates</span>
                 </button>
               </div>
             </div>
 
-            <div style="overflow-x: auto; background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px;">
+            <div
+              style="overflow-x: auto; background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px;">
               <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
                 <thead>
-                  <tr style="background: rgba(0,0,0,0.15); border-bottom: 1px solid var(--bg-card-border); color: var(--text-muted);">
+                  <tr
+                    style="background: rgba(0,0,0,0.15); border-bottom: 1px solid var(--bg-card-border); color: var(--text-muted);">
                     <th style="padding: 0.65rem 0.85rem; width: 100px;">Country</th>
                     <th style="padding: 0.65rem 0.85rem; width: 110px;">Rate %</th>
                     <th style="padding: 0.65rem 0.85rem; width: 130px;">Category Code</th>
@@ -1412,7 +1612,8 @@
           <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1.25rem; margin-top: 0.5rem;">
             <div style="margin-bottom: 0.75rem;">
               <h4 style="font-size: 0.95rem; color: #60a5fa; margin: 0 0 4px 0;">🏢 Seller (Your Business) Details</h4>
-              <span style="font-size: 0.75rem; color: var(--text-dim);">These details will automatically populate the manual form and be used when filling example data.</span>
+              <span style="font-size: 0.75rem; color: var(--text-dim);">These details will automatically populate the
+                manual form and be used when filling example data.</span>
             </div>
             <div class="form-row">
               <div class="form-group">
@@ -1453,8 +1654,10 @@
           <!-- Layout 2 Corporate Multi-Column Footer Configuration -->
           <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1.25rem; margin-top: 0.5rem;">
             <div style="margin-bottom: 0.75rem;">
-              <h4 style="font-size: 0.95rem; color: #34d399; margin: 0 0 4px 0;">📑 Layout 2 (Odelo Style) Corporate Footer Details</h4>
-              <span style="font-size: 0.75rem; color: var(--text-dim);">Configures the 4-column footer strip printed at the bottom of Layout 2 PDF invoices.</span>
+              <h4 style="font-size: 0.95rem; color: #34d399; margin: 0 0 4px 0;">📑 Layout 2 (Odelo Style) Corporate
+                Footer Details</h4>
+              <span style="font-size: 0.75rem; color: var(--text-dim);">Configures the 4-column footer strip printed at
+                the bottom of Layout 2 PDF invoices.</span>
             </div>
 
             <div class="form-row">
@@ -1475,7 +1678,8 @@
               </div>
               <div class="form-group">
                 <label>UST-ID-Nr. (VAT ID for Footer)</label>
-                <input type="text" id="cfgSellerUstId" placeholder="e.g. DE 347120003 (leave empty to use Seller VAT ID)">
+                <input type="text" id="cfgSellerUstId"
+                  placeholder="e.g. DE 347120003 (leave empty to use Seller VAT ID)">
               </div>
             </div>
 
@@ -1497,7 +1701,8 @@
               </div>
             </div>
 
-            <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--bg-card-border);">
+            <div
+              style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--bg-card-border);">
               <h5 style="font-size: 0.82rem; color: #38bdf8; margin: 0 0 0.5rem 0;">Primary Bank Account (Column 3)</h5>
               <div class="form-row">
                 <div class="form-group">
@@ -1515,8 +1720,10 @@
               </div>
             </div>
 
-            <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--bg-card-border);">
-              <h5 style="font-size: 0.82rem; color: #38bdf8; margin: 0 0 0.5rem 0;">Secondary Bank Account (Column 4)</h5>
+            <div
+              style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--bg-card-border);">
+              <h5 style="font-size: 0.82rem; color: #38bdf8; margin: 0 0 0.5rem 0;">Secondary Bank Account (Column 4)
+              </h5>
               <div class="form-row">
                 <div class="form-group">
                   <label>Bank Name</label>
@@ -1534,19 +1741,26 @@
             </div>
 
             <!-- Layout 2 Corporate Legal & Delivery Options -->
-            <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--bg-card-border); display: flex; flex-direction: column; gap: 0.6rem;">
+            <div
+              style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--bg-card-border); display: flex; flex-direction: column; gap: 0.6rem;">
               <div class="form-group">
-                <label style="font-size: 0.78rem; font-weight: 700; color: #34d399;">Privacy Disclosure (DSGVO / GDPR)</label>
-                <input type="text" id="cfgPrivacyDisclosure" placeholder="Gemäß Artikel 13 der DSGVO, teilen wir Ihnen die Informationspflichten über folgende Adresse mit: www.odelo.de unter Datenschutz.">
-                <span style="font-size: 0.73rem; color: var(--text-dim); margin-top: 3px;">Printed above the 4-column footer on Layout 2 invoices.</span>
+                <label style="font-size: 0.78rem; font-weight: 700; color: #34d399;">Privacy Disclosure (DSGVO /
+                  GDPR)</label>
+                <input type="text" id="cfgPrivacyDisclosure"
+                  placeholder="Gemäß Artikel 13 der DSGVO, teilen wir Ihnen die Informationspflichten über folgende Adresse mit: www.odelo.de unter Datenschutz.">
+                <span style="font-size: 0.73rem; color: var(--text-dim); margin-top: 3px;">Printed above the 4-column
+                  footer on Layout 2 invoices.</span>
               </div>
               <div style="display: flex; align-items: center; gap: 0.6rem; padding-top: 0.25rem;">
                 <input type="checkbox" id="cfgAutoSyncDeliveryDate" style="width: 1rem; height: 1rem; cursor: pointer;">
-                <label for="cfgAutoSyncDeliveryDate" style="margin: 0; font-size: 0.8rem; cursor: pointer; color: var(--text-main); font-weight: 600;">
+                <label for="cfgAutoSyncDeliveryDate"
+                  style="margin: 0; font-size: 0.8rem; cursor: pointer; color: var(--text-main); font-weight: 600;">
                   Auto-sync Delivery Date to Issue Date (Rechnungsdatum = Leistungsdatum)
                 </label>
               </div>
-              <span style="font-size: 0.73rem; color: var(--text-dim); margin-left: 1.6rem;">When checked and no separate delivery date is extracted, sets delivery date to issue date and prints notice on Layout 2 PDF footer automatically.</span>
+              <span style="font-size: 0.73rem; color: var(--text-dim); margin-left: 1.6rem;">When checked and no
+                separate delivery date is extracted, sets delivery date to issue date and prints notice on Layout 2 PDF
+                footer automatically.</span>
             </div>
           </div>
 
@@ -1554,26 +1768,35 @@
           <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1rem; margin-top: 0.5rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
               <div>
-                <label style="font-weight: 700; font-size: 0.85rem; color: #60a5fa;">Company Logo (for Manual Invoices)</label>
-                <div style="font-size: 0.75rem; color: var(--text-muted);">Uploaded logo will appear on the top-left of the synthesized PDF invoice.</div>
+                <label style="font-weight: 700; font-size: 0.85rem; color: #60a5fa;">Company Logo (for Manual
+                  Invoices)</label>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Uploaded logo will appear on the top-left of
+                  the synthesized PDF invoice.</div>
               </div>
-              <button type="button" class="btn btn-secondary" id="removeLogoBtn" style="display: none; padding: 0.3rem 0.75rem; font-size: 0.75rem; color: #ef4444;" onclick="removeLogo()">
+              <button type="button" class="btn btn-secondary" id="removeLogoBtn"
+                style="display: none; padding: 0.3rem 0.75rem; font-size: 0.75rem; color: #ef4444;"
+                onclick="removeLogo()">
                 <span>🗑️ Remove Logo</span>
               </button>
             </div>
 
             <div style="display: flex; align-items: center; gap: 1.25rem; margin-top: 0.75rem;">
-              <div id="logoPreviewContainer" style="width: 140px; height: 60px; border: 1px dashed var(--bg-card-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--bg-input); overflow: hidden;">
+              <div id="logoPreviewContainer"
+                style="width: 140px; height: 60px; border: 1px dashed var(--bg-card-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--bg-input); overflow: hidden;">
                 <span id="noLogoText" style="font-size: 0.72rem; color: var(--text-muted);">No logo uploaded</span>
-                <img id="logoPreviewImg" src="" alt="Company Logo" style="display: none; max-width: 100%; max-height: 100%; object-fit: contain;">
+                <img id="logoPreviewImg" src="" alt="Company Logo"
+                  style="display: none; max-width: 100%; max-height: 100%; object-fit: contain;">
               </div>
 
               <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-                <input type="file" id="logoFileInput" accept=".png,.jpg,.jpeg" style="display: none;" onchange="handleLogoSelected(this)">
-                <button type="button" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.82rem;" onclick="document.getElementById('logoFileInput').click()">
+                <input type="file" id="logoFileInput" accept=".png,.jpg,.jpeg" style="display: none;"
+                  onchange="handleLogoSelected(this)">
+                <button type="button" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.82rem;"
+                  onclick="document.getElementById('logoFileInput').click()">
                   <span>📁 Choose Image (.png, .jpg)</span>
                 </button>
-                <span id="logoUploadStatus" style="font-size: 0.75rem; color: var(--text-muted);">Recommended: transparent PNG, ~300x120px</span>
+                <span id="logoUploadStatus" style="font-size: 0.75rem; color: var(--text-muted);">Recommended:
+                  transparent PNG, ~300x120px</span>
               </div>
             </div>
           </div>
@@ -1582,30 +1805,40 @@
           <div style="border-top: 1px solid var(--bg-card-border); padding-top: 1.25rem; margin-top: 0.5rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
               <div>
-                <h4 style="font-size: 0.95rem; color: #a78bfa; margin: 0 0 4px 0;">👥 Saved Parties Directory (Sellers & Buyers)</h4>
-                <span style="font-size: 0.75rem; color: var(--text-dim);">Parties saved using "Save for later" in Studio v2 or manually stored here. Easily reusable in forms.</span>
+                <h4 style="font-size: 0.95rem; color: #a78bfa; margin: 0 0 4px 0;">👥 Saved Parties Directory (Sellers &
+                  Buyers)</h4>
+                <span style="font-size: 0.75rem; color: var(--text-dim);">Parties saved using "Save for later" in Studio
+                  v2 or manually stored here. Easily reusable in forms.</span>
               </div>
             </div>
 
             <!-- Tabbed or 2-column view of saved sellers and buyers -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <!-- Saved Sellers Column -->
-              <div style="background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px; padding: 0.85rem;">
+              <div
+                style="background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px; padding: 0.85rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                  <strong style="font-size: 0.82rem; color: #60a5fa;">🏢 Saved Sellers (<span id="cfgSavedSellersCount">0</span>)</strong>
+                  <strong style="font-size: 0.82rem; color: #60a5fa;">🏢 Saved Sellers (<span
+                      id="cfgSavedSellersCount">0</span>)</strong>
                 </div>
-                <div id="cfgSavedSellersList" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
-                  <div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No saved sellers yet. Click "Save for later" on the Seller card in Studio v2.</div>
+                <div id="cfgSavedSellersList"
+                  style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
+                  <div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No saved sellers yet.
+                    Click "Save for later" on the Seller card in Studio v2.</div>
                 </div>
               </div>
 
               <!-- Saved Buyers Column -->
-              <div style="background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px; padding: 0.85rem;">
+              <div
+                style="background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px; padding: 0.85rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                  <strong style="font-size: 0.82rem; color: #34d399;">👤 Saved Buyers (<span id="cfgSavedBuyersCount">0</span>)</strong>
+                  <strong style="font-size: 0.82rem; color: #34d399;">👤 Saved Buyers (<span
+                      id="cfgSavedBuyersCount">0</span>)</strong>
                 </div>
-                <div id="cfgSavedBuyersList" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
-                  <div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No saved buyers yet. Click "Save for later" on the Buyer card in Studio v2.</div>
+                <div id="cfgSavedBuyersList"
+                  style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
+                  <div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No saved buyers yet.
+                    Click "Save for later" on the Buyer card in Studio v2.</div>
                 </div>
               </div>
             </div>
@@ -1621,82 +1854,120 @@
   </div>
 
   <!-- Edit Saved Party Modal -->
-  <div id="editPartyModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78); backdrop-filter: blur(5px); z-index: 9999; align-items: center; justify-content: center; padding: 1.5rem;">
-    <div style="background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 12px; width: 100%; max-width: 580px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); overflow: hidden; display: flex; flex-direction: column;">
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--bg-card-border); background: var(--bg-secondary);">
+  <div id="editPartyModal"
+    style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78); backdrop-filter: blur(5px); z-index: 9999; align-items: center; justify-content: center; padding: 1.5rem;">
+    <div
+      style="background: var(--bg-card); border: 1px solid var(--bg-card-border); border-radius: 12px; width: 100%; max-width: 580px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); overflow: hidden; display: flex; flex-direction: column;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--bg-card-border); background: var(--bg-secondary);">
         <div style="display: flex; align-items: center; gap: 0.5rem;">
           <span style="font-size: 1.1rem;">✏️</span>
-          <h4 id="editPartyModalTitle" style="margin: 0; font-size: 0.95rem; color: var(--text-main);">Edit Saved Party</h4>
+          <h4 id="editPartyModalTitle" style="margin: 0; font-size: 0.95rem; color: var(--text-main);">Edit Saved Party
+          </h4>
         </div>
-        <button type="button" class="btn btn-secondary" onclick="closeEditPartyModal()" style="padding: 0.25rem 0.6rem; font-size: 0.8rem;">✕</button>
+        <button type="button" class="btn btn-secondary" onclick="closeEditPartyModal()"
+          style="padding: 0.25rem 0.6rem; font-size: 0.8rem;">✕</button>
       </div>
 
-      <div style="padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; max-height: 75vh; overflow-y: auto;">
+      <div
+        style="padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; max-height: 75vh; overflow-y: auto;">
         <div class="form-group">
-          <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">Company / Party Legal Name *</label>
-          <input type="text" id="editPartyName" placeholder="e.g. odelo GmbH" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+          <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">Company / Party Legal Name
+            *</label>
+          <input type="text" id="editPartyName" placeholder="e.g. odelo GmbH"
+            style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
         </div>
 
         <div class="form-row">
           <div class="form-group">
             <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">VAT ID / Tax Number</label>
-            <input type="text" id="editPartyVat" placeholder="e.g. DE123456789 or SI12345678" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+            <input type="text" id="editPartyVat" placeholder="e.g. DE123456789 or SI12345678"
+              style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
           </div>
           <div class="form-group">
             <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">Country Code</label>
-            <input type="text" id="editPartyCountry" placeholder="e.g. DE, SI, AT" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+            <input type="text" id="editPartyCountry" placeholder="e.g. DE, SI, AT"
+              style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
           </div>
         </div>
 
         <div class="form-group">
           <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">Street Address</label>
-          <input type="text" id="editPartyStreet" placeholder="e.g. Petuelring 130" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+          <input type="text" id="editPartyStreet" placeholder="e.g. Petuelring 130"
+            style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
         </div>
 
         <div class="form-group" id="editPartyBuyerRefWrapper">
-          <label style="font-size: 0.78rem; font-weight: 700; color: #a78bfa;">Default Buyer Reference / Routing (BT-10)</label>
-          <input type="text" id="editPartyBuyerRef" placeholder="e.g. 04011000-12345-67 or Dept / Order code" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
-          <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; display: block;">Auto-populates BT-10 when extracting invoices for this customer if omitted in OCR.</span>
+          <label style="font-size: 0.78rem; font-weight: 700; color: #a78bfa;">Default Buyer Reference / Routing
+            (BT-10)</label>
+          <input type="text" id="editPartyBuyerRef" placeholder="e.g. 04011000-12345-67 or Dept / Order code"
+            style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+          <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; display: block;">Auto-populates
+            BT-10 when extracting invoices for this customer if omitted in OCR.</span>
+        </div>
+
+        <div class="form-group" id="editPartySupplierCodeWrapper">
+          <label style="font-size: 0.78rem; font-weight: 700; color: #34d399;">Our Supplier Code at Buyer
+            (BT-29)</label>
+          <input type="text" id="editPartySupplierCode" placeholder="e.g. 104825 or SUP-01"
+            style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+          <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; display: block;">Auto-fills Seller
+            Supplier Code (BT-29) on the invoice mask when this buyer is selected or recognized.</span>
         </div>
 
         <div class="form-row">
           <div class="form-group">
             <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">City</label>
-            <input type="text" id="editPartyCity" placeholder="e.g. Berlin" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+            <input type="text" id="editPartyCity" placeholder="e.g. Berlin"
+              style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
           </div>
           <div class="form-group">
             <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">Postcode</label>
-            <input type="text" id="editPartyPostcode" placeholder="e.g. 10115" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+            <input type="text" id="editPartyPostcode" placeholder="e.g. 10115"
+              style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
           </div>
         </div>
 
         <!-- Extra Seller Specific fields (Bank / Contact) -->
-        <div id="editPartySellerExtra" style="display: none; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem; margin-top: 0.25rem;">
-          <div style="font-size: 0.75rem; font-weight: 700; color: #60a5fa; margin-bottom: 0.5rem;">Seller Payment & Contact Information</div>
+        <div id="editPartySellerExtra"
+          style="display: none; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem; margin-top: 0.25rem;">
+          <div style="font-size: 0.75rem; font-weight: 700; color: #60a5fa; margin-bottom: 0.5rem;">Seller Supplier Code
+            & Payment / Contact Information</div>
+          <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label style="font-size: 0.78rem; font-weight: 700; color: #60a5fa;">Supplier Code / Seller Identifier
+              (BT-29)</label>
+            <input type="text" id="editPartySellerIdentifier" placeholder="e.g. 104825 or SUP-01"
+              style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label style="font-size: 0.75rem; color: var(--text-muted);">IBAN</label>
-              <input type="text" id="editPartyIban" placeholder="DE..." style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
+              <input type="text" id="editPartyIban" placeholder="DE..."
+                style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
             </div>
             <div class="form-group">
               <label style="font-size: 0.75rem; color: var(--text-muted);">BIC / SWIFT</label>
-              <input type="text" id="editPartyBic" placeholder="COBA..." style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
+              <input type="text" id="editPartyBic" placeholder="COBA..."
+                style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
             </div>
           </div>
           <div class="form-row" style="margin-top: 0.4rem;">
             <div class="form-group">
               <label style="font-size: 0.75rem; color: var(--text-muted);">Contact Phone</label>
-              <input type="text" id="editPartyPhone" placeholder="+49..." style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
+              <input type="text" id="editPartyPhone" placeholder="+49..."
+                style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
             </div>
             <div class="form-group">
               <label style="font-size: 0.75rem; color: var(--text-muted);">Contact Email</label>
-              <input type="email" id="editPartyEmail" placeholder="billing@..." style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
+              <input type="email" id="editPartyEmail" placeholder="billing@..."
+                style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.82rem;">
             </div>
           </div>
         </div>
       </div>
 
-      <div style="display: flex; justify-content: flex-end; gap: 0.6rem; padding: 0.85rem 1.25rem; border-top: 1px solid var(--bg-card-border); background: var(--bg-secondary);">
+      <div
+        style="display: flex; justify-content: flex-end; gap: 0.6rem; padding: 0.85rem 1.25rem; border-top: 1px solid var(--bg-card-border); background: var(--bg-secondary);">
         <button type="button" class="btn btn-secondary" onclick="closeEditPartyModal()">Cancel</button>
         <button type="button" class="btn btn-primary" onclick="saveEditedParty()">Save Changes</button>
       </div>
@@ -1704,10 +1975,10 @@
   </div>
 
   <script src="/static/countries_data.js?v=2"></script>
-  <script src="/static/app.js?v=44"></script>
+  <script src="/static/app.js?v=45"></script>
   <script src="/static/en16931_data.js?v=7"></script>
   <script src="/static/overview.js?v=7"></script>
-  <script src="/static/v2.js?v=34"></script>
+  <script src="/static/v2.js?v=35"></script>
 </body>
 
 </html>

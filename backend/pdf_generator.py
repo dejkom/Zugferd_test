@@ -126,6 +126,8 @@ def _generate_standard_layout(inv: InvoiceData, output_pdf_path: str, logo_path:
         meta_lines.append(f"<b>Buyer Ref / Leitweg-ID:</b> {inv.buyer_reference}")
     if inv.purchase_order_number:
         meta_lines.append(f"<b>Purchase Order (PO):</b> {inv.purchase_order_number}")
+    if getattr(inv.seller, "seller_identifier", None):
+        meta_lines.append(f"<b>Supplier Code (BT-29):</b> {inv.seller.seller_identifier}")
     if inv.service_period_start or inv.service_period_end:
         start_p = inv.service_period_start or ""
         end_p = inv.service_period_end or ""
@@ -475,6 +477,8 @@ def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: st
         extra_meta_lines.append(f"<b>Your VAT Number:</b> {inv.buyer.vat_id}")
     if inv.purchase_order_number:
         extra_meta_lines.append(f"<b>PO / Bestellt:</b> {inv.purchase_order_number}")
+    if getattr(inv.seller, "seller_identifier", None):
+        extra_meta_lines.append(f"<b>Lieferanten-Nr. (BT-29):</b> {inv.seller.seller_identifier}")
     if inv.buyer_reference:
         extra_meta_lines.append(f"<b>Ihre Ref / Leitweg:</b> {inv.buyer_reference}")
     if inv.preceding_invoice_number:

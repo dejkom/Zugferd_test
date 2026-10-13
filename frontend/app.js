@@ -687,6 +687,12 @@ const DEFAULT_SYNONYMS_FALLBACK = {
     de: ["Lieferschein-Nr.", "Lieferscheinnummer", "LS-Nr."],
     sl: ["Številka dobavnice", "Dobavnica št.", "Dobavnica", "Št. dobavnice"]
   },
+  "BT-29": {
+    bt: "BT-29", field: "seller_identifier", name: "Seller identifier / Supplier code",
+    en: ["Supplier Code", "Seller ID", "Vendor #", "Vendor Number", "Supplier No."],
+    de: ["Lieferantennummer", "Lieferanten-Nr.", "Lieferanten-Nummer", "Lieferanten ID"],
+    sl: ["Koda dobavitelja", "Šifra dobavitelja", "Številka dobavitelja", "Dobavitelj št."]
+  },
   "BT-44": {
     bt: "BT-44", field: "buyer_name", name: "Buyer name",
     en: ["Buyer", "Customer", "Bill To", "Sold To"],
@@ -1161,10 +1167,11 @@ async function renderSavedPartiesConfig() {
         const partyId = s.id || `seller_${idx}`;
         const row = document.createElement("div");
         row.className = "v2-saved-party-row";
+        const suppBadge = s.seller_identifier ? ` &bull; <span style="color: #60a5fa;">ID: ${escapeHtml(s.seller_identifier)}</span>` : "";
         row.innerHTML = `
           <div style="flex: 1; min-width: 0;">
             <div style="font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">${escapeHtml(s.name)}</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(s.city || "")} &bull; ${escapeHtml(s.vat_id || "No VAT")}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(s.city || "")} &bull; ${escapeHtml(s.vat_id || "No VAT")}${suppBadge}</div>
           </div>
           <div style="display: flex; gap: 0.35rem; align-items: center;">
             <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 0.72rem;" onclick="openEditPartyModal('seller', '${partyId}')" title="Edit seller details">✏️</button>
@@ -1186,10 +1193,11 @@ async function renderSavedPartiesConfig() {
         const partyId = b.id || `buyer_${idx}`;
         const row = document.createElement("div");
         row.className = "v2-saved-party-row";
+        const suppBadge = b.our_supplier_code ? ` &bull; <span style="color: #34d399;">BT-29: ${escapeHtml(b.our_supplier_code)}</span>` : "";
         row.innerHTML = `
           <div style="flex: 1; min-width: 0;">
             <div style="font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">${escapeHtml(b.name)}</div>
-            <div style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(b.city || "")} &bull; ${escapeHtml(b.vat_id || "No VAT")}</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(b.city || "")} &bull; ${escapeHtml(b.vat_id || "No VAT")}${suppBadge}</div>
           </div>
           <div style="display: flex; gap: 0.35rem; align-items: center;">
             <button type="button" class="btn btn-secondary" style="padding: 2px 7px; font-size: 0.72rem;" onclick="openEditPartyModal('buyer', '${partyId}')" title="Edit buyer details">✏️</button>
@@ -1236,10 +1244,16 @@ function openEditPartyModal(type, id) {
   setVal("editPartyPostcode", party.postcode);
   setVal("editPartyCountry", party.country_code || "DE");
   setVal("editPartyBuyerRef", party.buyer_reference || "");
+  setVal("editPartySupplierCode", party.our_supplier_code || "");
 
   const buyerRefWrapper = document.getElementById("editPartyBuyerRefWrapper");
   if (buyerRefWrapper) {
     buyerRefWrapper.style.display = type === "buyer" ? "block" : "none";
+  }
+
+  const supplierCodeWrapper = document.getElementById("editPartySupplierCodeWrapper");
+  if (supplierCodeWrapper) {
+    supplierCodeWrapper.style.display = type === "buyer" ? "block" : "none";
   }
 
   const extraSellerFields = document.getElementById("editPartySellerExtra");
@@ -1247,6 +1261,7 @@ function openEditPartyModal(type, id) {
     extraSellerFields.style.display = type === "seller" ? "block" : "none";
   }
   if (type === "seller") {
+    setVal("editPartySellerIdentifier", party.seller_identifier || "");
     setVal("editPartyPhone", party.phone);
     setVal("editPartyEmail", party.email);
     setVal("editPartyIban", party.iban);
@@ -1293,7 +1308,9 @@ async function saveEditedParty() {
 
   if (type === "buyer") {
     updatedData.buyer_reference = document.getElementById("editPartyBuyerRef")?.value.trim() || "";
+    updatedData.our_supplier_code = document.getElementById("editPartySupplierCode")?.value.trim() || "";
   } else if (type === "seller") {
+    updatedData.seller_identifier = document.getElementById("editPartySellerIdentifier")?.value.trim() || "";
     updatedData.phone = document.getElementById("editPartyPhone")?.value.trim() || "";
     updatedData.email = document.getElementById("editPartyEmail")?.value.trim() || "";
     updatedData.iban = document.getElementById("editPartyIban")?.value.trim() || "";
@@ -3170,6 +3187,7 @@ const XML_FIELD_MAP = {
   "v2PayTerms": ["<ram:SpecifiedTradePaymentTerms>", "<ram:Description>", "<cac:PaymentTerms>"],
   "v2ExemptionReason": ["<ram:ExemptionReason>", "<cbc:TaxExemptionReason>"],
   "v2SellerName": ["<ram:SellerTradeParty>", "<ram:Name>", "<cac:AccountingSupplierParty>", "<cbc:RegistrationName>"],
+  "v2SellerIdentifier": ["<ram:SellerTradeParty>", "<ram:ID>", "<cac:AccountingSupplierParty>", "<cac:PartyIdentification>", "<cbc:ID>"],
   "v2SellerVat": ["<ram:SellerTradeParty>", "schemeID=\"VA\">", "<cac:AccountingSupplierParty>", "<cbc:CompanyID>"],
   "v2SellerStreet": ["<ram:SellerTradeParty>", "<ram:LineOne>", "<cac:AccountingSupplierParty>", "<cbc:StreetName>"],
   "v2SellerPostcode": ["<ram:SellerTradeParty>", "<ram:PostcodeCode>", "<cac:AccountingSupplierParty>", "<cbc:PostalZone>"],
@@ -3188,12 +3206,26 @@ const XML_FIELD_MAP = {
   "v2BuyerPhone": ["<ram:BuyerTradeParty>", "<ram:CompleteNumber>", "<cac:AccountingCustomerParty>", "<cbc:Telephone>"],
   "v2BuyerEmail": ["<ram:BuyerTradeParty>", "<ram:URIID>", "<cac:AccountingCustomerParty>", "<cbc:ElectronicMail>"],
   "v2DelivName": ["<ram:ShipToTradeParty>", "<ram:Name>", "<cac:DeliveryParty>", "<cbc:Name>"],
+  "v2DelivLocationId": ["<ram:ShipToTradeParty>", "<ram:ID>", "<cac:DeliveryLocation>", "<cbc:ID>"],
+  "v2DelivDespatchRef": ["<ram:DespatchAdviceReferencedDocument>", "<ram:IssuerAssignedID>", "<cac:DespatchDocumentReference>", "<cbc:ID>"],
   "v2DelivDate": ["<ram:ActualDeliverySupplyChainEvent>", "<ram:OccurrenceDateTime>", "<cbc:ActualDeliveryDate>"],
   "v2DelivStreet": ["<ram:ShipToTradeParty>", "<ram:LineOne>", "<cac:DeliveryParty>", "<cbc:StreetName>"],
   "v2DelivCity": ["<ram:ShipToTradeParty>", "<ram:CityName>", "<cac:DeliveryParty>", "<cbc:CityName>"],
   "v2DelivPostcode": ["<ram:ShipToTradeParty>", "<ram:PostcodeCode>", "<cac:DeliveryParty>", "<cbc:PostalZone>"],
   "v2PayIban": ["<ram:PayeePartyCreditorFinancialAccount>", "<ram:IBANID>", "<cac:PayeeFinancialAccount>", "<cbc:ID>"],
-  "v2PayBic": ["<ram:PayeeSpecifiedCreditorFinancialInstitution>", "<ram:BICID>"]
+  "v2PayBic": ["<ram:PayeeSpecifiedCreditorFinancialInstitution>", "<ram:BICID>"],
+  "v2SalesOrder": ["<ram:SalesOrderReferencedDocument>", "<ram:IssuerAssignedID>", "<cac:OrderReference>", "<cbc:SalesOrderID>"],
+  "v2ContractRef": ["<ram:ContractReferencedDocument>", "<ram:IssuerAssignedID>", "<cac:ContractDocumentReference>", "<cbc:ID>"],
+  "v2CostCenter": ["<ram:ReceivableSpecifiedTradeAccountingAccount>", "<ram:ID>", "<cbc:AccountingCost>"],
+  "v2FactoringName": ["<ram:PayeeTradeParty>", "<ram:Name>", "<cac:PayeeParty>", "<cac:PartyName>", "<cbc:Name>"],
+  "v2FactoringId": ["<ram:PayeeTradeParty>", "<ram:ID>", "<cac:PayeeParty>", "<cac:PartyIdentification>", "<cbc:ID>"],
+  "v2FactoringVat": ["<ram:PayeeTradeParty>", "<ram:SpecifiedTaxRegistration>", "<cac:PayeeParty>", "<cac:PartyTaxScheme>", "<cbc:CompanyID>"],
+  "v2SellerRegId": ["<ram:SellerTradeParty>", "<ram:SpecifiedLegalOrganization>", "<ram:ID>"],
+  "v2SellerEndpointId": ["<ram:SellerTradeParty>", "<ram:URIUniversalCommunication>", "<ram:URIID>", "<cbc:EndpointID>"],
+  "v2SellerLegalInfo": ["<ram:SellerTradeParty>", "<ram:Description>", "<cbc:CompanyLegalForm>"],
+  "v2BuyerSupplierCode": ["<ram:SellerTradeParty>", "<ram:ID>", "<cac:AccountingSupplierParty>", "<cac:PartyIdentification>", "<cbc:ID>"],
+  "v2BuyerEndpointId": ["<ram:BuyerTradeParty>", "<ram:URIUniversalCommunication>", "<ram:URIID>", "<cbc:EndpointID>"],
+  "v2ExemptionReasonCode": ["<ram:ApplicableTradeTax>", "<ram:ExemptionReasonCode>", "<cbc:TaxExemptionReasonCode>"]
 };
 
 // Highlighting execution function
@@ -3387,6 +3419,14 @@ const V2_BT_FIELD_MAP = {
     xml: ".../ram:SpecifiedTradeSettlementPaymentMeans/ram:TypeCode",
     req_xr: true, req_peppol: true, req_zugferd: false
   },
+  "v2PayReference": {
+    bt: "BT-83",
+    name: "Payment reference / Remittance info",
+    name_de: "Verwendungszweck / Zahlungsreferenz",
+    desc: "Structured payment reference or remittance information (BT-83/BT-84).",
+    xml: ".../ram:SpecifiedTradePaymentTerms/ram:Description | .../ram:PaymentReference",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
   "v2PayIban": {
     bt: "BT-84",
     name: "Payment account identifier (IBAN)",
@@ -3476,6 +3516,14 @@ const V2_BT_FIELD_MAP = {
     desc: "The full legal and registered commercial trade name of the selling company.",
     xml: ".../ram:SellerTradeParty/ram:Name",
     req_xr: true, req_peppol: true, req_zugferd: true
+  },
+  "v2SellerIdentifier": {
+    bt: "BT-29",
+    name: "Seller identifier / Supplier code",
+    name_de: "Identifikator des Verkäufers / Lieferantennummer",
+    desc: "Supplier code or internal vendor identifier assigned by or identifying the seller.",
+    xml: ".../ram:SellerTradeParty/ram:ID | .../cac:PartyIdentification/cbc:ID",
+    req_xr: false, req_peppol: false, req_zugferd: false
   },
   "v2SellerVat": {
     bt: "BT-31",
@@ -3698,6 +3746,100 @@ const V2_BT_FIELD_MAP = {
     desc: "Legal justification text when VAT is 0% (e.g. Reverse Charge § 13b UStG, Intra-Community supply).",
     xml: ".../ram:ApplicableTradeTax/ram:ExemptionReason",
     req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2ExemptionReasonCode": {
+    bt: "BT-121",
+    name: "Tax exemption reason code",
+    name_de: "Code für den Grund der Steuerbefreiung",
+    desc: "CEF VATEX exemption code (e.g. VATEX-EU-AE, VATEX-EU-E, VATEX-EU-G, VATEX-EU-IC).",
+    xml: ".../ram:ApplicableTradeTax/ram:ExemptionReasonCode",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+
+  // Factoring / Payee (BG-10)
+  "v2FactoringName": {
+    bt: "BT-59",
+    name: "Payee name (Factoring)",
+    name_de: "Name des Zahlungsempfängers (Factoring)",
+    desc: "Name of the third-party factor or collection payee if different from the seller.",
+    xml: ".../ram:PayeeTradeParty/ram:Name | .../cac:PayeeParty/cac:PartyName/cbc:Name",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2FactoringId": {
+    bt: "BT-60",
+    name: "Payee identifier",
+    name_de: "Identifikator des Zahlungsempfängers",
+    desc: "Identification code of the payee or factoring institution.",
+    xml: ".../ram:PayeeTradeParty/ram:ID | .../cac:PayeeParty/cac:PartyIdentification/cbc:ID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2FactoringVat": {
+    bt: "BT-61",
+    name: "Payee VAT identifier",
+    name_de: "Umsatzsteuer-Identifikationsnummer des Zahlungsempfängers",
+    desc: "Value Added Tax ID of the factoring company.",
+    xml: ".../ram:PayeeTradeParty/ram:SpecifiedTaxRegistration | .../cac:PayeeParty/cac:PartyTaxScheme/cbc:CompanyID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+
+  // Advanced Document Details
+  "v2SalesOrder": {
+    bt: "BT-14",
+    name: "Sales order reference",
+    name_de: "Auftragsbestätigungsnummer / Verkaufsauftragsreferenz",
+    desc: "Seller-assigned sales order confirmation reference number.",
+    xml: ".../ram:SalesOrderReferencedDocument/ram:IssuerAssignedID | .../cac:OrderReference/cbc:SalesOrderID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2ContractRef": {
+    bt: "BT-12",
+    name: "Contract reference",
+    name_de: "Vertragsnummer",
+    desc: "Framework agreement or contract reference number.",
+    xml: ".../ram:ContractReferencedDocument/ram:IssuerAssignedID | .../cac:ContractDocumentReference/cbc:ID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2CostCenter": {
+    bt: "BT-19",
+    name: "Buyer accounting reference / Cost center",
+    name_de: "Käuferkonto-Referenz / Kostenstelle",
+    desc: "Cost center code or accounting reference specified by the buyer.",
+    xml: ".../ram:ReceivableSpecifiedTradeAccountingAccount/ram:ID | .../cbc:AccountingCost",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+
+  // Seller & Buyer Advanced Routing & Registrations
+  "v2SellerRegId": {
+    bt: "BT-30",
+    name: "Seller legal registration identifier (Commercial register)",
+    name_de: "Handelsregisternummer des Verkäufers",
+    desc: "Registration number in the commercial register (e.g. HRB 736903).",
+    xml: ".../ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2SellerEndpointId": {
+    bt: "BT-34",
+    name: "Seller electronic address (Peppol)",
+    name_de: "Elektronische Adresse des Verkäufers",
+    desc: "Peppol electronic address endpoint identifier.",
+    xml: ".../ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID | .../cac:AccountingSupplierParty/.../cbc:EndpointID",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2SellerLegalInfo": {
+    bt: "BT-33",
+    name: "Seller additional legal information",
+    name_de: "Zusätzliche rechtliche Angaben zum Verkäufer",
+    desc: "Court of registration, managing directors, registered capital (§ 35a GmbHG).",
+    xml: ".../ram:SellerTradeParty/ram:Description | .../cac:AccountingSupplierParty/.../cbc:CompanyLegalForm",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2BuyerEndpointId": {
+    bt: "BT-49",
+    name: "Buyer electronic address (Peppol)",
+    name_de: "Elektronische Adresse des Erwerbers",
+    desc: "Peppol electronic address endpoint identifier of the buyer.",
+    xml: ".../ram:BuyerTradeParty/ram:URIUniversalCommunication/ram:URIID | .../cac:AccountingCustomerParty/.../cbc:EndpointID",
+    req_xr: false, req_peppol: true, req_zugferd: false
   }
 };
 
@@ -3737,7 +3879,9 @@ window.handleV2FormatChange = handleV2FormatChange;
 function updateMandatoryAsterisks() {
   const formFields = document.querySelectorAll(".v2-field");
   formFields.forEach(fieldDiv => {
-    const input = fieldDiv.querySelector("input, select, textarea");
+    const controls = Array.from(fieldDiv.querySelectorAll("input, select, textarea"));
+    if (controls.length === 0) return;
+    const input = controls.find(c => c.id && (V2_BT_FIELD_MAP[c.id] || XML_FIELD_MAP[c.id])) || controls.find(c => c.id) || controls[0];
     if (!input || !input.id) return;
     const btInfo = V2_BT_FIELD_MAP[input.id];
     if (!btInfo) return;
@@ -3770,7 +3914,11 @@ window.updateMandatoryAsterisks = updateMandatoryAsterisks;
 function initXmlQuestionButtons() {
   const formFields = document.querySelectorAll(".v2-field");
   formFields.forEach(fieldDiv => {
-    const input = fieldDiv.querySelector("input, select, textarea");
+    // Find all potential inputs/selects/textareas in this field
+    const controls = Array.from(fieldDiv.querySelectorAll("input, select, textarea"));
+    if (controls.length === 0) return;
+    // Prefer control mapped in V2_BT_FIELD_MAP or XML_FIELD_MAP, else fallback to first with ID
+    const input = controls.find(c => c.id && (V2_BT_FIELD_MAP[c.id] || XML_FIELD_MAP[c.id])) || controls.find(c => c.id) || controls[0];
     const label = fieldDiv.querySelector(".v2-label");
     if (!input || !label || !input.id) return;
 

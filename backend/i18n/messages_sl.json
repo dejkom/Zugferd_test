@@ -1,6 +1,7 @@
 {
   "vat_id": "ID za DDV",
-  "reg_no": "Matična št.",
+  "reg_no": "Davčna št.",
+  "tax_no": "Davčna št.",
   "court_reg": "Vpis v sodni register: Okrožno sodišče v Celju, št. vložka 1/09876/00",
   "doc_title_invoice": "RAČUN",
   "doc_title_credit": "DOBROPIS",
@@ -21,7 +22,9 @@
   "tel_label": "Telefon",
   "email_label": "E-pošta",
   "delivery_title": "Kraj dostave / Razklad",
+  "ref_buyer": "Referenca kupca",
   "ref_po": "Naročilnica (PO)",
+  "ref_supplier": "Koda dobavitelja",
   "ref_delivery": "Dobavnica",
   "ref_cost_center": "Stroškovno mesto",
   "ref_order": "Interno naročilo",

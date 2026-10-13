@@ -142,6 +142,7 @@ function populateV2SellerDefaults(force = false) {
   setVal("v2SellerName", settings.seller_name || "");
   setVal("v2SellerVat", settings.seller_vat || "");
   setVal("v2SellerTaxNumber", settings.seller_tax_number || "");
+  setVal("v2SellerIdentifier", settings.seller_identifier || "");
   setVal("v2SellerStreet", settings.seller_street || "");
   setVal("v2SellerCity", cityStr);
   setVal("v2SellerPostcode", postcodeStr);
@@ -358,41 +359,81 @@ function renderV2LineItems() {
           </button>
           <div id="v2ItemAdv_${idx}" style="display: none; margin-top: 0.5rem; background: var(--bg-input); padding: 0.65rem; border-radius: 6px; border: 1px dashed var(--bg-card-border); display: flex; flex-direction: column; gap: 0.5rem;">
             <div class="v2-field">
-              <label class="v2-label">Item Description / Technische Beschreibung (BT-154)</label>
+              <label class="v2-label">
+                <span class="v2-label-left">
+                  Item Description / Technische Beschreibung
+                  <span class="v2-bt-badge" data-bt="BT-154">BT-154</span>
+                </span>
+              </label>
               <textarea class="v2-input" rows="2" style="resize: vertical; font-size: 0.76rem;" placeholder="Secondary detailed technical specifications..." oninput="updateV2ItemField(${idx}, 'description', this.value)">${escapeHtml(item.description || '')}</textarea>
             </div>
             <div class="v2-grid-4">
               <div class="v2-field">
-                <label class="v2-label">Seller's Item ID / Artikelnr. (BT-155)</label>
+                <label class="v2-label">
+                  <span class="v2-label-left">
+                    Seller's Item ID / Artikelnr.
+                    <span class="v2-bt-badge" data-bt="BT-155">BT-155</span>
+                  </span>
+                </label>
                 <input type="text" class="v2-input" value="${escapeHtml(item.seller_item_id || '')}" placeholder="e.g. 930000006" oninput="updateV2ItemField(${idx}, 'seller_item_id', this.value)">
               </div>
               <div class="v2-field">
-                <label class="v2-label">Buyer's Part No. / Kunden-Artikelnr. (BT-156)</label>
+                <label class="v2-label">
+                  <span class="v2-label-left">
+                    Buyer's Part No. / Kunden-Artikelnr.
+                    <span class="v2-bt-badge" data-bt="BT-156">BT-156</span>
+                  </span>
+                </label>
                 <input type="text" class="v2-input" value="${escapeHtml(item.buyer_item_id || '')}" placeholder="e.g. ACK688 FATEV G45" oninput="updateV2ItemField(${idx}, 'buyer_item_id', this.value)">
               </div>
               <div class="v2-field">
-                <label class="v2-label">Standard ID / GTIN (BT-157)</label>
+                <label class="v2-label">
+                  <span class="v2-label-left">
+                    Standard ID / GTIN
+                    <span class="v2-bt-badge" data-bt="BT-157">BT-157</span>
+                  </span>
+                </label>
                 <div style="display: flex; gap: 0.25rem;">
                   <input type="text" style="width: 4rem;" class="v2-input" value="${escapeHtml(item.standard_item_id_scheme || '0160')}" title="Scheme ID (BT-157-1, default 0160 for GTIN)" placeholder="0160" oninput="updateV2ItemField(${idx}, 'standard_item_id_scheme', this.value)">
                   <input type="text" style="flex: 1;" class="v2-input" value="${escapeHtml(item.standard_item_id || '')}" placeholder="e.g. 4012345678901" oninput="updateV2ItemField(${idx}, 'standard_item_id', this.value)">
                 </div>
               </div>
               <div class="v2-field">
-                <label class="v2-label">PO Line Ref / Bestellposition (BT-132)</label>
+                <label class="v2-label">
+                  <span class="v2-label-left">
+                    PO Line Ref / Bestellposition
+                    <span class="v2-bt-badge" data-bt="BT-132">BT-132</span>
+                  </span>
+                </label>
                 <input type="text" class="v2-input" value="${escapeHtml(item.order_line_reference || '')}" placeholder="e.g. 1 or 2" oninput="updateV2ItemField(${idx}, 'order_line_reference', this.value)">
               </div>
             </div>
             <div class="v2-grid-3" style="margin-top: 0.25rem;">
               <div class="v2-field">
-                <label class="v2-label">Price Base Quantity (BT-149)</label>
+                <label class="v2-label">
+                  <span class="v2-label-left">
+                    Price Base Quantity
+                    <span class="v2-bt-badge" data-bt="BT-149">BT-149</span>
+                  </span>
+                </label>
                 <input type="number" step="1" min="0.0001" class="v2-input" value="${item.price_base_quantity || 1}" placeholder="e.g. 100 for €150/100pcs" oninput="updateV2ItemField(${idx}, 'price_base_quantity', parseFloat(this.value)||1)">
               </div>
               <div class="v2-field">
-                <label class="v2-label">Price Base Unit (BT-150)</label>
+                <label class="v2-label">
+                  <span class="v2-label-left">
+                    Price Base Unit
+                    <span class="v2-bt-badge" data-bt="BT-150">BT-150</span>
+                  </span>
+                </label>
                 <input type="text" class="v2-input" value="${escapeHtml(item.price_base_unit || item.unit_code || 'C62')}" placeholder="C62" oninput="updateV2ItemField(${idx}, 'price_base_unit', this.value)">
               </div>
               <div class="v2-field">
-                <label class="v2-label">Item Serial / Lot (BT-128)</label>
+                <label class="v2-label">
+                  <span class="v2-label-left">
+                    Item Serial / Lot
+                    <span class="v2-bt-badge" data-bt="BT-128">BT-128</span>
+                  </span>
+                </label>
                 <input type="text" class="v2-input" value="${escapeHtml(item.item_serial_number || '')}" placeholder="e.g. SN-883921" oninput="updateV2ItemField(${idx}, 'item_serial_number', this.value)">
               </div>
             </div>
@@ -902,7 +943,7 @@ function renderV2DocumentDiscounts() {
     if (isCharge) {
       card.style.borderColor = "rgba(16, 185, 129, 0.35)";
     }
-    const badgeLabel = isCharge ? `📈 Charge #${idx + 1} (Zuschlag / BT-99)` : `🏷️ Discount #${idx + 1} (Nachlass / BT-92)`;
+    const badgeLabel = isCharge ? `📈 Charge #${idx + 1} (Zuschlag)` : `🏷️ Discount #${idx + 1} (Nachlass)`;
     const reasonBt = isCharge ? "BT-104" : "BT-97";
     const reasonTitle = isCharge ? "BT-104: Grund für den Zuschlag (Document level charge reason)" : "BT-97: Grund für den Nachlass (Document level allowance reason)";
     const pctBt = isCharge ? "BT-101" : "BT-94";
@@ -934,13 +975,15 @@ function renderV2DocumentDiscounts() {
       <div class="v2-discount-topbar">
         <div class="v2-discount-title" style="display: flex; align-items: center; gap: 0.5rem;">
           <span style="${isCharge ? 'color: #10b981; font-weight: 600;' : ''}">${badgeLabel}</span>
+          <span class="v2-bt-badge" data-bt="${amtBt}">${amtBt}</span>
           <select class="v2-select" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.75rem;" onchange="updateV2DiscountField(${idx}, 'charge_indicator', this.value === 'charge')">
             <option value="allowance" ${!isCharge ? 'selected' : ''}>Allowance / Discount (-)</option>
             <option value="charge" ${isCharge ? 'selected' : ''}>Charge / Surcharge (+)</option>
           </select>
         </div>
-        <div style="font-size: 0.72rem; color: var(--text-muted);">
-          Base (${baseAmtBt}): €${docBaseAmt.toFixed(2)}
+        <div style="font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+          <span>Base: €${docBaseAmt.toFixed(2)}</span>
+          <span class="v2-bt-badge" data-bt="${baseAmtBt}">${baseAmtBt}</span>
         </div>
         <button type="button" class="v2-item-trash" onclick="removeV2DocumentDiscount(${idx})" title="Remove">🗑️</button>
       </div>
@@ -957,7 +1000,9 @@ function renderV2DocumentDiscounts() {
         <div class="v2-field">
           <label class="v2-label">
             <span class="v2-label-left">
-              ${isCharge ? 'Tax Category / Steuersatz (BT-102/103)' : 'Tax Category / Steuersatz (BT-95/96)'} <span class="v2-req-star">*</span>
+              Tax Category / Steuersatz <span class="v2-req-star">*</span>
+              <span class="v2-bt-badge" data-bt="${catBt}">${catBt}</span>
+              <span class="v2-bt-badge" data-bt="${rateBt}">${rateBt}</span>
             </span>
           </label>
           <select class="v2-select" onchange="handleV2DiscountTaxCategoryChange(${idx}, this.value)">
@@ -1429,6 +1474,7 @@ async function saveV2Party(type) {
   }
 
   if (isSeller) {
+    partyData.seller_identifier = document.getElementById("v2SellerIdentifier")?.value.trim() || "";
     partyData.phone = document.getElementById("v2SellerPhone")?.value.trim() || "";
     partyData.email = document.getElementById("v2SellerEmail")?.value.trim() || "";
     partyData.tax_number = document.getElementById("v2SellerTaxNumber")?.value.trim() || "";
@@ -1446,9 +1492,12 @@ async function saveV2Party(type) {
   const existingIdx = settings.saved_parties[listKey].findIndex(p => p.name.toLowerCase() === name.toLowerCase());
   if (existingIdx >= 0) {
     partyData.id = settings.saved_parties[listKey][existingIdx].id;
-    // Preserve existing buyer_reference if current input was blank
+    // Preserve existing buyer_reference & our_supplier_code if current input was blank
     if (!partyData.buyer_reference && settings.saved_parties[listKey][existingIdx].buyer_reference) {
       partyData.buyer_reference = settings.saved_parties[listKey][existingIdx].buyer_reference;
+    }
+    if (settings.saved_parties[listKey][existingIdx].our_supplier_code) {
+      partyData.our_supplier_code = settings.saved_parties[listKey][existingIdx].our_supplier_code;
     }
     settings.saved_parties[listKey][existingIdx] = partyData;
   } else {
@@ -1497,11 +1546,21 @@ function selectV2SavedParty(type, partyId) {
   setVal(isSeller ? "v2SellerCity" : "v2BuyerCity", party.city);
   setVal(isSeller ? "v2SellerPostcode" : "v2BuyerPostcode", party.postcode);
   setVal(isSeller ? "v2SellerCountry" : "v2BuyerCountry", party.country_code || "DE");
-  if (!isSeller && party.buyer_reference) {
-    setVal("v2BuyerRef", party.buyer_reference);
+  if (!isSeller) {
+    if (party.buyer_reference) {
+      setVal("v2BuyerRef", party.buyer_reference);
+    }
+    // Auto-fill workflow: If buyer profile contains our_supplier_code and #v2SellerIdentifier (BT-29) is empty, populate it
+    if (party.our_supplier_code) {
+      const sellerIdEl = document.getElementById("v2SellerIdentifier");
+      if (sellerIdEl && !sellerIdEl.value.trim()) {
+        sellerIdEl.value = party.our_supplier_code;
+      }
+    }
   }
 
   if (isSeller) {
+    if (party.seller_identifier) setVal("v2SellerIdentifier", party.seller_identifier);
     if (party.phone) setVal("v2SellerPhone", party.phone);
     if (party.email) setVal("v2SellerEmail", party.email);
     if (party.tax_number) setVal("v2SellerTaxNumber", party.tax_number);
@@ -1599,6 +1658,8 @@ async function handleV2PrefillUpload(file) {
     document.getElementById("v2SellerName").value = seller.name || cfg.seller_name || "";
     document.getElementById("v2SellerVat").value = seller.vat_id || cfg.seller_vat || "";
     document.getElementById("v2SellerTaxNumber").value = seller.tax_number || seller.tax_registration_id || cfg.seller_tax_number || "";
+    const sellerIdentEl = document.getElementById("v2SellerIdentifier");
+    if (sellerIdentEl) sellerIdentEl.value = seller.seller_identifier || cfg.seller_identifier || "";
     document.getElementById("v2SellerStreet").value = seller.street || cfg.seller_street || "";
     document.getElementById("v2SellerCity").value = seller.city || cfg.seller_city || "";
     document.getElementById("v2SellerPostcode").value = seller.postcode || cfg.seller_postcode || "";
@@ -1701,6 +1762,21 @@ async function handleV2PrefillUpload(file) {
         buyerRefEl.value = inv.buyer_reference;
       } else if (!buyerRefEl.value.trim() && matchedBuyer?.buyer_reference) {
         buyerRefEl.value = matchedBuyer.buyer_reference;
+      }
+    }
+
+    // Auto-populate Our Supplier Code at Buyer (BT-29) from matched buyer
+    const buyerSuppCodeVal = (inv.buyer?.our_supplier_code || "").trim() || (matchedBuyer?.our_supplier_code || "");
+    const buyerSuppCodeEl = document.getElementById("v2BuyerSupplierCode");
+    if (buyerSuppCodeEl && buyerSuppCodeVal) {
+      buyerSuppCodeEl.value = buyerSuppCodeVal;
+    }
+
+    // Auto-fill workflow: If buyer profile has our_supplier_code and invoice mask's #v2SellerIdentifier (BT-29) is empty, auto-populate it
+    if (matchedBuyer?.our_supplier_code) {
+      const sellerIdEl = document.getElementById("v2SellerIdentifier");
+      if (sellerIdEl && !sellerIdEl.value.trim()) {
+        sellerIdEl.value = matchedBuyer.our_supplier_code;
       }
     }
 
@@ -2028,6 +2104,7 @@ function harvestV2InvoiceData() {
       vat_id: document.getElementById("v2SellerVat")?.value.trim() || "",
       tax_number: document.getElementById("v2SellerTaxNumber")?.value.trim() || "",
       tax_registration_id: document.getElementById("v2SellerTaxNumber")?.value.trim() || "",
+      seller_identifier: document.getElementById("v2SellerIdentifier")?.value.trim() || null,
       street: document.getElementById("v2SellerStreet")?.value.trim() || "",
       city: document.getElementById("v2SellerCity")?.value.trim() || "",
       postcode: document.getElementById("v2SellerPostcode")?.value.trim() || "",
@@ -2047,7 +2124,8 @@ function harvestV2InvoiceData() {
       country_code: document.getElementById("v2BuyerCountry")?.value || "DE",
       contact_name: document.getElementById("v2BuyerContactName")?.value.trim() || null,
       contact_phone: document.getElementById("v2BuyerPhone")?.value.trim() || null,
-      contact_email: document.getElementById("v2BuyerEmail")?.value.trim() || null
+      contact_email: document.getElementById("v2BuyerEmail")?.value.trim() || null,
+      our_supplier_code: document.getElementById("v2BuyerSupplierCode")?.value.trim() || null
     },
     delivery: {
       recipient_name: document.getElementById("v2DelivName")?.value.trim() || null,
@@ -2278,7 +2356,7 @@ function populateV2FromHistory(inv, layout, lang) {
   }
   const btTagsEl = document.getElementById("v2ShowBtTags");
   if (btTagsEl) {
-    btTagsEl.checked = Boolean(historyEntry?.show_bt_tags || inv?.show_bt_tags);
+    btTagsEl.checked = Boolean(inv?.show_bt_tags);
   }
 
   // Header Details
@@ -2308,6 +2386,7 @@ function populateV2FromHistory(inv, layout, lang) {
   setVal("v2SellerName", seller.name);
   setVal("v2SellerVat", seller.vat_id);
   setVal("v2SellerTaxNumber", seller.tax_number || seller.tax_registration_id);
+  setVal("v2SellerIdentifier", seller.seller_identifier);
   setVal("v2SellerStreet", seller.street);
   setVal("v2SellerCity", seller.city);
   setVal("v2SellerPostcode", seller.postcode);
@@ -2330,6 +2409,7 @@ function populateV2FromHistory(inv, layout, lang) {
   setVal("v2BuyerContactName", buyer.contact_name);
   setVal("v2BuyerPhone", buyer.contact_phone);
   setVal("v2BuyerEmail", buyer.contact_email);
+  setVal("v2BuyerSupplierCode", buyer.our_supplier_code);
   setVal("v2BuyerEndpointId", buyer.endpoint_id);
   setVal("v2BuyerEndpointScheme", buyer.endpoint_scheme || "0088");
   if (buyer.contact_name || buyer.contact_phone || buyer.contact_email) {

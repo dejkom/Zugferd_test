@@ -70,6 +70,8 @@ class TradeParty(BaseModel):
     name: str = Field(..., description="Company or individual legal name (BT-27 / BT-44)")
     trading_name: Optional[str] = Field(None, description="Trading name (BT-28 / BT-45)")
     company_id: Optional[str] = Field(None, description="Company identification number (BT-29 / BT-46)")
+    seller_identifier: Optional[str] = Field(None, description="Seller identifier / Supplier Code (BT-29)")
+    our_supplier_code: Optional[str] = Field(None, description="Our supplier code at buyer (BT-29)")
     company_legal_form: Optional[str] = Field(None, description="Company Registration / Commercial Register Number (BT-30)")
     legal_info: Optional[str] = Field(None, description="Additional Legal Information e.g. Court of Registration, Managing Directors / Geschäftsführer (BT-33)")
     endpoint_id: Optional[str] = Field(None, description="Electronic Address / Peppol Endpoint ID (BT-34 / BT-49)")

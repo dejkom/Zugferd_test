@@ -20,6 +20,7 @@ def run_tests():
         'cost_center': 'CC-PROD-401',
         'seller': {
             'name': 'Tech Solutions GmbH',
+            'seller_identifier': 'SUP-49201',
             'vat_id': 'DE123456789',
             'company_legal_form': 'HRB 736903',
             'legal_info': 'Amtsgericht Muenchen, GF: Max Mustermann',
@@ -210,6 +211,11 @@ def run_tests():
     assert 'DE89370400440532013000' in ibans and 'DE27200411440123456789' in ibans, f"CII IBANs mismatch: {ibans}"
     print(f"  [PASS] BG-17 (Multi-Bank Accounts in CII): {ibans}")
 
+    # 5.5. BT-29 (Seller identifier / Supplier Code)
+    seller_id_node = tree_cii_380.find('.//ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty/ram:ID', ns_cii)
+    assert seller_id_node is not None and seller_id_node.text == "SUP-49201", f"CII BT-29 mismatch: {seller_id_node}"
+    print("  [PASS] Seller Trade Party BT-29 (Seller ID / Supplier Code): SUP-49201")
+
     # 6. BG-3 (Preceding invoice for 381)
     prec_doc = tree_cii_381.find('.//ram:ApplicableHeaderTradeSettlement/ram:InvoiceReferencedDocument', ns_cii)
     assert prec_doc is not None, "CII 381: InvoiceReferencedDocument missing"
@@ -272,6 +278,11 @@ def run_tests():
     ubl_ibans = [pm.find('.//cac:PayeeFinancialAccount/cbc:ID', ns_ubl).text for pm in ubl_pm_nodes]
     assert 'DE89370400440532013000' in ubl_ibans and 'DE27200411440123456789' in ubl_ibans, f"UBL IBANs mismatch: {ubl_ibans}"
     print(f"  [PASS] BG-17 (Multiple cac:PaymentMeans entries): {ubl_ibans}")
+
+    # 4.5. BT-29 (PartyIdentification in UBL Supplier Party)
+    ubl_seller_id = tree_ubl_380.find('.//cac:AccountingSupplierParty/cac:Party/cac:PartyIdentification/cbc:ID', ns_ubl)
+    assert ubl_seller_id is not None and ubl_seller_id.text == "SUP-49201", f"UBL BT-29 mismatch: {ubl_seller_id}"
+    print("  [PASS] Supplier Party BT-29 (cac:PartyIdentification/cbc:ID): SUP-49201")
 
     # 5. Preceding invoice BT-25 for 381 in UBL
     ubl_prec = tree_ubl_381.find('.//cac:BillingReference/cac:InvoiceDocumentReference/cbc:ID', ns_ubl)

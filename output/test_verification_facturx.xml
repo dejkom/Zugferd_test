@@ -58,6 +58,7 @@
     <ram:ApplicableHeaderTradeAgreement>
       <ram:BuyerReference>EP53</ram:BuyerReference>
       <ram:SellerTradeParty>
+        <ram:ID>SUP-49201</ram:ID>
         <ram:Name>Tech Solutions GmbH</ram:Name>        <ram:SpecifiedLegalOrganization>
           <ram:ID schemeID="0002">HRB 736903</ram:ID>
           <ram:TradingBusinessName>Amtsgericht Muenchen, GF: Max Mustermann</ram:TradingBusinessName>

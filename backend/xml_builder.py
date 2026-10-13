@@ -589,6 +589,8 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     if total_charge_amt > 0:
         charge_total_xml = f"        <ram:ChargeTotalAmount>{total_charge_amt:.2f}</ram:ChargeTotalAmount>\n"
 
+    seller_id_xml = f"\n        <ram:ID>{escape(inv.seller.seller_identifier.strip())}</ram:ID>" if getattr(inv.seller, "seller_identifier", None) and inv.seller.seller_identifier.strip() else ""
+
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice xmlns:a="urn:un:unece:uncefact:data:standard:QualifiedDataType:100" xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:10" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
   <rsm:ExchangedDocumentContext>
@@ -606,7 +608,7 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
   <rsm:SupplyChainTradeTransaction>
 {line_items_xml}    <ram:ApplicableHeaderTradeAgreement>
       <ram:BuyerReference>{escape(buyer_ref)}</ram:BuyerReference>
-      <ram:SellerTradeParty>
+      <ram:SellerTradeParty>{seller_id_xml}
         <ram:Name>{escape(inv.seller.name)}</ram:Name>{seller_legal_org_xml}{seller_contact_xml}        <ram:PostalTradeAddress>
           <ram:PostcodeCode>{escape(s_postcode)}</ram:PostcodeCode>
           <ram:LineOne>{escape(inv.seller.street or "")}</ram:LineOne>

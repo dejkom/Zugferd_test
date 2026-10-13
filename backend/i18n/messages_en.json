@@ -1,6 +1,7 @@
 {
   "vat_id": "VAT ID",
-  "reg_no": "Company Reg. No.",
+  "reg_no": "Tax Number",
+  "tax_no": "Tax Number",
   "court_reg": "Commercial Register: District Court Celje, Entry 1/09876/00",
   "doc_title_invoice": "INVOICE",
   "doc_title_credit": "CREDIT NOTE",
@@ -21,7 +22,9 @@
   "tel_label": "Phone",
   "email_label": "Email",
   "delivery_title": "Delivery Location",
+  "ref_buyer": "Buyer Reference",
   "ref_po": "Purchase Order (PO)",
+  "ref_supplier": "Supplier Code",
   "ref_delivery": "Despatch Advice",
   "ref_cost_center": "Cost Center",
   "ref_order": "Sales Order",

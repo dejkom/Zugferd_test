@@ -163,6 +163,14 @@ def generate_ubl_xml(inv: InvoiceData, profile: str = "PEPPOL") -> str:
             scheme = "9957" if s_endpoint.startswith("FR") else ("9930" if s_endpoint.startswith("DE") else "9948")
         s_endpoint_xml = f"      <cbc:EndpointID schemeID=\"{escape(scheme)}\">{escape(s_endpoint)}</cbc:EndpointID>\n"
 
+    # Seller Party Identification / Supplier Code (BT-29)
+    s_party_id_xml = ""
+    s_ident = (getattr(inv.seller, "seller_identifier", None) or "").strip()
+    if s_ident:
+        s_party_id_xml = f"""      <cac:PartyIdentification>
+        <cbc:ID>{escape(s_ident)}</cbc:ID>
+      </cac:PartyIdentification>\n"""
+
     # Seller Legal Entity (BT-27, BT-30, BT-33)
     s_legal_id_attr = ""
     s_reg_id = (getattr(inv.seller, "company_legal_form", None) or inv.seller.company_id or inv.seller.court_registry or "").strip()
@@ -520,7 +528,7 @@ def generate_ubl_xml(inv: InvoiceData, profile: str = "PEPPOL") -> str:
   <cbc:BuyerReference>{buyer_ref}</cbc:BuyerReference>
 {accounting_cost_xml}{period_xml}{order_ref_xml}{contract_ref_xml}{sales_order_ref_xml}{billing_ref_xml}{despatch_xml}  <cac:AccountingSupplierParty>
     <cac:Party>
-{s_endpoint_xml}      <cac:PartyName>
+{s_endpoint_xml}{s_party_id_xml}      <cac:PartyName>
         <cbc:Name>{escape(inv.seller.name)}</cbc:Name>
       </cac:PartyName>
       <cac:PostalAddress>

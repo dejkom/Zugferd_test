@@ -44,7 +44,7 @@ Your goal is to parse raw text extracted from invoice PDFs into a clean, complet
 
 Instructions:
 1. Identify Invoice Number, Issue Date (format YYYY-MM-DD or DD.MM.YYYY), Due Date, and Currency (e.g. EUR).
-2. Identify Seller (Supplier) details: Name, Street, Postcode, City, Country Code (ISO alpha-2 e.g. DE, SI), VAT ID (e.g. DE814113634), Tax Registration Number (e.g. HRB number or local tax number), and Contact details.
+2. Identify Seller (Supplier) details: Name, Street, Postcode, City, Country Code (ISO alpha-2 e.g. DE, SI), VAT ID (e.g. DE814113634), Tax Registration Number (e.g. HRB number or local tax number), Contact details, and Seller identifier / Supplier Code (BT-29: map 'Supplier Code', 'Lieferantennummer', 'Lieferanten-Nr.', 'Koda dobavitelja', 'Šifra dobavitelja' to `seller.seller_identifier`).
 3. Identify Buyer (Customer) details: Name, Street, Postcode, City, Country Code (e.g. SI, DE), VAT ID (e.g. SI52093808), and Buyer Reference (if present).
 4. Identify Delivery & Logistics (BG-13): If present, extract destination name, street, postcode, city, country_code, delivery_date (BT-72), location_id (BT-71, e.g. unloading point / Abladestelle number like '960' from 'Abladestelle Nr. 960'), and despatch_advice_id (BT-16).
    STRICT RULE FOR BT-16: Only extract `despatch_advice_id` if an actual delivery note / packing slip number is explicitly present next to 'Lieferschein-Nr.'. If no document number appears after 'Lieferschein-Nr.', return null. NEVER extract words like 'Lieferdatum', 'Lieferschein', or 'Bestell-Nr.' as the reference number. If the field is blank or contains only colons/labels (e.g., service invoices where no delivery note exists), return null (None). NEVER extract label fragments such as '-Nr', 'Nr.', or colons.

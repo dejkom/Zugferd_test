@@ -194,12 +194,16 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
     if not effective_delivery_date and inv.delivery and inv.delivery.delivery_date:
         effective_delivery_date = inv.delivery.delivery_date
 
-    # References matrix (BT-10, BT-16, BT-19, BT-14, BT-11, BT-12)
+    # References matrix (BT-10, BT-13, BT-29, BT-12, BT-16, BT-19, BT-14, BT-11)
     references = []
     if inv.buyer_reference:
-        references.append({"tag": "BT-10", "label": t_func("ref_po", "Kupčeva ref."), "value": inv.buyer_reference})
+        references.append({"tag": "BT-10", "label": t_func("ref_buyer", "Referenca kupca"), "value": inv.buyer_reference})
     if inv.purchase_order_number:
         references.append({"tag": "BT-13", "label": t_func("ref_po", "Naročilnica (PO)"), "value": inv.purchase_order_number})
+    if getattr(inv.seller, "seller_identifier", None):
+        references.append({"tag": "BT-29", "label": t_func("ref_supplier", "Koda dobavitelja"), "value": inv.seller.seller_identifier})
+    if getattr(inv, "contract_reference", None):
+        references.append({"tag": "BT-12", "label": t_func("ref_contract", "Pogodba"), "value": inv.contract_reference})
     if inv.despatch_advice_reference:
         references.append({"tag": "BT-16", "label": t_func("ref_delivery", "Dobavnica"), "value": inv.despatch_advice_reference})
     if getattr(inv, "cost_center", None):
@@ -208,8 +212,6 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
         references.append({"tag": "BT-14", "label": t_func("ref_order", "Interno naročilo"), "value": inv.sales_order_number})
     if getattr(inv, "project_reference", None):
         references.append({"tag": "BT-11", "label": t_func("ref_project", "Projekt"), "value": inv.project_reference})
-    if getattr(inv, "contract_reference", None):
-        references.append({"tag": "BT-12", "label": t_func("ref_contract", "Pogodba"), "value": inv.contract_reference})
 
     # Factoring (BG-10)
     factoring = getattr(inv.payment, "factoring_payee", None)

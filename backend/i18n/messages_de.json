@@ -1,6 +1,7 @@
 {
   "vat_id": "USt-IdNr.",
-  "reg_no": "Reg.-Nr.",
+  "reg_no": "Steuernummer",
+  "tax_no": "Steuernummer",
   "court_reg": "Handelsregister: Bezirksgericht Celje, Einl. Nr. 1/09876/00",
   "doc_title_invoice": "RECHNUNG",
   "doc_title_credit": "GUTSCHRIFT",
@@ -21,7 +22,9 @@
   "tel_label": "Telefon",
   "email_label": "E-Mail",
   "delivery_title": "Lieferort / Empfangsstelle",
+  "ref_buyer": "Kundenreferenz",
   "ref_po": "Bestell-Nr. (PO)",
+  "ref_supplier": "Lieferanten-Nr.",
   "ref_delivery": "Lieferschein",
   "ref_cost_center": "Kostenstelle",
   "ref_order": "Auftrags-Nr.",
