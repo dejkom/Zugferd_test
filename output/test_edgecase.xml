@@ -18,11 +18,12 @@
         <ram:LineID>1</ram:LineID>
       </ram:AssociatedDocumentLineDocument>
       <ram:SpecifiedTradeProduct>
+        <ram:SellerAssignedID>SNZ-PRS-01</ram:SellerAssignedID>
         <ram:Name>Senzor tlaka CUAA-240 (Reklamirano vračilo)</ram:Name>
       </ram:SpecifiedTradeProduct>
       <ram:SpecifiedLineTradeAgreement>
         <ram:NetPriceProductTradePrice>
-          <ram:ChargeAmount>120.00</ram:ChargeAmount>
+          <ram:ChargeAmount>120.0000</ram:ChargeAmount>
         </ram:NetPriceProductTradePrice>
       </ram:SpecifiedLineTradeAgreement>
       <ram:SpecifiedLineTradeDelivery>
@@ -42,14 +43,12 @@
     <ram:ApplicableHeaderTradeAgreement>
       <ram:BuyerReference>DE9901844</ram:BuyerReference>
       <ram:SellerTradeParty>
-        <ram:Name>VZORČNO PODJETJE d.o.o.</ram:Name>
-        <ram:PostalTradeAddress>
+        <ram:Name>VZORČNO PODJETJE d.o.o.</ram:Name>        <ram:PostalTradeAddress>
           <ram:PostcodeCode>3312</ram:PostcodeCode>
           <ram:LineOne>Tehnološka cesta 12</ram:LineOne>
           <ram:CityName>Prebold</ram:CityName>
           <ram:CountryID>SI</ram:CountryID>
-        </ram:PostalTradeAddress>
-        <ram:SpecifiedTaxRegistration>
+        </ram:PostalTradeAddress>        <ram:SpecifiedTaxRegistration>
           <ram:ID schemeID="VA">SI12345678</ram:ID>
         </ram:SpecifiedTaxRegistration>
         <ram:SpecifiedTaxRegistration>
@@ -57,30 +56,28 @@
         </ram:SpecifiedTaxRegistration>
       </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
-        <ram:Name>DEUTSCHE INDUSTRIE AG</ram:Name>
-        <ram:PostalTradeAddress>
+        <ram:Name>DEUTSCHE INDUSTRIE AG</ram:Name>        <ram:PostalTradeAddress>
           <ram:PostcodeCode>70173</ram:PostcodeCode>
           <ram:LineOne>Industriestrasse 100</ram:LineOne>
           <ram:CityName>Stuttgart</ram:CityName>
           <ram:CountryID>DE</ram:CountryID>
-        </ram:PostalTradeAddress>
-        <ram:SpecifiedTaxRegistration>
+        </ram:PostalTradeAddress>        <ram:SpecifiedTaxRegistration>
           <ram:ID schemeID="VA">DE123456789</ram:ID>
         </ram:SpecifiedTaxRegistration>
       </ram:BuyerTradeParty>
       <ram:BuyerOrderReferencedDocument>
         <ram:IssuerAssignedID>PO-2026-8812</ram:IssuerAssignedID>
       </ram:BuyerOrderReferencedDocument>
-      <ram:InvoiceReferencedDocument>
-        <ram:IssuerAssignedID>2026-00481</ram:IssuerAssignedID>
-        <ram:FormattedIssueDateTime>
-          <qdt:DateTimeString format="102">20261012</qdt:DateTimeString>
-        </ram:FormattedIssueDateTime>
-      </ram:InvoiceReferencedDocument>
     </ram:ApplicableHeaderTradeAgreement>
 <ram:ApplicableHeaderTradeDelivery />
     <ram:ApplicableHeaderTradeSettlement>
       <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
+      <ram:PayeeTradeParty>
+        <ram:Name>PRVA FAKTORING d.o.o.</ram:Name>
+        <ram:SpecifiedTaxRegistration>
+          <ram:ID schemeID="VA">SI99887766</ram:ID>
+        </ram:SpecifiedTaxRegistration>
+        </ram:PayeeTradeParty>
       <ram:SpecifiedTradeSettlementPaymentMeans>
         <ram:TypeCode>58</ram:TypeCode>
         <ram:PayeePartyCreditorFinancialAccount>
@@ -113,6 +110,12 @@
         <ram:TotalPrepaidAmount>500.00</ram:TotalPrepaidAmount>
         <ram:DuePayableAmount>100.00</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+      <ram:InvoiceReferencedDocument>
+        <ram:IssuerAssignedID>2026-00481</ram:IssuerAssignedID>
+        <ram:FormattedIssueDateTime>
+          <qdt:DateTimeString format="102">20261012</qdt:DateTimeString>
+        </ram:FormattedIssueDateTime>
+      </ram:InvoiceReferencedDocument>
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>

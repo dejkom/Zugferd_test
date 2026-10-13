@@ -77,11 +77,57 @@ def _format_num(val, decimals: int = 2) -> str:
 def _format_price(val) -> str:
     try:
         f = float(val or 0.0)
-        # Up to 4 decimal places if needed, else 2
         decimals = 4 if abs(f * 100 - round(f * 100)) > 0.0001 else 2
         return _format_num(f, decimals)
     except (ValueError, TypeError):
         return "0,00"
+
+UNIT_LABELS = {
+    "C62": {"sl": "KOS", "en": "PCS", "de": "STK"},
+    "H87": {"sl": "KOS", "en": "PCS", "de": "STK"},
+    "PCE": {"sl": "KOS", "en": "PCS", "de": "STK"},
+    "NAR": {"sl": "KOS", "en": "PCS", "de": "STK"},
+    "HUR": {"sl": "URA", "en": "HRS", "de": "STD"},
+    "DAY": {"sl": "DAN", "en": "DAY", "de": "TAG"},
+    "WEE": {"sl": "TED", "en": "WK", "de": "WO"},
+    "MON": {"sl": "MES", "en": "MTH", "de": "MON"},
+    "ANN": {"sl": "LETO", "en": "YR", "de": "JAHR"},
+    "SEC": {"sl": "SEK", "en": "SEC", "de": "SEK"},
+    "MIN": {"sl": "MIN", "en": "MIN", "de": "MIN"},
+    "KGM": {"sl": "KG", "en": "KG", "de": "KG"},
+    "GRM": {"sl": "G", "en": "G", "de": "G"},
+    "DTN": {"sl": "DT", "en": "DT", "de": "DT"},
+    "TNE": {"sl": "T", "en": "T", "de": "T"},
+    "MTR": {"sl": "M", "en": "M", "de": "M"},
+    "CMT": {"sl": "CM", "en": "CM", "de": "CM"},
+    "MMT": {"sl": "MM", "en": "MM", "de": "MM"},
+    "KMT": {"sl": "KM", "en": "KM", "de": "KM"},
+    "MTK": {"sl": "M²", "en": "M²", "de": "M²"},
+    "MTQ": {"sl": "M³", "en": "M³", "de": "M³"},
+    "LTR": {"sl": "L", "en": "L", "de": "L"},
+    "MLT": {"sl": "ML", "en": "ML", "de": "ML"},
+    "KWT": {"sl": "KW", "en": "KW", "de": "KW"},
+    "KWH": {"sl": "KWH", "en": "KWH", "de": "KWH"},
+    "MWH": {"sl": "MWH", "en": "MWH", "de": "MWH"},
+    "SET": {"sl": "KOMP", "en": "SET", "de": "SET"},
+    "PR":  {"sl": "PAR", "en": "PAIR", "de": "PAAR"},
+    "BX":  {"sl": "ŠKTL", "en": "BOX", "de": "KART"},
+    "PK":  {"sl": "PAK", "en": "PKG", "de": "PAK"},
+    "XPK": {"sl": "PAK", "en": "PKG", "de": "PAK"},
+}
+
+def _format_unit(code: str, lang: str = "sl") -> str:
+    if not code:
+        return "PCS" if lang == "en" else ("STK" if lang == "de" else "KOS")
+    c = str(code).strip().upper()
+    lang = (lang or "sl").lower()
+    mapping = UNIT_LABELS.get(c)
+    if mapping:
+        if lang in ["multi", "multilingual"]:
+            # Trilingual or bilingual representation
+            return mapping.get("en", c)
+        return mapping.get(lang, mapping.get("en", c))
+    return code
 
 def get_chrome_executable() -> str:
     candidates = [
@@ -100,6 +146,7 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
     env.filters["format_date"] = _format_date
     env.filters["format_num"] = _format_num
     env.filters["format_price"] = _format_price
+    env.filters["format_unit"] = lambda val: _format_unit(val, lang=lang)
     
     t_func = get_i18n_translator(lang)
     template = env.get_template("en16931_complete.html")

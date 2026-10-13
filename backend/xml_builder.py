@@ -99,20 +99,84 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     </ram:IncludedNote>\n"""
 
 
-    # Line Items XML
+    # Line Items XML (BG-25)
     line_items_xml = ""
     for idx, item in enumerate(inv.items, start=1):
         line_num = item.line_id or str(idx)
+        
+        # SpecifiedTradeProduct (BT-153..BT-157)
+        desc_xml = f"\n        <ram:Description>{escape(item.description)}</ram:Description>" if item.description else ""
+        seller_id_xml = f"\n        <ram:SellerAssignedID>{escape(item.seller_item_id)}</ram:SellerAssignedID>" if item.seller_item_id else ""
+        buyer_id_xml = f"\n        <ram:BuyerAssignedID>{escape(item.buyer_item_id)}</ram:BuyerAssignedID>" if item.buyer_item_id else ""
+        std_id_xml = ""
+        if item.standard_item_id:
+            scheme = escape(item.standard_item_id_scheme or "0160")
+            std_id_xml = f'\n        <ram:GlobalID schemeID="{scheme}">{escape(item.standard_item_id)}</ram:GlobalID>'
+
+        # Net Price & Price Base (BT-146, BT-149, BT-150)
+        base_qty_attr = ""
+        if item.price_base_quantity and item.price_base_quantity != 1.0:
+            b_unit = escape(item.price_base_unit or item.unit_code)
+            base_qty_attr = f'\n          <ram:BasisQuantity unitCode="{b_unit}">{item.price_base_quantity:.4f}</ram:BasisQuantity>'
+
+        # Referenced Purchase Order Line (BT-132)
+        po_line_xml = ""
+        if item.order_line_reference:
+            po_line_xml = f"""\n        <ram:BuyerOrderReferencedDocument>
+          <ram:LineID>{escape(str(item.order_line_reference))}</ram:LineID>
+        </ram:BuyerOrderReferencedDocument>"""
+
+        # Line Allowances & Charges (BG-27 & BG-28)
+        line_allowance_charges_xml = ""
+        effective_allowances = getattr(item, "allowances_charges", [])
+        base_item_price_qty = (item.quantity * item.unit_price) / (item.price_base_quantity if (item.price_base_quantity and item.price_base_quantity > 0) else 1.0)
+        if not effective_allowances and (item.discount_amount and item.discount_amount > 0):
+            # Fallback to discount_amount if allowances_charges list not populated
+            pct_tag = ""
+            basis_tag = ""
+            if item.discount_percent:
+                pct_tag = f"\n          <ram:CalculationPercent>{item.discount_percent:.2f}</ram:CalculationPercent>"
+                basis_tag = f"\n          <ram:BasisAmount>{base_item_price_qty:.2f}</ram:BasisAmount>"
+            line_allowance_charges_xml += f"""\n        <ram:SpecifiedTradeAllowanceCharge>
+          <ram:ChargeIndicator>
+            <udt:Indicator>false</udt:Indicator>
+          </ram:ChargeIndicator>{pct_tag}{basis_tag}
+          <ram:ActualAmount>{item.discount_amount:.2f}</ram:ActualAmount>
+          <ram:Reason>Discount</ram:Reason>
+        </ram:SpecifiedTradeAllowanceCharge>"""
+        elif effective_allowances:
+            for ac in effective_allowances:
+                amt = float(ac.amount or 0.0)
+                if amt <= 0:
+                    continue
+                is_chg = bool(ac.charge_indicator)
+                chg_ind_str = "true" if is_chg else "false"
+                reason_str = escape(ac.reason or ("Charge" if is_chg else "Discount"))
+                pct_tag = ""
+                basis_tag = ""
+                ac_base = getattr(ac, "base_amount", None) or base_item_price_qty
+                if ac.percentage is not None:
+                    pct_tag = f"\n          <ram:CalculationPercent>{float(ac.percentage):.2f}</ram:CalculationPercent>"
+                    # BR-DEC-15: If BT-138/143 is present, BT-137/142 (BasisAmount) is mandatory
+                    basis_tag = f"\n          <ram:BasisAmount>{float(ac_base):.2f}</ram:BasisAmount>"
+                line_allowance_charges_xml += f"""\n        <ram:SpecifiedTradeAllowanceCharge>
+          <ram:ChargeIndicator>
+            <udt:Indicator>{chg_ind_str}</udt:Indicator>
+          </ram:ChargeIndicator>{pct_tag}{basis_tag}
+          <ram:ActualAmount>{amt:.2f}</ram:ActualAmount>
+          <ram:Reason>{reason_str}</ram:Reason>
+        </ram:SpecifiedTradeAllowanceCharge>"""
+
         line_items_xml += f"""    <ram:IncludedSupplyChainTradeLineItem>
       <ram:AssociatedDocumentLineDocument>
         <ram:LineID>{line_num}</ram:LineID>
       </ram:AssociatedDocumentLineDocument>
-      <ram:SpecifiedTradeProduct>
-        <ram:Name>{escape(item.name)}</ram:Name>
+      <ram:SpecifiedTradeProduct>{std_id_xml}{seller_id_xml}{buyer_id_xml}
+        <ram:Name>{escape(item.name)}</ram:Name>{desc_xml}
       </ram:SpecifiedTradeProduct>
-      <ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedLineTradeAgreement>{po_line_xml}
         <ram:NetPriceProductTradePrice>
-          <ram:ChargeAmount>{item.unit_price:.2f}</ram:ChargeAmount>
+          <ram:ChargeAmount>{item.unit_price:.4f}</ram:ChargeAmount>{base_qty_attr}
         </ram:NetPriceProductTradePrice>
       </ram:SpecifiedLineTradeAgreement>
       <ram:SpecifiedLineTradeDelivery>
@@ -123,64 +187,99 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
           <ram:TypeCode>VAT</ram:TypeCode>
           <ram:CategoryCode>{item.tax_category_code}</ram:CategoryCode>
           <ram:RateApplicablePercent>{item.tax_percent:.2f}</ram:RateApplicablePercent>
-        </ram:ApplicableTradeTax>
+        </ram:ApplicableTradeTax>{line_allowance_charges_xml}
         <ram:SpecifiedTradeSettlementLineMonetarySummation>
           <ram:LineTotalAmount>{item.line_total_amount:.2f}</ram:LineTotalAmount>
         </ram:SpecifiedTradeSettlementLineMonetarySummation>
       </ram:SpecifiedLineTradeSettlement>
     </ram:IncludedSupplyChainTradeLineItem>\n"""
 
-    # Tax breakdown XML
+    # Compute allowances and charges per tax category to satisfy BR-AE-08, BR-S-08 etc.
+    cat_adjustments = {}
+    total_allowance_amt = 0.0
+    total_charge_amt = 0.0
+    for disc in (inv.discounts or []):
+        amt = float(disc.amount or 0.0)
+        if amt <= 0:
+            continue
+        c_code = (getattr(disc, "tax_category_code", None) or "S").upper()
+        if c_code not in cat_adjustments:
+            cat_adjustments[c_code] = 0.0
+        if getattr(disc, "charge_indicator", False):
+            total_charge_amt += amt
+            cat_adjustments[c_code] += amt
+        else:
+            total_allowance_amt += amt
+            cat_adjustments[c_code] -= amt
+
+    # Tax breakdown XML (BG-23)
     tax_breakdown_xml = ""
     if not inv.tax_breakdown:
         # Default single breakdown from totals
         tax_category = "S" if inv.tax_total > 0 else "AE"
         tax_pct = round((inv.tax_total / inv.line_net_total * 100), 2) if inv.line_net_total > 0 and inv.tax_total > 0 else 0.0
+        cat_adj = cat_adjustments.get(tax_category, 0.0)
+        effective_basis = max(0.0, inv.line_net_total + cat_adj)
+
+        ex_reason_txt = escape(inv.vat_exemption_reason or "") if tax_category in ["E", "AE", "K", "G"] and inv.vat_exemption_reason else ""
+        ex_code_txt = escape(inv.vat_exemption_reason_code or "") if tax_category in ["E", "AE", "K", "G"] and inv.vat_exemption_reason_code else ""
+        ex_reason_xml = f"<ram:ExemptionReason>{ex_reason_txt}</ram:ExemptionReason>\n        " if ex_reason_txt else ""
+        ex_code_xml = f"\n        <ram:ExemptionReasonCode>{ex_code_txt}</ram:ExemptionReasonCode>" if ex_code_txt else ""
         tax_breakdown_xml = f"""      <ram:ApplicableTradeTax>
         <ram:CalculatedAmount>{inv.tax_total:.2f}</ram:CalculatedAmount>
         <ram:TypeCode>VAT</ram:TypeCode>
-        <ram:BasisAmount>{inv.line_net_total:.2f}</ram:BasisAmount>
-        <ram:CategoryCode>{tax_category}</ram:CategoryCode>
+        {ex_reason_xml}<ram:BasisAmount>{effective_basis:.2f}</ram:BasisAmount>
+        <ram:CategoryCode>{tax_category}</ram:CategoryCode>{ex_code_xml}
         <ram:RateApplicablePercent>{tax_pct:.2f}</ram:RateApplicablePercent>
       </ram:ApplicableTradeTax>\n"""
     else:
         for tax in inv.tax_breakdown:
-            exemption_xml = f"<ram:ExemptionReason>{escape(tax.exemption_reason)}</ram:ExemptionReason>\n        " if tax.exemption_reason else ""
+            cat_code = (tax.tax_category_code or "S").upper()
+            reason_str = tax.exemption_reason or (inv.vat_exemption_reason if cat_code in ["E", "AE", "K", "G"] else None)
+            code_str = getattr(tax, "exemption_reason_code", None) or (inv.vat_exemption_reason_code if cat_code in ["E", "AE", "K", "G"] else None)
+            exemption_xml = f"<ram:ExemptionReason>{escape(reason_str)}</ram:ExemptionReason>\n        " if reason_str else ""
+            exemption_code_xml = f"\n        <ram:ExemptionReasonCode>{escape(code_str)}</ram:ExemptionReasonCode>" if code_str else ""
             tax_breakdown_xml += f"""      <ram:ApplicableTradeTax>
         <ram:CalculatedAmount>{tax.tax_amount:.2f}</ram:CalculatedAmount>
         <ram:TypeCode>VAT</ram:TypeCode>
         {exemption_xml}<ram:BasisAmount>{tax.basis_amount:.2f}</ram:BasisAmount>
-        <ram:CategoryCode>{tax.tax_category_code}</ram:CategoryCode>
+        <ram:CategoryCode>{cat_code}</ram:CategoryCode>{exemption_code_xml}
         <ram:RateApplicablePercent>{tax.tax_percent:.2f}</ram:RateApplicablePercent>
       </ram:ApplicableTradeTax>\n"""
 
-    # Payment Means XML
+    # Payment Means XML (BG-16, BG-17) - support multiple bank accounts
     payment_means_xml = ""
-    if s_iban:
-        bic_xml = f"<ram:BICID>{s_bic}</ram:BICID>" if s_bic else ""
-        # Check for Slovenian payment reference (Sklic / Reference)
-        sklic_xml = ""
-        if profile.upper() in ["ESLOG2", "ESLOG_2_0", "ESLOG"] or inv.seller.country_code == "SI":
-            ref_val = (inv.payment.payment_terms or inv.invoice_number or "").strip()
-            # If model is present or plain invoice number
-            if ref_val:
-                sklic_xml = f"""\n        <ram:PayeePartyCreditorFinancialAccount>
-          <ram:IBANID>{s_iban}</ram:IBANID>
-        </ram:PayeePartyCreditorFinancialAccount>"""
-        payment_means_xml = f"""      <ram:SpecifiedTradeSettlementPaymentMeans>
-        <ram:TypeCode>{inv.payment.payment_means_code or "58"}</ram:TypeCode>
+    accounts_to_render = []
+    if getattr(inv.payment, "bank_accounts", None) and len(inv.payment.bank_accounts) > 0:
+        accounts_to_render = inv.payment.bank_accounts
+    elif s_iban:
+        accounts_to_render = [{"iban": s_iban, "bic": s_bic, "bank_name": inv.payment.bank_name}]
+
+    p_code = inv.payment.payment_means_code or "58"
+    for acc in accounts_to_render:
+        acc_iban = (getattr(acc, "iban", None) or (acc.get("iban") if isinstance(acc, dict) else "") or "").replace(" ", "").upper()
+        if not acc_iban:
+            continue
+        acc_bic = (getattr(acc, "bic", None) or (acc.get("bic") if isinstance(acc, dict) else "") or "").replace(" ", "").upper()
+        acc_name = getattr(acc, "bank_name", None) or (acc.get("bank_name") if isinstance(acc, dict) else "") or ""
+        inst_block = f"""\n        <ram:PayeeSpecifiedCreditorFinancialInstitution>
+          <ram:BICID>{escape(acc_bic)}</ram:BICID>
+        </ram:PayeeSpecifiedCreditorFinancialInstitution>""" if acc_bic else ""
+
+        payment_means_xml += f"""      <ram:SpecifiedTradeSettlementPaymentMeans>
+        <ram:TypeCode>{p_code}</ram:TypeCode>
         <ram:PayeePartyCreditorFinancialAccount>
-          <ram:IBANID>{s_iban}</ram:IBANID>
-        </ram:PayeePartyCreditorFinancialAccount>
-        <ram:PayeeSpecifiedCreditorFinancialInstitution>
-          {bic_xml}
-        </ram:PayeeSpecifiedCreditorFinancialInstitution>
+          <ram:IBANID>{acc_iban}</ram:IBANID>
+        </ram:PayeePartyCreditorFinancialAccount>{inst_block}
       </ram:SpecifiedTradeSettlementPaymentMeans>\n"""
 
-    # Payment terms XML
+    # Payment terms XML (BT-20 & BT-83)
     payment_terms_xml = ""
-    if inv.payment.payment_terms or due_date_formatted:
-        desc_xml = f"<ram:Description>{escape(inv.payment.payment_terms)}</ram:Description>\n        " if inv.payment.payment_terms else ""
+    pmt_desc = inv.payment.payment_terms or ""
+    pmt_ref = (inv.payment.payment_reference or "").strip()
+    if pmt_desc or due_date_formatted or pmt_ref:
+        full_desc = f"{pmt_desc} [Ref: {pmt_ref}]" if (pmt_desc and pmt_ref) else (pmt_desc or f"Payment Reference: {pmt_ref}")
+        desc_xml = f"<ram:Description>{escape(full_desc)}</ram:Description>\n        " if full_desc else ""
         due_xml = f"""<ram:DueDateDateTime>
           <udt:DateTimeString format="102">{due_date_formatted}</udt:DateTimeString>
         </ram:DueDateDateTime>\n        """ if due_date_formatted else ""
@@ -188,7 +287,7 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
         {desc_xml}{due_xml}
       </ram:SpecifiedTradePaymentTerms>\n"""
 
-    # Seller tax IDs
+    # Seller tax IDs & Legal disclosures (BT-30, BT-33, BT-34)
     seller_tax_xml = ""
     if s_vat:
         seller_tax_xml += f"""        <ram:SpecifiedTaxRegistration>
@@ -198,7 +297,6 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     # Local Tax Number / Steuernummer (FC)
     s_tax_number = (getattr(inv.seller, "tax_number", None) or inv.seller.tax_registration_id or "").strip()
     if not s_tax_number:
-        # Fallback to system configuration if available
         try:
             from backend.app import UPLOAD_DIR
             import json
@@ -214,6 +312,54 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
         seller_tax_xml += f"""        <ram:SpecifiedTaxRegistration>
           <ram:ID schemeID="FC">{escape(s_tax_number)}</ram:ID>
         </ram:SpecifiedTaxRegistration>\n"""
+
+    # Seller Legal Organization (BT-30: Legal Registration & BT-33: Additional Legal Information)
+    seller_legal_org_xml = ""
+    s_reg_id = (getattr(inv.seller, "company_legal_form", None) or inv.seller.company_id or inv.seller.court_registry or "").strip()
+    s_legal_info = (getattr(inv.seller, "legal_info", None) or "").strip()
+    if s_reg_id or s_legal_info:
+        reg_id_elem = f'\n          <ram:ID schemeID="0002">{escape(s_reg_id)}</ram:ID>' if s_reg_id else ""
+        legal_info_elem = f'\n          <ram:TradingBusinessName>{escape(s_legal_info)}</ram:TradingBusinessName>' if s_legal_info else ""
+        seller_legal_org_xml = f"""        <ram:SpecifiedLegalOrganization>{reg_id_elem}{legal_info_elem}
+        </ram:SpecifiedLegalOrganization>\n"""
+
+    # Seller Electronic Address (BT-34)
+    seller_endpoint_xml = ""
+    s_endpoint = (getattr(inv.seller, "endpoint_id", None) or "").strip()
+    if s_endpoint:
+        s_scheme = escape(getattr(inv.seller, "endpoint_scheme", None) or "0088")
+        seller_endpoint_xml = f"""        <ram:URIUniversalCommunication>
+          <ram:URIID schemeID="{s_scheme}">{escape(s_endpoint)}</ram:URIID>
+        </ram:URIUniversalCommunication>\n"""
+
+    # Buyer Electronic Address (BT-49)
+    buyer_endpoint_xml = ""
+    b_endpoint = (getattr(inv.buyer, "endpoint_id", None) or "").strip()
+    if b_endpoint:
+        b_scheme = escape(getattr(inv.buyer, "endpoint_scheme", None) or "0088")
+        buyer_endpoint_xml = f"""        <ram:URIUniversalCommunication>
+          <ram:URIID schemeID="{b_scheme}">{escape(b_endpoint)}</ram:URIID>
+        </ram:URIUniversalCommunication>\n"""
+
+    # Buyer Legal Organization (BT-47)
+    buyer_legal_org_xml = ""
+    b_reg_id = (getattr(inv.buyer, "company_legal_form", None) or inv.buyer.company_id or "").strip()
+    if b_reg_id:
+        buyer_legal_org_xml = f"""        <ram:SpecifiedLegalOrganization>
+          <ram:ID schemeID="0002">{escape(b_reg_id)}</ram:ID>
+        </ram:SpecifiedLegalOrganization>\n"""
+
+    # Factoring / Third-Party Payee (BG-10 / BT-59..BT-61)
+    payee_party_xml = ""
+    factoring = getattr(inv, "factoring_payee", None) or getattr(inv.payment, "factoring_payee", None)
+    if factoring and (factoring.name or factoring.payee_id or factoring.vat_id):
+        p_name = f"<ram:Name>{escape(factoring.name)}</ram:Name>\n        " if factoring.name else ""
+        p_id = f'<ram:ID>{escape(factoring.payee_id)}</ram:ID>\n        ' if factoring.payee_id else ""
+        p_vat = f"""<ram:SpecifiedTaxRegistration>
+          <ram:ID schemeID="VA">{escape(factoring.vat_id)}</ram:ID>
+        </ram:SpecifiedTaxRegistration>\n        """ if factoring.vat_id else ""
+        payee_party_xml = f"""      <ram:PayeeTradeParty>
+        {p_id}{p_name}{p_vat}</ram:PayeeTradeParty>\n"""
 
     # Buyer tax IDs
     buyer_tax_xml = ""
@@ -249,6 +395,25 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
         buyer_contact_xml = f"""        <ram:DefinedTradeContact>
           {b_name_x}{b_phone_x}{b_email_x}
         </ram:DefinedTradeContact>\n"""
+
+    # Header references: Contract (BT-12), Sales Order (BT-14), Buyer Accounting / Cost Center (BT-19)
+    contract_doc_xml = ""
+    if getattr(inv, "contract_reference", None):
+        contract_doc_xml = f"""      <ram:ContractReferencedDocument>
+        <ram:IssuerAssignedID>{escape(inv.contract_reference)}</ram:IssuerAssignedID>
+      </ram:ContractReferencedDocument>\n"""
+
+    sales_order_doc_xml = ""
+    if getattr(inv, "sales_order_number", None):
+        sales_order_doc_xml = f"""      <ram:SellerOrderReferencedDocument>
+        <ram:IssuerAssignedID>{escape(inv.sales_order_number)}</ram:IssuerAssignedID>
+      </ram:SellerOrderReferencedDocument>\n"""
+
+    accounting_cost_xml = ""
+    if getattr(inv, "cost_center", None):
+        accounting_cost_xml = f"""      <ram:ReceivableSpecifiedTradeAccountingAccount>
+        <ram:ID>{escape(inv.cost_center)}</ram:ID>
+      </ram:ReceivableSpecifiedTradeAccountingAccount>\n"""
 
     # Buyer order / Purchase Order reference (BT-13 & BT-14)
     buyer_order_xml = ""
@@ -322,12 +487,17 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
 
             deliv_name = f"<ram:Name>{escape(inv.delivery.recipient_name)}</ram:Name>\n          " if inv.delivery.recipient_name else ""
             deliv_country = (inv.delivery.country_code or "DE").strip().upper()[:2]
+            addr_elements = ""
+            if inv.delivery.postcode:
+                addr_elements += f"\n            <ram:PostcodeCode>{escape(inv.delivery.postcode)}</ram:PostcodeCode>"
+            if inv.delivery.street:
+                addr_elements += f"\n            <ram:LineOne>{escape(inv.delivery.street)}</ram:LineOne>"
+            if inv.delivery.city:
+                addr_elements += f"\n            <ram:CityName>{escape(inv.delivery.city)}</ram:CityName>"
+            addr_elements += f"\n            <ram:CountryID>{escape(deliv_country)}</ram:CountryID>"
+
             deliv_party_xml = f"""        <ram:ShipToTradeParty>
-          {deliv_id_xml}{deliv_name}<ram:PostalTradeAddress>
-            <ram:PostcodeCode>{escape(inv.delivery.postcode or "")}</ram:PostcodeCode>
-            <ram:LineOne>{escape(inv.delivery.street or "")}</ram:LineOne>
-            <ram:CityName>{escape(inv.delivery.city or "")}</ram:CityName>
-            <ram:CountryID>{escape(deliv_country)}</ram:CountryID>
+          {deliv_id_xml}{deliv_name}<ram:PostalTradeAddress>{addr_elements}
           </ram:PostalTradeAddress>
         </ram:ShipToTradeParty>\n"""
 
@@ -344,7 +514,7 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
         </ram:ActualDeliverySupplyChainEvent>\n"""
 
         delivery_xml = f"""    <ram:ApplicableHeaderTradeDelivery>
-{despatch_advice_xml}{deliv_party_xml}{deliv_date_xml}    </ram:ApplicableHeaderTradeDelivery>"""
+{deliv_party_xml}{deliv_date_xml}{despatch_advice_xml}    </ram:ApplicableHeaderTradeDelivery>"""
 
     # Billing period XML
     billing_period_xml = ""
@@ -368,7 +538,7 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     total_allowance_amt = 0.0
     total_charge_amt = 0.0
     if inv.discounts:
-        # Determine dominant tax category & percent from items or default to 19% S
+        # Determine fallback tax category & percent from items or default to 19% S
         dom_tax_cat = "S"
         dom_tax_pct = 19.0
         if inv.items and len(inv.items) > 0:
@@ -387,17 +557,28 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
 
             reason_txt = escape(disc.reason or ("Charge" if is_charge else "Discount / Rebate"))
             indicator_val = "true" if is_charge else "false"
-            pct_xml = f"        <ram:CalculationPercent>{disc.percentage:.2f}</ram:CalculationPercent>\n" if disc.percentage is not None and disc.percentage > 0 else ""
+            pct_xml = ""
+            basis_xml = ""
+            if disc.percentage is not None and disc.percentage > 0:
+                pct_xml = f"        <ram:CalculationPercent>{disc.percentage:.2f}</ram:CalculationPercent>\n"
+                doc_base = getattr(disc, "base_amount", None) or inv.line_net_total
+                basis_xml = f"        <ram:BasisAmount>{doc_base:.2f}</ram:BasisAmount>\n"
+            elif getattr(disc, "base_amount", None) is not None:
+                basis_xml = f"        <ram:BasisAmount>{disc.base_amount:.2f}</ram:BasisAmount>\n"
+
+            tax_cat = getattr(disc, "tax_category_code", None) or dom_tax_cat
+            tax_rate = getattr(disc, "tax_percent", None) if getattr(disc, "tax_percent", None) is not None else dom_tax_pct
+
             allowance_charges_xml += f"""      <ram:SpecifiedTradeAllowanceCharge>
         <ram:ChargeIndicator>
           <udt:Indicator>{indicator_val}</udt:Indicator>
         </ram:ChargeIndicator>
-{pct_xml}        <ram:ActualAmount>{amt:.2f}</ram:ActualAmount>
+{pct_xml}{basis_xml}        <ram:ActualAmount>{amt:.2f}</ram:ActualAmount>
         <ram:Reason>{reason_txt}</ram:Reason>
         <ram:CategoryTradeTax>
           <ram:TypeCode>VAT</ram:TypeCode>
-          <ram:CategoryCode>{dom_tax_cat}</ram:CategoryCode>
-          <ram:RateApplicablePercent>{dom_tax_pct:.2f}</ram:RateApplicablePercent>
+          <ram:CategoryCode>{tax_cat}</ram:CategoryCode>
+          <ram:RateApplicablePercent>{tax_rate:.2f}</ram:RateApplicablePercent>
         </ram:CategoryTradeTax>
       </ram:SpecifiedTradeAllowanceCharge>\n"""
 
@@ -426,35 +607,31 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
 {line_items_xml}    <ram:ApplicableHeaderTradeAgreement>
       <ram:BuyerReference>{escape(buyer_ref)}</ram:BuyerReference>
       <ram:SellerTradeParty>
-        <ram:Name>{escape(inv.seller.name)}</ram:Name>
-{seller_contact_xml}        <ram:PostalTradeAddress>
+        <ram:Name>{escape(inv.seller.name)}</ram:Name>{seller_legal_org_xml}{seller_contact_xml}        <ram:PostalTradeAddress>
           <ram:PostcodeCode>{escape(s_postcode)}</ram:PostcodeCode>
           <ram:LineOne>{escape(inv.seller.street or "")}</ram:LineOne>
           <ram:CityName>{escape(s_city)}</ram:CityName>
           <ram:CountryID>{inv.seller.country_code or "DE"}</ram:CountryID>
-        </ram:PostalTradeAddress>
-{seller_tax_xml}      </ram:SellerTradeParty>
+        </ram:PostalTradeAddress>{seller_endpoint_xml}{seller_tax_xml}      </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
-        <ram:Name>{escape(inv.buyer.name)}</ram:Name>
-{buyer_contact_xml}        <ram:PostalTradeAddress>
+        <ram:Name>{escape(inv.buyer.name)}</ram:Name>{buyer_legal_org_xml}{buyer_contact_xml}        <ram:PostalTradeAddress>
           <ram:PostcodeCode>{escape(b_postcode)}</ram:PostcodeCode>
           <ram:LineOne>{escape(inv.buyer.street or "")}</ram:LineOne>
           <ram:CityName>{escape(b_city)}</ram:CityName>
           <ram:CountryID>{inv.buyer.country_code or "DE"}</ram:CountryID>
-        </ram:PostalTradeAddress>
-{buyer_tax_xml}      </ram:BuyerTradeParty>
-{buyer_order_xml}{preceding_doc_xml}    </ram:ApplicableHeaderTradeAgreement>
+        </ram:PostalTradeAddress>{buyer_endpoint_xml}{buyer_tax_xml}      </ram:BuyerTradeParty>
+{sales_order_doc_xml}{buyer_order_xml}{contract_doc_xml}    </ram:ApplicableHeaderTradeAgreement>
 {delivery_xml}
     <ram:ApplicableHeaderTradeSettlement>
       <ram:InvoiceCurrencyCode>{inv.currency or "EUR"}</ram:InvoiceCurrencyCode>
-{billing_period_xml}{payment_means_xml}{tax_breakdown_xml}{allowance_charges_xml}{payment_terms_xml}      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+{payee_party_xml}{payment_means_xml}{tax_breakdown_xml}{billing_period_xml}{allowance_charges_xml}{payment_terms_xml}      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
         <ram:LineTotalAmount>{inv.line_net_total:.2f}</ram:LineTotalAmount>
 {charge_total_xml}{allowance_total_xml}        <ram:TaxBasisTotalAmount>{(inv.line_net_total - total_allowance_amt + total_charge_amt):.2f}</ram:TaxBasisTotalAmount>
         <ram:TaxTotalAmount currencyID="{inv.currency or "EUR"}">{inv.tax_total:.2f}</ram:TaxTotalAmount>
         <ram:GrandTotalAmount>{inv.grand_total:.2f}</ram:GrandTotalAmount>
 {prepaid_xml}        <ram:DuePayableAmount>{inv.due_payable_amount:.2f}</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-    </ram:ApplicableHeaderTradeSettlement>
+{preceding_doc_xml}{accounting_cost_xml}    </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>
 """

@@ -6,6 +6,7 @@
 let v2LineItems = [];
 let v2DocumentDiscounts = [];
 let v2ExtractedNotes = [];
+let v2BankAccounts = [];
 let v2TokenUsage = null;
 let v2UploadedFileId = null;
 let v2UploadedFileName = null;
@@ -14,6 +15,7 @@ let v2UploadedFileName = null;
 function initV2Studio() {
   populateV2CountryDropdowns();
   initV2LineItems();
+  initV2BankAccounts();
   initV2DocumentDiscounts();
   initV2InvoiceNotes();
   populateV2SellerDefaults();
@@ -148,6 +150,11 @@ function populateV2SellerDefaults(force = false) {
   setVal("v2SellerFax", settings.seller_fax || "");
   setVal("v2PayIban", settings.seller_bank1_iban || "");
   setVal("v2PayBic", settings.seller_bank1_bic || "");
+
+  // Auto-populate BG-17 payment accounts with configured corporate banks
+  if (typeof populateV2DefaultBankAccounts === "function") {
+    populateV2DefaultBankAccounts();
+  }
 }
 window.populateV2SellerDefaults = populateV2SellerDefaults;
 
@@ -162,15 +169,28 @@ function handleV2DocTypeChange(docType) {
   // Update badge & title hints
   const labelMap = {
     "380": "Commercial Invoice",
-    "381": "Credit Note (Gutschrift)",
-    "384": "Corrected Invoice (Rechnungskorrektur)",
+    "381": "Credit Note (Gutschrift / Dobropis)",
+    "384": "Corrected Invoice (Lastschrift / Rechnungskorrektur)",
+    "389": "Prepayment Invoice (Anzahlungsrechnung)",
     "326": "Partial Invoice (Teilrechnung)",
-    "386": "Prepayment Invoice (Vorauszahlungsrechnung)",
     "orderx": "Order-X Purchase Order"
   };
 
   const titleEl = document.getElementById("v2DocTypeLabel");
   if (titleEl) titleEl.textContent = labelMap[docType] || "Invoice";
+
+  // Due Date (BT-9): optional for 381, mandatory for 380 and 384
+  const dueDateInput = document.getElementById("v2DueDate");
+  if (dueDateInput) {
+    const dueDateLabel = dueDateInput.closest(".v2-field")?.querySelector("label");
+    if (dueDateLabel) {
+      if (docType === "381") {
+        dueDateLabel.innerHTML = `Payment Due Date / Fälligkeitsdatum <span class="v2-bt-badge" data-bt="BT-9">BT-9</span> <span style="font-size: 0.72rem; color: var(--text-muted);">(Optional for Credit Notes)</span>`;
+      } else {
+        dueDateLabel.innerHTML = `Payment Due Date / Fälligkeitsdatum <span class="v2-req-star">*</span> <span class="v2-bt-badge" data-bt="BT-9">BT-9</span>`;
+      }
+    }
+  }
 }
 window.handleV2DocTypeChange = handleV2DocTypeChange;
 
@@ -207,7 +227,22 @@ function renderV2LineItems() {
   v2LineItems.forEach((item, idx) => {
     const card = document.createElement("div");
     card.className = "v2-item-card";
-    const lineTotal = Math.max(0, (item.quantity * item.unit_price) - (item.discount_amount || 0));
+
+    const baseQty = item.price_base_quantity || 1.0;
+    // Calculate line net total taking allowances and charges into account
+    let lineAllowances = 0;
+    let lineCharges = 0;
+    if (item.allowances_charges && Array.isArray(item.allowances_charges)) {
+      item.allowances_charges.forEach(ac => {
+        const amt = parseFloat(ac.amount) || 0;
+        if (ac.charge_indicator) lineCharges += amt;
+        else lineAllowances += amt;
+      });
+    } else {
+      lineAllowances = item.discount_amount || 0;
+    }
+    const itemNetSub = (item.quantity * item.unit_price) / (baseQty > 0 ? baseQty : 1.0);
+    const lineTotal = Math.max(0, itemNetSub - lineAllowances + lineCharges);
 
     card.innerHTML = `
       <div class="v2-item-topbar">
@@ -215,23 +250,25 @@ function renderV2LineItems() {
         <button type="button" class="v2-item-trash" onclick="removeV2LineItem(${idx})" title="Remove Line">🗑️</button>
       </div>
       <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <!-- BT-153: Item Name (Strictly product name) -->
         <div class="v2-field">
           <label class="v2-label">
             <span class="v2-label-left">
-              Description / Bezeichnung <span class="v2-req-star">*</span>
+              Item Name / Produktname <span class="v2-req-star">*</span>
               <span class="v2-bt-badge" data-bt="BT-153">BT-153
                 <div class="v2-bt-tooltip">
-                  <span class="v2-bt-tooltip-title">BT-153: Artikelname / Leistungsbezeichnung (Item name)</span>
-                  <div>Full name or clear textual description of the good or service billed.</div>
+                  <span class="v2-bt-tooltip-title">BT-153: Artikelname (Item name)</span>
+                  <div>Full name of the good or deliverable service.</div>
                   <span class="v2-bt-tooltip-xml">XML: .../ram:SpecifiedTradeProduct/ram:Name</span>
-                  <span class="v2-bt-tooltip-status req">● Mandatory Standard Field / Pflichtfeld</span>
+                  <span class="v2-bt-tooltip-status req">● Mandatory Standard Field</span>
                 </div>
               </span>
             </span>
             <button type="button" class="v2-xml-help-btn" onclick="jumpToXmlForField('v2ItemName_${idx}')" title="Jump to BT-153 in factur-x.xml">?</button>
           </label>
-          <input type="text" id="v2ItemName_${idx}" class="v2-input" value="${escapeHtml(item.name)}" oninput="updateV2ItemField(${idx}, 'name', this.value)" placeholder="Product or consulting deliverable">
+          <input type="text" id="v2ItemName_${idx}" class="v2-input" value="${escapeHtml(item.name || '')}" oninput="updateV2ItemField(${idx}, 'name', this.value)" placeholder="e.g. Development costs / ECU Module">
         </div>
+
         <div class="v2-grid-4">
           <div class="v2-field">
             <label class="v2-label">
@@ -240,15 +277,15 @@ function renderV2LineItems() {
                 <span class="v2-bt-badge" data-bt="BT-129">BT-129
                   <div class="v2-bt-tooltip">
                     <span class="v2-bt-tooltip-title">BT-129: Menge der Rechnungsposition (Invoiced quantity)</span>
-                    <div>Quantity of items, hours, or units invoiced for this line.</div>
+                    <div>Quantity of items, hours, or units invoiced.</div>
                     <span class="v2-bt-tooltip-xml">XML: .../ram:BilledQuantity</span>
-                    <span class="v2-bt-tooltip-status req">● Mandatory Standard Field / Pflichtfeld</span>
+                    <span class="v2-bt-tooltip-status req">● Mandatory Standard Field</span>
                   </div>
                 </span>
               </span>
               <button type="button" class="v2-xml-help-btn" onclick="jumpToXmlForField('v2ItemQty_${idx}')" title="Jump to BT-129 in factur-x.xml">?</button>
             </label>
-            <input type="number" id="v2ItemQty_${idx}" step="0.01" min="0.01" class="v2-input" value="${item.quantity}" oninput="updateV2ItemField(${idx}, 'quantity', parseFloat(this.value)||0)">
+            <input type="number" id="v2ItemQty_${idx}" step="0.01" min="0.0001" class="v2-input" value="${item.quantity}" oninput="updateV2ItemField(${idx}, 'quantity', parseFloat(this.value)||0)">
           </div>
           <div class="v2-field">
             <label class="v2-label">
@@ -256,10 +293,10 @@ function renderV2LineItems() {
                 Unit / Einheit <span class="v2-req-star">*</span>
                 <span class="v2-bt-badge" data-bt="BT-130">BT-130
                   <div class="v2-bt-tooltip">
-                    <span class="v2-bt-tooltip-title">BT-130: Mengeneinheitencode (Quantity unit code)</span>
-                    <div>UN/ECE Recommendation 20 unit code (C62 = pcs, HUR = hours, KGM = kg).</div>
+                    <span class="v2-bt-tooltip-title">BT-130: Mengeneinheitencode (Unit code)</span>
+                    <div>UN/ECE Rec 20 unit code (C62 = pcs, HUR = hours, KGM = kg).</div>
                     <span class="v2-bt-tooltip-xml">XML: @unitCode</span>
-                    <span class="v2-bt-tooltip-status req">● Mandatory Standard Field / Pflichtfeld</span>
+                    <span class="v2-bt-tooltip-status req">● Mandatory Standard Field</span>
                   </div>
                 </span>
               </span>
@@ -267,10 +304,12 @@ function renderV2LineItems() {
             </label>
             <select id="v2ItemUnit_${idx}" class="v2-select" onchange="updateV2ItemField(${idx}, 'unit_code', this.value)">
               <option value="C62" ${item.unit_code === "C62" ? "selected" : ""}>Piece / Stück (C62)</option>
+              <option value="H87" ${item.unit_code === "H87" ? "selected" : ""}>Piece / Stück (H87)</option>
               <option value="HUR" ${item.unit_code === "HUR" ? "selected" : ""}>Hour / Stunde (HUR)</option>
               <option value="DAY" ${item.unit_code === "DAY" ? "selected" : ""}>Day / Tag (DAY)</option>
               <option value="MON" ${item.unit_code === "MON" ? "selected" : ""}>Month / Monat (MON)</option>
               <option value="KGM" ${item.unit_code === "KGM" ? "selected" : ""}>Kilogram / Kilogramm (KGM)</option>
+              <option value="MTR" ${item.unit_code === "MTR" ? "selected" : ""}>Meter / Meter (MTR)</option>
             </select>
           </div>
           <div class="v2-field">
@@ -282,13 +321,13 @@ function renderV2LineItems() {
                     <span class="v2-bt-tooltip-title">BT-146: Artikel-Nettopreis (Item net price)</span>
                     <div>Net price per single item unit excluding VAT.</div>
                     <span class="v2-bt-tooltip-xml">XML: .../ram:ChargeAmount</span>
-                    <span class="v2-bt-tooltip-status req">● Mandatory Standard Field / Pflichtfeld</span>
+                    <span class="v2-bt-tooltip-status req">● Mandatory Standard Field</span>
                   </div>
                 </span>
               </span>
               <button type="button" class="v2-xml-help-btn" onclick="jumpToXmlForField('v2ItemPrice_${idx}')" title="Jump to BT-146 in factur-x.xml">?</button>
             </label>
-            <input type="number" id="v2ItemPrice_${idx}" step="0.01" class="v2-input" value="${item.unit_price}" oninput="updateV2ItemField(${idx}, 'unit_price', parseFloat(this.value)||0)">
+            <input type="number" id="v2ItemPrice_${idx}" step="0.0001" class="v2-input" value="${item.unit_price}" oninput="updateV2ItemField(${idx}, 'unit_price', parseFloat(this.value)||0)">
           </div>
           <div class="v2-field">
             <label class="v2-label">
@@ -299,7 +338,7 @@ function renderV2LineItems() {
                     <span class="v2-bt-tooltip-title">BT-151 &amp; BT-152: Steuerkategorie &amp; Steuersatz %</span>
                     <div>Tax category code ('S' standard, 'AE' reverse charge) and percentage rate.</div>
                     <span class="v2-bt-tooltip-xml">XML: .../ram:ApplicableTradeTax</span>
-                    <span class="v2-bt-tooltip-status req">● Mandatory Standard Field / Pflichtfeld</span>
+                    <span class="v2-bt-tooltip-status req">● Mandatory Standard Field</span>
                   </div>
                 </span>
               </span>
@@ -310,15 +349,79 @@ function renderV2LineItems() {
             </select>
           </div>
         </div>
+
+        <!-- Advanced Item Details Drawer: Part numbers, PO line, base quantity, description -->
+        <div style="margin-top: 0.25rem;">
+          <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2ItemAdv_${idx}', 'v2ItemAdvChev_${idx}')" style="font-size: 0.74rem; padding: 0.25rem 0.4rem;">
+            <span id="v2ItemAdvChev_${idx}">▼</span>
+            <span>🔧 Advanced Item Details (Seller/Buyer/Standard Identifiers, PO Line, Base Qty, Description)</span>
+          </button>
+          <div id="v2ItemAdv_${idx}" style="display: none; margin-top: 0.5rem; background: var(--bg-input); padding: 0.65rem; border-radius: 6px; border: 1px dashed var(--bg-card-border); display: flex; flex-direction: column; gap: 0.5rem;">
+            <div class="v2-field">
+              <label class="v2-label">Item Description / Technische Beschreibung (BT-154)</label>
+              <textarea class="v2-input" rows="2" style="resize: vertical; font-size: 0.76rem;" placeholder="Secondary detailed technical specifications..." oninput="updateV2ItemField(${idx}, 'description', this.value)">${escapeHtml(item.description || '')}</textarea>
+            </div>
+            <div class="v2-grid-4">
+              <div class="v2-field">
+                <label class="v2-label">Seller's Item ID / Artikelnr. (BT-155)</label>
+                <input type="text" class="v2-input" value="${escapeHtml(item.seller_item_id || '')}" placeholder="e.g. 930000006" oninput="updateV2ItemField(${idx}, 'seller_item_id', this.value)">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">Buyer's Part No. / Kunden-Artikelnr. (BT-156)</label>
+                <input type="text" class="v2-input" value="${escapeHtml(item.buyer_item_id || '')}" placeholder="e.g. ACK688 FATEV G45" oninput="updateV2ItemField(${idx}, 'buyer_item_id', this.value)">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">Standard ID / GTIN (BT-157)</label>
+                <div style="display: flex; gap: 0.25rem;">
+                  <input type="text" style="width: 4rem;" class="v2-input" value="${escapeHtml(item.standard_item_id_scheme || '0160')}" title="Scheme ID (BT-157-1, default 0160 for GTIN)" placeholder="0160" oninput="updateV2ItemField(${idx}, 'standard_item_id_scheme', this.value)">
+                  <input type="text" style="flex: 1;" class="v2-input" value="${escapeHtml(item.standard_item_id || '')}" placeholder="e.g. 4012345678901" oninput="updateV2ItemField(${idx}, 'standard_item_id', this.value)">
+                </div>
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">PO Line Ref / Bestellposition (BT-132)</label>
+                <input type="text" class="v2-input" value="${escapeHtml(item.order_line_reference || '')}" placeholder="e.g. 1 or 2" oninput="updateV2ItemField(${idx}, 'order_line_reference', this.value)">
+              </div>
+            </div>
+            <div class="v2-grid-3" style="margin-top: 0.25rem;">
+              <div class="v2-field">
+                <label class="v2-label">Price Base Quantity (BT-149)</label>
+                <input type="number" step="1" min="0.0001" class="v2-input" value="${item.price_base_quantity || 1}" placeholder="e.g. 100 for €150/100pcs" oninput="updateV2ItemField(${idx}, 'price_base_quantity', parseFloat(this.value)||1)">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">Price Base Unit (BT-150)</label>
+                <input type="text" class="v2-input" value="${escapeHtml(item.price_base_unit || item.unit_code || 'C62')}" placeholder="C62" oninput="updateV2ItemField(${idx}, 'price_base_unit', this.value)">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">Item Serial / Lot (BT-128)</label>
+                <input type="text" class="v2-input" value="${escapeHtml(item.item_serial_number || '')}" placeholder="e.g. SN-883921" oninput="updateV2ItemField(${idx}, 'item_serial_number', this.value)">
+              </div>
+            </div>
+
+            <!-- Item-Level Allowances & Charges (BG-27 & BG-28) -->
+            <div style="margin-top: 0.5rem; border-top: 1px dashed var(--bg-card-border); padding-top: 0.5rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                <span style="font-size: 0.72rem; font-weight: 600;">🏷️ Item Allowances &amp; Charges (BG-27 / BG-28):</span>
+                <div style="display: flex; gap: 0.3rem;">
+                  <button type="button" class="btn btn-secondary" onclick="addV2ItemAllowanceCharge(${idx}, false)" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;">+ Discount (BT-136)</button>
+                  <button type="button" class="btn btn-secondary" onclick="addV2ItemAllowanceCharge(${idx}, true)" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;">+ Surcharge (BT-141)</button>
+                </div>
+              </div>
+              <div id="v2ItemACContainer_${idx}" style="display: flex; flex-direction: column; gap: 0.35rem;">
+                ${renderV2ItemAllowancesChargesHtml(item, idx)}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div style="display: flex; justify-content: flex-end; align-items: center; gap: 1rem; border-top: 1px dashed var(--bg-card-border); padding-top: 0.5rem; margin-top: 0.25rem;">
           <div style="font-size: 0.78rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.4rem;">
             Line Net Total / Positions-Nettobetrag: 
             <span class="v2-bt-badge" data-bt="BT-131">BT-131
               <div class="v2-bt-tooltip">
-                <span class="v2-bt-tooltip-title">BT-131: Nettobetrag der Rechnungsposition (Invoice line net amount)</span>
-                <div>Total net amount for this line (Qty × Net Price - Discount).</div>
+                <span class="v2-bt-tooltip-title">BT-131: Nettobetrag der Rechnungsposition (Line net amount)</span>
+                <div>Total net amount = (Qty × Unit Price / Base Qty) - Allowances + Charges.</div>
                 <span class="v2-bt-tooltip-xml">XML: .../ram:LineTotalAmount</span>
-                <span class="v2-bt-tooltip-status req">● Mandatory Standard Field / Pflichtfeld</span>
+                <span class="v2-bt-tooltip-status req">● Mandatory Standard Field</span>
               </div>
             </span>
             <strong style="color: var(--text-main); font-size: 0.95rem;">€${lineTotal.toFixed(2)}</strong>
@@ -332,16 +435,148 @@ function renderV2LineItems() {
   recalcV2Totals();
 }
 
+function renderV2ItemAllowancesChargesHtml(item, itemIdx) {
+  const acList = item.allowances_charges || [];
+  if (acList.length === 0) {
+    return `<div style="font-size: 0.7rem; color: var(--text-muted); font-style: italic;">No item-level discount or charge. Click buttons above to add.</div>`;
+  }
+  const baseQty = item.price_base_quantity || 1.0;
+  const itemGrossBase = (item.quantity * item.unit_price) / (baseQty > 0 ? baseQty : 1.0);
+
+  return acList.map((ac, acIdx) => {
+    const isChg = Boolean(ac.charge_indicator);
+    const amt = ac.amount !== undefined && ac.amount !== null ? ac.amount : 0;
+    const pct = ac.percentage !== undefined && ac.percentage !== null ? ac.percentage : '';
+    const baseAmt = ac.base_amount !== undefined && ac.base_amount !== null ? ac.base_amount : itemGrossBase;
+
+    return `
+      <div style="display: flex; flex-direction: column; gap: 0.25rem; background: var(--bg-card); padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid var(--bg-card-border);">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-size: 0.68rem; font-weight: 700; color: ${isChg ? '#10b981' : '#3b82f6'};">
+            ${isChg ? '➕ Charge (BG-28)' : '➖ Discount (BG-27)'}
+          </span>
+          <span style="font-size: 0.65rem; color: var(--text-muted);">
+            Base (${isChg ? 'BT-142' : 'BT-137'}): €${baseAmt.toFixed(2)}
+          </span>
+          <button type="button" class="v2-item-trash" style="padding: 0.1rem 0.3rem;" onclick="removeV2ItemAllowanceCharge(${itemIdx}, ${acIdx})" title="Remove">🗑️</button>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.35rem;">
+          <input type="text" class="v2-input" style="flex: 2; padding: 0.2rem 0.4rem; font-size: 0.72rem;" value="${escapeHtml(ac.reason || '')}" placeholder="${isChg ? 'Reason (BT-144, e.g. Hazardous surcharge)' : 'Reason (BT-139, e.g. Volume discount)'}" oninput="updateV2ItemAllowanceCharge(${itemIdx}, ${acIdx}, 'reason', this.value)">
+          <div style="display: flex; align-items: center; gap: 2px;">
+            <input type="number" step="0.01" min="0" max="100" class="v2-input" style="width: 4.2rem; padding: 0.2rem 0.3rem; font-size: 0.72rem;" value="${pct}" placeholder="% (${isChg ? 'BT-143' : 'BT-138'})" oninput="handleV2ItemAllowancePercentInput(${itemIdx}, ${acIdx}, this.value)">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">%</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 2px;">
+            <input type="number" step="0.01" min="0" class="v2-input" style="width: 5rem; padding: 0.2rem 0.3rem; font-size: 0.72rem;" value="${amt}" placeholder="€ (${isChg ? 'BT-141' : 'BT-136'})" oninput="handleV2ItemAllowanceAmountInput(${itemIdx}, ${acIdx}, this.value)">
+            <span style="font-size: 0.7rem; color: var(--text-muted);">€</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+window.renderV2ItemAllowancesChargesHtml = renderV2ItemAllowancesChargesHtml;
+
+function getItemGrossBaseAmount(itemIdx) {
+  const item = v2LineItems[itemIdx];
+  if (!item) return 0.0;
+  const baseQty = item.price_base_quantity || 1.0;
+  return (item.quantity * item.unit_price) / (baseQty > 0 ? baseQty : 1.0);
+}
+
+function handleV2ItemAllowancePercentInput(itemIdx, acIdx, pctStr) {
+  if (!v2LineItems[itemIdx] || !v2LineItems[itemIdx].allowances_charges) return;
+  const ac = v2LineItems[itemIdx].allowances_charges[acIdx];
+  if (!ac) return;
+
+  const baseAmt = getItemGrossBaseAmount(itemIdx);
+  ac.base_amount = baseAmt;
+
+  const pct = parseFloat(pctStr);
+  if (!isNaN(pct) && pct >= 0) {
+    ac.percentage = pct;
+    ac.amount = Math.round(baseAmt * (pct / 100) * 100) / 100;
+  } else {
+    ac.percentage = null;
+  }
+  renderV2LineItems();
+}
+window.handleV2ItemAllowancePercentInput = handleV2ItemAllowancePercentInput;
+
+function handleV2ItemAllowanceAmountInput(itemIdx, acIdx, amtStr) {
+  if (!v2LineItems[itemIdx] || !v2LineItems[itemIdx].allowances_charges) return;
+  const ac = v2LineItems[itemIdx].allowances_charges[acIdx];
+  if (!ac) return;
+
+  const baseAmt = getItemGrossBaseAmount(itemIdx);
+  ac.base_amount = baseAmt;
+
+  const amt = parseFloat(amtStr);
+  if (!isNaN(amt) && amt >= 0) {
+    ac.amount = amt;
+    if (baseAmt > 0) {
+      ac.percentage = Math.round((amt / baseAmt) * 10000) / 100;
+    } else {
+      ac.percentage = null;
+    }
+  } else {
+    ac.amount = 0.0;
+    ac.percentage = null;
+  }
+  renderV2LineItems();
+}
+window.handleV2ItemAllowanceAmountInput = handleV2ItemAllowanceAmountInput;
+
+function addV2ItemAllowanceCharge(itemIdx, isCharge) {
+  if (!v2LineItems[itemIdx]) return;
+  if (!v2LineItems[itemIdx].allowances_charges) v2LineItems[itemIdx].allowances_charges = [];
+  const baseAmt = getItemGrossBaseAmount(itemIdx);
+  v2LineItems[itemIdx].allowances_charges.push({
+    charge_indicator: Boolean(isCharge),
+    amount: 0.0,
+    percentage: null,
+    base_amount: baseAmt,
+    reason: isCharge ? "Item Surcharge" : "Item Discount"
+  });
+  renderV2LineItems();
+}
+window.addV2ItemAllowanceCharge = addV2ItemAllowanceCharge;
+
+function removeV2ItemAllowanceCharge(itemIdx, acIdx) {
+  if (!v2LineItems[itemIdx] || !v2LineItems[itemIdx].allowances_charges) return;
+  v2LineItems[itemIdx].allowances_charges.splice(acIdx, 1);
+  renderV2LineItems();
+}
+window.removeV2ItemAllowanceCharge = removeV2ItemAllowanceCharge;
+
+function updateV2ItemAllowanceCharge(itemIdx, acIdx, field, val) {
+  if (!v2LineItems[itemIdx] || !v2LineItems[itemIdx].allowances_charges) return;
+  if (v2LineItems[itemIdx].allowances_charges[acIdx]) {
+    v2LineItems[itemIdx].allowances_charges[acIdx][field] = val;
+    recalcV2Totals();
+  }
+}
+window.updateV2ItemAllowanceCharge = updateV2ItemAllowanceCharge;
+
 function addV2LineItem() {
   v2LineItems.push({
     name: "New Line Item",
     quantity: 1,
     unit_code: "C62",
     unit_price: 100.0,
+    price_base_quantity: 1.0,
+    price_base_unit: "C62",
     tax_category_code: "S",
     tax_percent: 19.0,
     discount_amount: 0.0,
-    discount_percent: null
+    discount_percent: null,
+    seller_item_id: "",
+    buyer_item_id: "",
+    standard_item_id: "",
+    standard_item_id_scheme: "0160",
+    order_line_reference: "",
+    description: "",
+    allowances_charges: []
   });
   renderV2LineItems();
 }
@@ -472,6 +707,160 @@ function getV2ItemTaxOptionsHtml(item) {
 }
 window.getV2ItemTaxOptionsHtml = getV2ItemTaxOptionsHtml;
 
+// ================= MULTIPLE BANK ACCOUNTS (BG-17) =================
+function getV2ConfiguredBankPresets() {
+  const settings = window.cachedCompanySettings || {};
+  let localSettings = {};
+  try {
+    const raw = localStorage.getItem("ZUGFERD_COMPANY_SETTINGS");
+    if (raw) localSettings = JSON.parse(raw);
+  } catch (e) {}
+
+  const merged = Object.assign({}, localSettings, settings);
+  const presets = [];
+
+  const b1Iban = (merged.seller_bank1_iban || "").trim();
+  const b1Name = (merged.seller_bank1_name || "").trim() || "Primary Bank";
+  const b1Bic = (merged.seller_bank1_bic || "").trim();
+
+  const b2Iban = (merged.seller_bank2_iban || "").trim();
+  const b2Name = (merged.seller_bank2_name || "").trim() || "Secondary Bank";
+  const b2Bic = (merged.seller_bank2_bic || "").trim();
+
+  if (b1Iban) {
+    presets.push({
+      key: "primary",
+      label: `Primary Bank (${b1Name} - ...${b1Iban.replace(/\s+/g, "").slice(-4)})`,
+      iban: b1Iban,
+      bank_name: b1Name,
+      bic: b1Bic
+    });
+  }
+
+  if (b2Iban) {
+    presets.push({
+      key: "secondary",
+      label: `Secondary Bank (${b2Name} - ...${b2Iban.replace(/\s+/g, "").slice(-4)})`,
+      iban: b2Iban,
+      bank_name: b2Name,
+      bic: b2Bic
+    });
+  }
+
+  return presets;
+}
+window.getV2ConfiguredBankPresets = getV2ConfiguredBankPresets;
+
+function updateV2BankPresetDropdown() {
+  const select = document.getElementById("v2BankPresetSelect");
+  if (!select) return;
+  const presets = getV2ConfiguredBankPresets();
+  let html = `<option value="">-- Insert Configured Bank --</option>`;
+  presets.forEach(p => {
+    html += `<option value="${escapeHtml(p.key)}">${escapeHtml(p.label)}</option>`;
+  });
+  select.innerHTML = html;
+  select.value = "";
+}
+window.updateV2BankPresetDropdown = updateV2BankPresetDropdown;
+
+function populateV2DefaultBankAccounts() {
+  const presets = getV2ConfiguredBankPresets();
+  if (presets.length > 0) {
+    v2BankAccounts = presets.map(p => ({
+      iban: p.iban,
+      bank_name: p.bank_name,
+      bic: p.bic
+    }));
+  } else {
+    // Fallback if no corporate banks are configured yet
+    const primaryIban = document.getElementById("v2PayIban")?.value || "";
+    const primaryBic = document.getElementById("v2PayBic")?.value || "";
+    v2BankAccounts = [
+      { iban: primaryIban || "DE89370400440532013000", bank_name: "Primary Bank", bic: primaryBic || "DBBADEFFXXX" }
+    ];
+  }
+  renderV2BankAccounts();
+  updateV2BankPresetDropdown();
+}
+window.populateV2DefaultBankAccounts = populateV2DefaultBankAccounts;
+
+function insertV2BankPreset(key) {
+  if (!key) return;
+  const presets = getV2ConfiguredBankPresets();
+  const selected = presets.find(p => p.key === key);
+  if (selected) {
+    v2BankAccounts.push({
+      iban: selected.iban,
+      bank_name: selected.bank_name,
+      bic: selected.bic
+    });
+    renderV2BankAccounts();
+  }
+  const select = document.getElementById("v2BankPresetSelect");
+  if (select) select.value = "";
+}
+window.insertV2BankPreset = insertV2BankPreset;
+
+function initV2BankAccounts() {
+  if (v2BankAccounts.length === 0) {
+    populateV2DefaultBankAccounts();
+  } else {
+    renderV2BankAccounts();
+    updateV2BankPresetDropdown();
+  }
+}
+window.initV2BankAccounts = initV2BankAccounts;
+
+function renderV2BankAccounts() {
+  const container = document.getElementById("v2BankAccountsContainer");
+  if (!container) return;
+  container.innerHTML = "";
+
+  v2BankAccounts.forEach((acc, idx) => {
+    const row = document.createElement("div");
+    row.style.cssText = "display: flex; align-items: center; gap: 0.5rem; background: var(--bg-card); padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--bg-card-border);";
+    row.innerHTML = `
+      <span style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); width: 1.6rem;">#${idx + 1}</span>
+      <div style="flex: 2;">
+        <input type="text" class="v2-input" style="padding: 0.25rem 0.5rem; font-size: 0.76rem;" value="${escapeHtml(acc.iban || '')}" placeholder="IBAN (BT-84)" oninput="updateV2BankAccount(${idx}, 'iban', this.value)">
+      </div>
+      <div style="flex: 1.5;">
+        <input type="text" class="v2-input" style="padding: 0.25rem 0.5rem; font-size: 0.76rem;" value="${escapeHtml(acc.bank_name || '')}" placeholder="Bank Name (BT-85)" oninput="updateV2BankAccount(${idx}, 'bank_name', this.value)">
+      </div>
+      <div style="flex: 1;">
+        <input type="text" class="v2-input" style="padding: 0.25rem 0.5rem; font-size: 0.76rem;" value="${escapeHtml(acc.bic || '')}" placeholder="BIC / SWIFT (BT-86)" oninput="updateV2BankAccount(${idx}, 'bic', this.value)">
+      </div>
+      <button type="button" class="v2-item-trash" onclick="removeV2BankAccount(${idx})" title="Remove Bank Account">🗑️</button>
+    `;
+    container.appendChild(row);
+  });
+}
+window.renderV2BankAccounts = renderV2BankAccounts;
+
+function addV2BankAccount() {
+  v2BankAccounts.push({ iban: "", bank_name: "", bic: "" });
+  renderV2BankAccounts();
+}
+window.addV2BankAccount = addV2BankAccount;
+
+function removeV2BankAccount(idx) {
+  if (v2BankAccounts.length <= 1) {
+    alert("At least one payment account is required.");
+    return;
+  }
+  v2BankAccounts.splice(idx, 1);
+  renderV2BankAccounts();
+}
+window.removeV2BankAccount = removeV2BankAccount;
+
+function updateV2BankAccount(idx, field, val) {
+  if (v2BankAccounts[idx]) {
+    v2BankAccounts[idx][field] = val;
+  }
+}
+window.updateV2BankAccount = updateV2BankAccount;
+
 // ================= DOCUMENT-LEVEL DISCOUNTS =================
 function initV2DocumentDiscounts() {
   renderV2DocumentDiscounts();
@@ -518,57 +907,85 @@ function renderV2DocumentDiscounts() {
         </div>
         <button type="button" class="v2-item-trash" onclick="removeV2DocumentDiscount(${idx})" title="Remove">🗑️</button>
       </div>
-      <div class="v2-grid-3">
+    const catBt = isCharge ? "BT-102" : "BT-95";
+    const rateBt = isCharge ? "BT-103" : "BT-96";
+    const baseAmtBt = isCharge ? "BT-100" : "BT-93";
+    const taxCat = disc.tax_category_code || "S";
+    const taxPct = disc.tax_percent !== undefined && disc.tax_percent !== null ? disc.tax_percent : 19.0;
+
+    let itemsNetTotal = 0;
+    v2LineItems.forEach(it => {
+      const bq = it.price_base_quantity || 1.0;
+      let lineDiscounts = 0;
+      let lineCharges = 0;
+      (it.allowances_charges || []).forEach(ac => {
+        const a = parseFloat(ac.amount) || 0;
+        if (ac.charge_indicator) lineCharges += a;
+        else lineDiscounts += a;
+      });
+      itemsNetTotal += Math.max(0, ((it.quantity * it.unit_price) / (bq > 0 ? bq : 1.0)) - lineDiscounts + lineCharges);
+    });
+    const docBaseAmt = disc.base_amount !== undefined && disc.base_amount !== null ? disc.base_amount : itemsNetTotal;
+
+    card.innerHTML = `
+      <div class="v2-discount-topbar">
+        <div class="v2-discount-title" style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="${isCharge ? 'color: #10b981; font-weight: 600;' : ''}">${badgeLabel}</span>
+          <select class="v2-select" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.75rem;" onchange="updateV2DiscountField(${idx}, 'charge_indicator', this.value === 'charge')">
+            <option value="allowance" ${!isCharge ? 'selected' : ''}>Allowance / Discount (-)</option>
+            <option value="charge" ${isCharge ? 'selected' : ''}>Charge / Surcharge (+)</option>
+          </select>
+        </div>
+        <div style="font-size: 0.72rem; color: var(--text-muted);">
+          Base (${baseAmtBt}): €${docBaseAmt.toFixed(2)}
+        </div>
+        <button type="button" class="v2-item-trash" onclick="removeV2DocumentDiscount(${idx})" title="Remove">🗑️</button>
+      </div>
+      <div class="v2-grid-4">
         <div class="v2-field" style="grid-column: span 1;">
           <label class="v2-label">
             <span class="v2-label-left">
               Reason / Grund
-              <span class="v2-bt-badge" data-bt="${reasonBt}">${reasonBt}
-                <div class="v2-bt-tooltip">
-                  <span class="v2-bt-tooltip-title">${reasonTitle}</span>
-                  <div>Textual reason for the document-level adjustment.</div>
-                  <span class="v2-bt-tooltip-xml">XML: .../ram:SpecifiedTradeAllowanceCharge/ram:Reason</span>
-                  <span class="v2-bt-tooltip-status opt">Optional / Bedingt</span>
-                </div>
-              </span>
+              <span class="v2-bt-badge" data-bt="${reasonBt}">${reasonBt}</span>
             </span>
-            <button type="button" class="v2-xml-help-btn" onclick="jumpToXmlForField('v2DiscountReason_${idx}')" title="Jump to ${reasonBt} in factur-x.xml">?</button>
           </label>
           <input type="text" id="v2DiscountReason_${idx}" class="v2-input" value="${escapeHtml(disc.reason || "")}" placeholder="${isCharge ? 'e.g. Packaging, Freight, Handling' : 'e.g. Early payment rebate or Loyalty'}" oninput="updateV2DiscountField(${idx}, 'reason', this.value)">
         </div>
         <div class="v2-field">
           <label class="v2-label">
             <span class="v2-label-left">
-              ${isCharge ? 'Charge % / Prozentsatz' : 'Discount % / Prozentsatz'}
-              <span class="v2-bt-badge" data-bt="${pctBt}">${pctBt}
-                <div class="v2-bt-tooltip">
-                  <span class="v2-bt-tooltip-title">${pctTitle}</span>
-                  <div>Percentage rate of the document-level adjustment.</div>
-                  <span class="v2-bt-tooltip-xml">XML: .../ram:SpecifiedTradeAllowanceCharge/ram:CalculationPercent</span>
-                  <span class="v2-bt-tooltip-status opt">Optional / Bedingt</span>
-                </div>
-              </span>
+              ${isCharge ? 'Tax Category / Steuersatz (BT-102/103)' : 'Tax Category / Steuersatz (BT-95/96)'} <span class="v2-req-star">*</span>
             </span>
-            <button type="button" class="v2-xml-help-btn" onclick="jumpToXmlForField('v2DiscountPct_${idx}')" title="Jump to ${pctBt} in factur-x.xml">?</button>
           </label>
-          <input type="number" id="v2DiscountPct_${idx}" step="0.1" min="0" max="100" class="v2-input" value="${disc.percentage !== null && disc.percentage !== undefined ? disc.percentage : ''}" placeholder="e.g. 5" oninput="handleV2DiscountPercentChange(${idx}, this.value)">
+          <select class="v2-select" onchange="handleV2DiscountTaxCategoryChange(${idx}, this.value)">
+            <option value="S_19" ${taxCat === 'S' && taxPct === 19 ? 'selected' : ''}>Standard 19% (S)</option>
+            <option value="S_22" ${taxCat === 'S' && taxPct === 22 ? 'selected' : ''}>Standard 22% (S - SI)</option>
+            <option value="S_7" ${taxCat === 'S' && taxPct === 7 ? 'selected' : ''}>Reduced 7% (S)</option>
+            <option value="S_9.5" ${taxCat === 'S' && taxPct === 9.5 ? 'selected' : ''}>Reduced 9.5% (S - SI)</option>
+            <option value="Z_0" ${taxCat === 'Z' ? 'selected' : ''}>Zero 0% (Z)</option>
+            <option value="AE_0" ${taxCat === 'AE' ? 'selected' : ''}>Reverse Charge 0% (AE)</option>
+            <option value="E_0" ${taxCat === 'E' ? 'selected' : ''}>Exempt 0% (E)</option>
+            <option value="K_0" ${taxCat === 'K' ? 'selected' : ''}>Intra-Community 0% (K)</option>
+            <option value="G_0" ${taxCat === 'G' ? 'selected' : ''}>Export 0% (G)</option>
+          </select>
         </div>
         <div class="v2-field">
           <label class="v2-label">
             <span class="v2-label-left">
-              ${isCharge ? 'Charge Amount (€) / Betrag' : 'Discount Amount (€) / Betrag'} <span class="v2-req-star">*</span>
-              <span class="v2-bt-badge" data-bt="${amtBt}">${amtBt}
-                <div class="v2-bt-tooltip">
-                  <span class="v2-bt-tooltip-title">${amtTitle}</span>
-                  <div>The actual monetary amount of the adjustment.</div>
-                  <span class="v2-bt-tooltip-xml">XML: .../ram:SpecifiedTradeAllowanceCharge/ram:ActualAmount</span>
-                  <span class="v2-bt-tooltip-status req">● Mandatory Standard Field / Pflichtfeld</span>
-                </div>
-              </span>
+              ${isCharge ? 'Charge %' : 'Discount %'}
+              <span class="v2-bt-badge" data-bt="${pctBt}">${pctBt}</span>
             </span>
-            <button type="button" class="v2-xml-help-btn" onclick="jumpToXmlForField('v2DiscountAmount_${idx}')" title="Jump to ${amtBt} in factur-x.xml">?</button>
           </label>
-          <input type="number" id="v2DiscountAmount_${idx}" step="0.01" min="0" class="v2-input" value="${disc.amount || 0}" placeholder="0.00" oninput="updateV2DiscountField(${idx}, 'amount', parseFloat(this.value)||0)">
+          <input type="number" id="v2DiscountPct_${idx}" step="0.01" min="0" max="100" class="v2-input" value="${disc.percentage !== null && disc.percentage !== undefined ? disc.percentage : ''}" placeholder="e.g. 5" oninput="handleV2DiscountPercentChange(${idx}, this.value)">
+        </div>
+        <div class="v2-field">
+          <label class="v2-label">
+            <span class="v2-label-left">
+              ${isCharge ? 'Charge (€)' : 'Discount (€)'} <span class="v2-req-star">*</span>
+              <span class="v2-bt-badge" data-bt="${amtBt}">${amtBt}</span>
+            </span>
+          </label>
+          <input type="number" id="v2DiscountAmount_${idx}" step="0.01" min="0" class="v2-input" value="${disc.amount || 0}" placeholder="0.00" oninput="handleV2DiscountAmountChange(${idx}, this.value)">
         </div>
       </div>
     `;
@@ -578,12 +995,36 @@ function renderV2DocumentDiscounts() {
   recalcV2Totals();
 }
 
+function handleV2DiscountTaxCategoryChange(idx, catVal) {
+  if (!v2DocumentDiscounts[idx]) return;
+  const parts = catVal.split("_");
+  v2DocumentDiscounts[idx].tax_category_code = parts[0] || "S";
+  v2DocumentDiscounts[idx].tax_percent = parseFloat(parts[1]) || 0.0;
+  recalcV2Totals();
+}
+window.handleV2DiscountTaxCategoryChange = handleV2DiscountTaxCategoryChange;
+
 function addV2DocumentDiscount(isCharge = false) {
+  let domCat = "S";
+  let domPct = 19.0;
+  if (v2LineItems.length > 0) {
+    domCat = v2LineItems[0].tax_category_code || "S";
+    domPct = v2LineItems[0].tax_percent !== undefined ? v2LineItems[0].tax_percent : 19.0;
+  }
+  let itemsNet = 0;
+  v2LineItems.forEach(it => {
+    const bq = it.price_base_quantity || 1.0;
+    itemsNet += Math.max(0, (it.quantity * it.unit_price) / (bq > 0 ? bq : 1.0));
+  });
+
   v2DocumentDiscounts.push({
     reason: isCharge ? "Packaging / Freight" : "Document Discount",
     percentage: null,
     amount: 0.0,
-    charge_indicator: Boolean(isCharge)
+    base_amount: itemsNet,
+    charge_indicator: Boolean(isCharge),
+    tax_category_code: domCat,
+    tax_percent: domPct
   });
   renderV2DocumentDiscounts();
 }
@@ -607,17 +1048,31 @@ function updateV2DiscountField(idx, field, val) {
 }
 window.updateV2DiscountField = updateV2DiscountField;
 
+function getDocumentDiscountBaseTotal() {
+  let itemsNet = 0;
+  v2LineItems.forEach(it => {
+    const bq = it.price_base_quantity || 1.0;
+    let lineDiscounts = 0;
+    let lineCharges = 0;
+    (it.allowances_charges || []).forEach(ac => {
+      const a = parseFloat(ac.amount) || 0;
+      if (ac.charge_indicator) lineCharges += a;
+      else lineDiscounts += a;
+    });
+    itemsNet += Math.max(0, ((it.quantity * it.unit_price) / (bq > 0 ? bq : 1.0)) - lineDiscounts + lineCharges);
+  });
+  return itemsNet;
+}
+
 function handleV2DiscountPercentChange(idx, pctVal) {
   if (!v2DocumentDiscounts[idx]) return;
+  const baseTotal = getDocumentDiscountBaseTotal();
+  v2DocumentDiscounts[idx].base_amount = baseTotal;
+
   const pct = parseFloat(pctVal);
-  if (!isNaN(pct) && pct > 0) {
+  if (!isNaN(pct) && pct >= 0) {
     v2DocumentDiscounts[idx].percentage = pct;
-    // Calculate amount from net line items
-    let itemsNet = 0;
-    v2LineItems.forEach(it => {
-      itemsNet += Math.max(0, (it.quantity * it.unit_price) - (it.discount_amount || 0));
-    });
-    const calculatedAmt = Math.round(itemsNet * (pct / 100) * 100) / 100;
+    const calculatedAmt = Math.round(baseTotal * (pct / 100) * 100) / 100;
     v2DocumentDiscounts[idx].amount = calculatedAmt;
   } else {
     v2DocumentDiscounts[idx].percentage = null;
@@ -625,6 +1080,27 @@ function handleV2DiscountPercentChange(idx, pctVal) {
   renderV2DocumentDiscounts();
 }
 window.handleV2DiscountPercentChange = handleV2DiscountPercentChange;
+
+function handleV2DiscountAmountChange(idx, amtVal) {
+  if (!v2DocumentDiscounts[idx]) return;
+  const baseTotal = getDocumentDiscountBaseTotal();
+  v2DocumentDiscounts[idx].base_amount = baseTotal;
+
+  const amt = parseFloat(amtVal);
+  if (!isNaN(amt) && amt >= 0) {
+    v2DocumentDiscounts[idx].amount = amt;
+    if (baseTotal > 0) {
+      v2DocumentDiscounts[idx].percentage = Math.round((amt / baseTotal) * 10000) / 100;
+    } else {
+      v2DocumentDiscounts[idx].percentage = null;
+    }
+  } else {
+    v2DocumentDiscounts[idx].amount = 0.0;
+    v2DocumentDiscounts[idx].percentage = null;
+  }
+  recalcV2Totals();
+}
+window.handleV2DiscountAmountChange = handleV2DiscountAmountChange;
 
 // 4b. Dynamic Document Notes (<ram:IncludedNote> / BT-22)
 function initV2InvoiceNotes() {
@@ -696,49 +1172,83 @@ function recalcV2Totals() {
   let hasExemption = false;
 
   v2LineItems.forEach(it => {
-    const lineNet = Math.max(0, (it.quantity * it.unit_price) - (it.discount_amount || 0));
+    const baseQty = it.price_base_quantity || 1.0;
+    let lineAllowances = 0;
+    let lineCharges = 0;
+    if (it.allowances_charges && Array.isArray(it.allowances_charges)) {
+      it.allowances_charges.forEach(ac => {
+        const amt = parseFloat(ac.amount) || 0;
+        if (ac.charge_indicator) lineCharges += amt;
+        else lineAllowances += amt;
+      });
+    } else {
+      lineAllowances = it.discount_amount || 0;
+    }
+    const itemNetSub = (it.quantity * it.unit_price) / (baseQty > 0 ? baseQty : 1.0);
+    const lineNet = Math.max(0, itemNetSub - lineAllowances + lineCharges);
     lineNetTotal += lineNet;
 
-    const rateKey = `${it.tax_category_code}_${it.tax_percent}`;
+    const catCode = (it.tax_category_code || "S").toUpperCase();
+    const rateVal = parseFloat(it.tax_percent) || 0.0;
+    const rateKey = `${catCode}_${rateVal}`;
     if (!taxGroups[rateKey]) {
       taxGroups[rateKey] = {
-        category: it.tax_category_code,
-        rate: it.tax_percent,
+        category: catCode,
+        rate: rateVal,
         basis: 0,
         tax: 0
       };
     }
     taxGroups[rateKey].basis += lineNet;
-    taxGroups[rateKey].tax += Math.round(lineNet * (it.tax_percent / 100) * 100) / 100;
+    taxGroups[rateKey].tax += Math.round(lineNet * (rateVal / 100) * 100) / 100;
 
-    if (it.tax_category_code === "E") hasExemption = true;
+    // Trigger exemption input if 0% or AE, E, G, K
+    if (rateVal === 0 || ["E", "AE", "G", "K"].includes(catCode)) {
+      hasExemption = true;
+    }
   });
 
-  // Calculate document-level allowances (BT-92) and charges (BT-99)
+  // Calculate document-level allowances (BT-92) and charges (BT-99) allocated to specific tax categories (BT-95 / BT-96)
   let totalDocAllowance = 0;
   let totalDocCharge = 0;
   v2DocumentDiscounts.forEach(d => {
     const amt = Math.max(0, parseFloat(d.amount) || 0);
+    if (amt <= 0) return;
+    const catCode = (d.tax_category_code || "S").toUpperCase();
+    const rateVal = parseFloat(d.tax_percent) || 0.0;
+    const rateKey = `${catCode}_${rateVal}`;
+
+    if (!taxGroups[rateKey]) {
+      taxGroups[rateKey] = {
+        category: catCode,
+        rate: rateVal,
+        basis: 0,
+        tax: 0
+      };
+    }
+
     if (d.charge_indicator) {
       totalDocCharge += amt;
+      taxGroups[rateKey].basis += amt;
     } else {
       totalDocAllowance += amt;
+      taxGroups[rateKey].basis = Math.max(0, taxGroups[rateKey].basis - amt);
+    }
+
+    if (rateVal === 0 || ["E", "AE", "G", "K"].includes(catCode)) {
+      hasExemption = true;
     }
   });
 
   const netAdjustment = totalDocCharge - totalDocAllowance;
   const taxableNet = Math.max(0, lineNetTotal + netAdjustment);
 
-  // If there are document allowances or charges, adjust tax basis proportionally across groups
   let totalTax = 0;
   const matrixContainer = document.getElementById("v2TaxMatrixContainer");
   if (matrixContainer) {
     matrixContainer.innerHTML = "";
     Object.values(taxGroups).forEach(grp => {
-      // Pro-rate adjustment if lines exist
-      const groupRatio = lineNetTotal > 0 ? (grp.basis / lineNetTotal) : 0;
-      const effectiveGroupBasis = Math.max(0, grp.basis + (netAdjustment * groupRatio));
-      const effectiveGroupTax = Math.round(effectiveGroupBasis * (grp.rate / 100) * 100) / 100;
+      const effectiveGroupTax = Math.round(grp.basis * (grp.rate / 100) * 100) / 100;
       grp.tax = effectiveGroupTax;
       totalTax += effectiveGroupTax;
 
@@ -747,7 +1257,7 @@ function recalcV2Totals() {
       tile.innerHTML = `
         <div class="v2-tax-tile-label">${grp.rate}% (${grp.category})</div>
         <div class="v2-tax-tile-val">€${effectiveGroupTax.toFixed(2)}</div>
-        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Base: €${effectiveGroupBasis.toFixed(2)}</div>
+        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Base: €${grp.basis.toFixed(2)}</div>
       `;
       matrixContainer.appendChild(tile);
     });
@@ -794,7 +1304,7 @@ function recalcV2Totals() {
   setTxt("v2GrandTotal", `€${grandTotal.toFixed(2)}`);
   setTxt("v2DuePayable", `€${dueAmount.toFixed(2)}`);
 
-  // Reveal exemption input if category E present
+  // Reveal exemption input if 0% or category E/AE/G/K present
   const exCard = document.getElementById("v2ExemptionCard");
   if (exCard) exCard.style.display = hasExemption ? "block" : "none";
 }
@@ -983,6 +1493,17 @@ function selectV2SavedParty(type, partyId) {
     if (party.tax_number) setVal("v2SellerTaxNumber", party.tax_number);
     if (party.iban) setVal("v2PayIban", party.iban);
     if (party.bic) setVal("v2PayBic", party.bic);
+
+    if (party.iban) {
+      v2BankAccounts = [{
+        iban: party.iban,
+        bank_name: party.name ? `${party.name} Bank` : "Primary Bank",
+        bic: party.bic || ""
+      }];
+      renderV2BankAccounts();
+    } else {
+      populateV2DefaultBankAccounts();
+    }
   }
 }
 window.selectV2SavedParty = selectV2SavedParty;
@@ -1215,17 +1736,44 @@ function harvestV2InvoiceData() {
   const taxBreakdownMap = {};
 
   const items = v2LineItems.map((it, idx) => {
-    const lineNet = Math.max(0, (it.quantity * it.unit_price) - (it.discount_amount || 0));
+    const baseQty = it.price_base_quantity || 1.0;
+    const itemGrossBase = (it.quantity * it.unit_price) / (baseQty > 0 ? baseQty : 1.0);
+    let lineAllowances = 0;
+    let lineCharges = 0;
+    const cleanAC = (it.allowances_charges || []).filter(ac => (parseFloat(ac.amount) || 0) > 0).map(ac => ({
+      charge_indicator: Boolean(ac.charge_indicator),
+      amount: parseFloat(ac.amount) || 0,
+      percentage: ac.percentage !== undefined && ac.percentage !== null ? parseFloat(ac.percentage) : null,
+      base_amount: ac.base_amount !== undefined && ac.base_amount !== null ? parseFloat(ac.base_amount) : itemGrossBase,
+      reason: ac.reason || (ac.charge_indicator ? "Item Surcharge" : "Item Discount")
+    }));
+    cleanAC.forEach(ac => {
+      if (ac.charge_indicator) lineCharges += ac.amount;
+      else lineAllowances += ac.amount;
+    });
+
+    const itemNetSub = itemGrossBase;
+    const lineNet = Math.max(0, itemNetSub - lineAllowances + lineCharges);
     lineNetTotal += lineNet;
 
-    const rateKey = `${it.tax_category_code}_${it.tax_percent}`;
+    const catCode = (it.tax_category_code || "S").toUpperCase();
+    const rateVal = parseFloat(it.tax_percent) || 0.0;
+    const rateKey = `${catCode}_${rateVal}`;
     if (!taxBreakdownMap[rateKey]) {
+      const exReason = ["E", "AE", "G", "K"].includes(catCode) || rateVal === 0 
+        ? (document.getElementById("v2ExemptionReason")?.value || "Reverse charge / Tax exempt") 
+        : null;
+      const exCode = ["E", "AE", "G", "K"].includes(catCode) || rateVal === 0 
+        ? (document.getElementById("v2ExemptionReasonCode")?.value || null) 
+        : null;
+
       taxBreakdownMap[rateKey] = {
-        tax_category_code: it.tax_category_code,
-        tax_percent: it.tax_percent,
+        tax_category_code: catCode,
+        tax_percent: rateVal,
         basis_amount: 0,
         tax_amount: 0,
-        exemption_reason: it.tax_category_code === "E" ? (document.getElementById("v2ExemptionReason")?.value || "Small business exemption") : null
+        exemption_reason: exReason,
+        exemption_reason_code: exCode
       };
     }
     taxBreakdownMap[rateKey].basis_amount += lineNet;
@@ -1233,13 +1781,23 @@ function harvestV2InvoiceData() {
     return {
       line_id: String(idx + 1),
       name: it.name,
+      description: it.description || null,
+      seller_item_id: it.seller_item_id || null,
+      buyer_item_id: it.buyer_item_id || null,
+      standard_item_id: it.standard_item_id || null,
+      standard_item_id_scheme: it.standard_item_id_scheme || "0160",
+      order_line_reference: it.order_line_reference || null,
+      price_base_quantity: baseQty,
+      price_base_unit: it.price_base_unit || it.unit_code,
+      item_serial_number: it.item_serial_number || null,
       quantity: it.quantity,
       unit_code: it.unit_code,
       unit_price: it.unit_price,
       line_total_amount: lineNet,
-      tax_category_code: it.tax_category_code,
-      tax_percent: it.tax_percent,
-      discount_amount: it.discount_amount || 0.0
+      tax_category_code: catCode,
+      tax_percent: rateVal,
+      discount_amount: lineAllowances,
+      allowances_charges: cleanAC
     };
   });
 
@@ -1251,26 +1809,51 @@ function harvestV2InvoiceData() {
     .map(d => {
       const isCharge = Boolean(d.charge_indicator);
       const amt = parseFloat(d.amount) || 0.0;
+      const catCode = (d.tax_category_code || "S").toUpperCase();
+      const rateVal = parseFloat(d.tax_percent) || 0.0;
+      const rateKey = `${catCode}_${rateVal}`;
+
+      if (!taxBreakdownMap[rateKey]) {
+        const exReason = ["E", "AE", "G", "K"].includes(catCode) || rateVal === 0 
+          ? (document.getElementById("v2ExemptionReason")?.value || "Reverse charge / Tax exempt") 
+          : null;
+        const exCode = ["E", "AE", "G", "K"].includes(catCode) || rateVal === 0 
+          ? (document.getElementById("v2ExemptionReasonCode")?.value || null) 
+          : null;
+
+        taxBreakdownMap[rateKey] = {
+          tax_category_code: catCode,
+          tax_percent: rateVal,
+          basis_amount: 0,
+          tax_amount: 0,
+          exemption_reason: exReason,
+          exemption_reason_code: exCode
+        };
+      }
+
       if (isCharge) {
         totalDocCharge += amt;
+        taxBreakdownMap[rateKey].basis_amount += amt;
       } else {
         totalDocAllowance += amt;
+        taxBreakdownMap[rateKey].basis_amount = Math.max(0, taxBreakdownMap[rateKey].basis_amount - amt);
       }
+
       return {
         reason: d.reason || (isCharge ? "Packaging / Charge" : "Document Discount"),
         percentage: d.percentage !== null && d.percentage !== undefined ? parseFloat(d.percentage) : null,
         amount: amt,
-        charge_indicator: isCharge
+        charge_indicator: isCharge,
+        tax_category_code: catCode,
+        tax_percent: rateVal,
+        base_amount: d.base_amount !== undefined && d.base_amount !== null ? parseFloat(d.base_amount) : lineNetTotal
       };
     });
 
   const netAdjustment = totalDocCharge - totalDocAllowance;
   let taxTotal = 0;
   Object.values(taxBreakdownMap).forEach(grp => {
-    const groupRatio = lineNetTotal > 0 ? (grp.basis_amount / lineNetTotal) : 0;
-    const effectiveBasis = Math.max(0, grp.basis_amount + (netAdjustment * groupRatio));
-    const effectiveTax = Math.round(effectiveBasis * (grp.tax_percent / 100) * 100) / 100;
-    grp.basis_amount = effectiveBasis;
+    const effectiveTax = Math.round(grp.basis_amount * (grp.tax_percent / 100) * 100) / 100;
     grp.tax_amount = effectiveTax;
     taxTotal += effectiveTax;
   });
@@ -1285,6 +1868,29 @@ function harvestV2InvoiceData() {
     .map(n => (typeof n === "string" ? n.trim() : String(n || "").trim()))
     .filter(n => n.length > 0 && !n.includes("ZUGFeRD PDF/A-3 Generator"));
 
+  // Bank accounts harvesting (BG-17)
+  const cleanBankAccounts = (v2BankAccounts || [])
+    .filter(a => (a.iban || "").trim().length > 0)
+    .map(a => ({
+      iban: (a.iban || "").replace(/\s+/g, "").toUpperCase(),
+      bank_name: (a.bank_name || "").trim() || null,
+      bic: (a.bic || "").replace(/\s+/g, "").toUpperCase() || null
+    }));
+
+  const primaryIban = cleanBankAccounts.length > 0 ? cleanBankAccounts[0].iban : (document.getElementById("v2PayIban")?.value.trim() || "");
+  const primaryBic = cleanBankAccounts.length > 0 ? cleanBankAccounts[0].bic : (document.getElementById("v2PayBic")?.value.trim() || "");
+  const primaryBankName = cleanBankAccounts.length > 0 ? cleanBankAccounts[0].bank_name : null;
+
+  // Factoring / Payee details (BG-10)
+  const factoringName = document.getElementById("v2FactoringName")?.value.trim() || null;
+  const factoringId = document.getElementById("v2FactoringId")?.value.trim() || null;
+  const factoringVat = document.getElementById("v2FactoringVat")?.value.trim() || null;
+  const factoringPayee = (factoringName || factoringId || factoringVat) ? {
+    name: factoringName,
+    payee_id: factoringId,
+    vat_id: factoringVat
+  } : null;
+
   return {
     invoice_number: document.getElementById("v2InvNumber")?.value.trim() || "",
     issue_date: document.getElementById("v2IssueDate")?.value || "",
@@ -1294,6 +1900,9 @@ function harvestV2InvoiceData() {
     document_format: isOrderX ? "orderx" : "zugferd",
     buyer_reference: document.getElementById("v2BuyerRef")?.value.trim() || "",
     purchase_order_number: document.getElementById("v2PurchaseOrder")?.value.trim() || null,
+    sales_order_number: document.getElementById("v2SalesOrder")?.value.trim() || null,
+    contract_reference: document.getElementById("v2ContractRef")?.value.trim() || null,
+    cost_center: document.getElementById("v2CostCenter")?.value.trim() || null,
     preceding_invoice_number: document.getElementById("v2PrecedingInvNumber")?.value.trim() || null,
     preceding_invoice_date: document.getElementById("v2PrecedingInvDate")?.value || null,
     service_period_start: document.getElementById("v2ServiceStart")?.value || null,
@@ -1301,8 +1910,13 @@ function harvestV2InvoiceData() {
     prepaid_amount: prepaidAmount,
     discounts: docDiscounts,
     vat_exemption_reason: document.getElementById("v2ExemptionReason")?.value || null,
+    vat_exemption_reason_code: document.getElementById("v2ExemptionReasonCode")?.value || null,
     seller: {
       name: document.getElementById("v2SellerName")?.value.trim() || "",
+      company_legal_form: document.getElementById("v2SellerRegId")?.value.trim() || null,
+      legal_info: document.getElementById("v2SellerLegalInfo")?.value.trim() || null,
+      endpoint_id: document.getElementById("v2SellerEndpointId")?.value.trim() || null,
+      endpoint_scheme: document.getElementById("v2SellerEndpointScheme")?.value || "9930",
       vat_id: document.getElementById("v2SellerVat")?.value.trim() || "",
       tax_number: document.getElementById("v2SellerTaxNumber")?.value.trim() || "",
       tax_registration_id: document.getElementById("v2SellerTaxNumber")?.value.trim() || "",
@@ -1316,6 +1930,8 @@ function harvestV2InvoiceData() {
     },
     buyer: {
       name: document.getElementById("v2BuyerName")?.value.trim() || "",
+      endpoint_id: document.getElementById("v2BuyerEndpointId")?.value.trim() || null,
+      endpoint_scheme: document.getElementById("v2BuyerEndpointScheme")?.value || "9930",
       vat_id: document.getElementById("v2BuyerVat")?.value.trim() || "",
       street: document.getElementById("v2BuyerStreet")?.value.trim() || "",
       city: document.getElementById("v2BuyerCity")?.value.trim() || "",
@@ -1328,6 +1944,7 @@ function harvestV2InvoiceData() {
     delivery: {
       recipient_name: document.getElementById("v2DelivName")?.value.trim() || null,
       location_id: document.getElementById("v2DelivLocationId")?.value.trim() || null,
+      location_scheme: document.getElementById("v2DelivLocationScheme")?.value || "0088",
       delivery_date: document.getElementById("v2DelivDate")?.value || null,
       despatch_advice_id: document.getElementById("v2DelivDespatchRef")?.value.trim() || null,
       street: document.getElementById("v2DelivStreet")?.value.trim() || null,
@@ -1336,10 +1953,14 @@ function harvestV2InvoiceData() {
       country_code: document.getElementById("v2DelivCountry")?.value || "DE"
     },
     payment: {
-      iban: document.getElementById("v2PayIban")?.value.trim() || "",
-      bic: document.getElementById("v2PayBic")?.value.trim() || "",
+      iban: primaryIban,
+      bic: primaryBic,
+      bank_name: primaryBankName,
+      bank_accounts: cleanBankAccounts,
       payment_means_code: document.getElementById("v2PayMethod")?.value || "58",
-      payment_terms: document.getElementById("v2PayTerms")?.value.trim() || ""
+      payment_terms: document.getElementById("v2PayTerms")?.value.trim() || "",
+      payment_reference: document.getElementById("v2PayReference")?.value.trim() || null,
+      factoring_payee: factoringPayee
     },
     notes: cleanNotes,
     invoice_notes: cleanNotes,
@@ -1365,8 +1986,53 @@ async function validateV2Invoice() {
   if (!invData.buyer.name) errors.push("Buyer Company Name is required.");
   if (invData.items.length === 0) errors.push("At least one line item is required.");
 
-  if ((invData.invoice_type_code === "381" || invData.invoice_type_code === "384") && !invData.preceding_invoice_number) {
-    errors.push("Credit Notes (381) and Corrected Invoices (384) require a Preceding Invoice Number.");
+  const docType = invData.invoice_type_code;
+
+  // Due Date (BT-9): mandatory for 380 and 384, optional for 381 (Credit Note)
+  if (docType === "380" || docType === "384") {
+    if (!invData.due_date) {
+      errors.push("Payment Due Date (BT-9) is mandatory for Commercial Invoices (380) and Corrected Invoices (384).");
+    }
+  }
+
+  // Preceding Invoice (BG-3 / BT-25): strictly required for 381 and 384
+  if (docType === "381" || docType === "384") {
+    if (!invData.preceding_invoice_number) {
+      errors.push("Credit Notes (381) and Corrected Invoices (384) strictly require a Preceding Invoice Number (BT-25).");
+    }
+  }
+
+  // Credit Note (381) Positive Quantities rule (EN 16931 Schematron rule)
+  if (docType === "381") {
+    invData.items.forEach((it, idx) => {
+      if (it.quantity < 0) {
+        errors.push(`Line #${idx + 1}: Quantity must be positive on Credit Notes (381). The document type code already conveys the credit direction.`);
+      }
+      if (it.unit_price < 0) {
+        errors.push(`Line #${idx + 1}: Unit price must be positive on Credit Notes (381).`);
+      }
+      if (it.line_total_amount < 0) {
+        errors.push(`Line #${idx + 1}: Line net total must be positive on Credit Notes (381).`);
+      }
+    });
+    if (invData.grand_total < 0) {
+      errors.push("Grand total must be positive on Credit Notes (381).");
+    }
+  }
+
+  // VAT Exemption Reason & Code (BT-120 & BT-121): required when 0% or categories AE, E, G, K are used
+  const hasExemptItem = invData.items.some(it => {
+    const cat = (it.tax_category_code || "S").toUpperCase();
+    const rate = parseFloat(it.tax_percent) || 0;
+    return rate === 0 || ["AE", "E", "G", "K"].includes(cat);
+  });
+  if (hasExemptItem) {
+    if (!invData.vat_exemption_reason || !invData.vat_exemption_reason.trim()) {
+      errors.push("VAT Exemption Reason Text (BT-120) is required for 0% / reverse charge / exempt lines (e.g. 'Reverse charge according to §13b UStG / Art. 194/196').");
+    }
+    if (!invData.vat_exemption_reason_code || !invData.vat_exemption_reason_code.trim()) {
+      errors.push("VAT Exemption Reason Code (BT-121) is required for 0% / reverse charge / exempt lines (e.g. 'VATEX-EU-AE').");
+    }
   }
 
   if (errors.length > 0) {
@@ -1403,6 +2069,7 @@ async function handleV2GenerateSubmit() {
     const invData = harvestV2InvoiceData();
     const layout = document.getElementById("v2LayoutSelect")?.value || "original";
     const lang = document.getElementById("v2LangSelect")?.value || "multi";
+    const showBtTags = Boolean(document.getElementById("v2ShowBtTags")?.checked);
 
     let apiProfile = "EN16931";
     if (invData.document_format === "orderx") apiProfile = "BASIC";
@@ -1419,6 +2086,7 @@ async function handleV2GenerateSubmit() {
         invoice_data: invData,
         layout: layout,
         lang: lang,
+        show_bt_tags: showBtTags,
         file_id: v2UploadedFileId,
         generator: "v2",
         source_type: "v2",
@@ -1500,6 +2168,10 @@ function populateV2FromHistory(inv, layout, lang) {
     const langEl = document.getElementById("v2LangSelect");
     if (langEl) langEl.value = lang;
   }
+  const btTagsEl = document.getElementById("v2ShowBtTags");
+  if (btTagsEl) {
+    btTagsEl.checked = Boolean(historyEntry?.show_bt_tags || inv?.show_bt_tags);
+  }
 
   // Header Details
   const setVal = (id, val) => {
@@ -1519,6 +2191,10 @@ function populateV2FromHistory(inv, layout, lang) {
   setVal("v2ServiceEnd", inv.service_period_end);
   setVal("v2PrepaidAmount", inv.prepaid_amount || 0);
 
+  setVal("v2SalesOrder", inv.sales_order_number);
+  setVal("v2ContractRef", inv.contract_reference);
+  setVal("v2CostCenter", inv.cost_center);
+
   // Seller
   const seller = inv.seller || {};
   setVal("v2SellerName", seller.name);
@@ -1530,6 +2206,10 @@ function populateV2FromHistory(inv, layout, lang) {
   setVal("v2SellerCountry", seller.country_code || "DE");
   setVal("v2SellerPhone", seller.contact_phone);
   setVal("v2SellerEmail", seller.contact_email);
+  setVal("v2SellerRegId", seller.company_legal_form || seller.commercial_register_number);
+  setVal("v2SellerLegalInfo", seller.legal_info);
+  setVal("v2SellerEndpointId", seller.endpoint_id);
+  setVal("v2SellerEndpointScheme", seller.endpoint_scheme || "0088");
 
   // Buyer
   const buyer = inv.buyer || {};
@@ -1542,6 +2222,8 @@ function populateV2FromHistory(inv, layout, lang) {
   setVal("v2BuyerContactName", buyer.contact_name);
   setVal("v2BuyerPhone", buyer.contact_phone);
   setVal("v2BuyerEmail", buyer.contact_email);
+  setVal("v2BuyerEndpointId", buyer.endpoint_id);
+  setVal("v2BuyerEndpointScheme", buyer.endpoint_scheme || "0088");
   if (buyer.contact_name || buyer.contact_phone || buyer.contact_email) {
     const bSec = document.getElementById("v2BuyerContactSec");
     if (bSec) bSec.style.display = "block";
@@ -1551,6 +2233,7 @@ function populateV2FromHistory(inv, layout, lang) {
   const deliv = inv.delivery || {};
   setVal("v2DelivName", deliv.recipient_name);
   setVal("v2DelivLocationId", deliv.location_id);
+  setVal("v2DelivLocationScheme", deliv.location_scheme || "0088");
   setVal("v2DelivDate", deliv.delivery_date);
   setVal("v2DelivDespatchRef", deliv.despatch_advice_reference || deliv.despatch_advice_id);
   setVal("v2DelivStreet", deliv.street);
@@ -1572,19 +2255,75 @@ function populateV2FromHistory(inv, layout, lang) {
   }
   setVal("v2PayMethod", pay.payment_means_code || "58");
   setVal("v2PayTerms", pay.payment_terms || "");
+  setVal("v2PayReference", pay.payment_reference || inv.payment_reference || "");
+
+  // Multiple Bank Accounts
+  if (pay.bank_accounts && Array.isArray(pay.bank_accounts) && pay.bank_accounts.length > 0) {
+    v2BankAccounts = pay.bank_accounts.map(acc => ({
+      iban: acc.iban || "",
+      bank_name: acc.bank_name || "",
+      bic: acc.bic || ""
+    }));
+  } else if (pay.iban) {
+    v2BankAccounts = [{
+      iban: pay.iban || "",
+      bank_name: pay.bank_name || "",
+      bic: pay.bic || ""
+    }];
+  } else {
+    v2BankAccounts = [];
+  }
+  renderV2BankAccounts();
+
+  // Factoring Payee (BG-10)
+  const factoringToggle = document.getElementById("v2FactoringToggle");
+  const factoringSec = document.getElementById("v2FactoringSection");
+  const payee = inv.factoring_payee || {};
+  if (payee.name || payee.payee_id || payee.vat_id) {
+    if (factoringToggle) factoringToggle.checked = true;
+    if (factoringSec) factoringSec.style.display = "block";
+    setVal("v2FactoringName", payee.name);
+    setVal("v2FactoringId", payee.payee_id);
+    setVal("v2FactoringVat", payee.vat_id);
+  } else {
+    if (factoringToggle) factoringToggle.checked = false;
+    if (factoringSec) factoringSec.style.display = "none";
+    setVal("v2FactoringName", "");
+    setVal("v2FactoringId", "");
+    setVal("v2FactoringVat", "");
+  }
+
+  // Exemption
+  setVal("v2ExemptionReason", inv.vat_exemption_reason || "");
+  setVal("v2ExemptionReasonCode", inv.vat_exemption_reason_code || "");
 
   // Line items
   const items = inv.items || inv.line_items || [];
   if (items.length > 0) {
     v2LineItems = items.map(it => ({
       name: it.name || it.item_name || "Item",
+      description: it.description || "",
+      seller_item_id: it.seller_item_id || "",
+      buyer_item_id: it.buyer_item_id || "",
+      standard_item_id: it.standard_item_id || "",
+      standard_item_id_scheme: it.standard_item_id_scheme || "0160",
+      order_line_reference: it.order_line_reference || "",
       quantity: Number(it.quantity) || 1,
       unit_code: it.unit_code || "C62",
       unit_price: Number(it.unit_price) || 0,
+      price_base_quantity: Number(it.price_base_quantity) || 1,
+      price_base_unit: it.price_base_unit || "",
       tax_category_code: it.tax_category_code || "S",
       tax_percent: it.tax_percent !== undefined ? Number(it.tax_percent) : 19.0,
       discount_amount: Number(it.discount_amount) || 0.0,
-      discount_percent: it.discount_percent || null
+      discount_percent: it.discount_percent || null,
+      allowances_charges: Array.isArray(it.allowances_charges) ? it.allowances_charges.map(ac => ({
+        charge_indicator: Boolean(ac.charge_indicator),
+        amount: Number(ac.amount) || 0.0,
+        reason: ac.reason || "",
+        reason_code: ac.reason_code || "",
+        percentage: ac.percentage !== null && ac.percentage !== undefined ? Number(ac.percentage) : null
+      })) : []
     }));
   } else {
     initV2LineItems();

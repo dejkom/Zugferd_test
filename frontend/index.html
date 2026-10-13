@@ -303,6 +303,10 @@
                 <option value="en">🇬🇧 English (EN)</option>
                 <option value="de">🇩🇪 German (DE)</option>
               </select>
+              <label for="v2ShowBtTags" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.76rem; font-weight: 600; cursor: pointer; padding: 0.28rem 0.55rem; background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 6px; user-select: none; white-space: nowrap; color: var(--text-main);" title="Show or hide BT-X / BG-X semantic badge tags in generated PDF for visual mapping inspection">
+                <input type="checkbox" id="v2ShowBtTags" style="cursor: pointer; accent-color: var(--accent-primary);">
+                <span>🏷️ BT-X in PDF</span>
+              </label>
             </div>
           </div>
 
@@ -313,8 +317,8 @@
                 <option value="380" selected>Commercial Invoice (380 / Rechnung)</option>
                 <option value="381">Credit Note (381 / Gutschrift)</option>
                 <option value="384">Corrected Invoice (384 / Rechnungskorrektur)</option>
+                <option value="389">Prepayment Invoice (389 / Anzahlungsrechnung)</option>
                 <option value="326">Partial Invoice (326 / Teilrechnung)</option>
-                <option value="386">Prepayment Invoice (386 / Anzahlung)</option>
                 <option value="orderx">Order-X Purchase Order (220 / Bestellung)</option>
               </select>
             </div>
@@ -339,11 +343,11 @@
 
           <div class="v2-grid-3" style="margin-top: 1rem;">
             <div class="v2-field">
-              <label class="v2-label">Payment Due Date / Fälligkeitsdatum</label>
+              <label class="v2-label">Payment Due Date / Fälligkeitsdatum <span class="v2-bt-badge" data-bt="BT-9">BT-9</span></label>
               <input type="date" id="v2DueDate" class="v2-input">
             </div>
             <div class="v2-field">
-              <label class="v2-label">Payment Method / Zahlungsart</label>
+              <label class="v2-label">Payment Method / Zahlungsart <span class="v2-bt-badge" data-bt="BT-81">BT-81</span></label>
               <select id="v2PayMethod" class="v2-select">
                 <option value="58" selected>SEPA Credit Transfer (58 / Überweisung)</option>
                 <option value="30">Credit Transfer (30 / Banküberweisung)</option>
@@ -353,45 +357,101 @@
             </div>
             <div class="v2-field">
               <label class="v2-label">
-                <span>IBAN / Bankkonto</span>
-                <button type="button" class="v2-label-link" onclick="toggleV2Section('v2BicFieldWrapper', null)">+ Add BIC</button>
+                <span>Remittance Ref / Sklic / Verwendungszweck <span class="v2-bt-badge" data-bt="BT-83">BT-83</span></span>
               </label>
-              <input type="text" id="v2PayIban" class="v2-input" placeholder="e.g. DE89370400440532013000">
+              <input type="text" id="v2PayReference" class="v2-input" placeholder="e.g. RF18539007547034 or SI00 2026-001">
             </div>
           </div>
 
-          <div id="v2BicFieldWrapper" style="display: none; margin-top: 0.75rem;">
-            <div class="v2-grid-3">
-              <div class="v2-field">
-                <label class="v2-label">BIC / SWIFT (Bank-Kennung)</label>
-                <input type="text" id="v2PayBic" class="v2-input" placeholder="e.g. DBBADEFFXXX">
+          <!-- Multiple Bank Accounts (BG-17) & BIC -->
+          <div style="margin-top: 1rem; background: var(--bg-input); padding: 0.75rem; border-radius: 6px; border: 1px dashed var(--bg-card-border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+              <label class="v2-label" style="margin: 0; font-weight: 600;">
+                🏦 Payment Accounts (BG-17) / Bankverbindungen (<span style="font-size: 0.75rem;">BT-84 IBAN, BT-85 Bank, BT-86 BIC</span>)
+              </label>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <select id="v2BankPresetSelect" class="v2-select" style="padding: 0.2rem 0.5rem; font-size: 0.74rem; max-width: 260px;" onchange="insertV2BankPreset(this.value)">
+                  <option value="">-- Insert Configured Bank --</option>
+                </select>
+                <button type="button" class="btn btn-secondary" onclick="addV2BankAccount()" style="padding: 0.2rem 0.55rem; font-size: 0.74rem;">
+                  + Add Bank Account
+                </button>
+              </div>
+            </div>
+            <div id="v2BankAccountsContainer" style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <!-- Dynamically rendered bank account rows -->
+            </div>
+          </div>
+
+          <!-- Factoring / Third-Party Payee Toggle (BG-10) -->
+          <div style="margin-top: 0.75rem;">
+            <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2FactoringSection', 'v2FactoringChev')">
+              <span id="v2FactoringChev">▼</span>
+              <span>🏢 Payee differs from Seller / Factoring (BG-10 / Dritter Zahlungsempfänger)</span>
+            </button>
+            <div id="v2FactoringSection" style="display: none; margin-top: 0.75rem; background: rgba(59, 130, 246, 0.03); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; padding: 0.75rem;">
+              <div class="v2-grid-3">
+                <div class="v2-field">
+                  <label class="v2-label">Payee Name (BT-59) / Name des Factoring-Empfängers</label>
+                  <input type="text" id="v2FactoringName" class="v2-input" placeholder="e.g. Eurofactor AG / NL Factoring BV">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Payee ID (BT-60) / Empfänger-Kennung</label>
+                  <input type="text" id="v2FactoringId" class="v2-input" placeholder="e.g. FACTOR-77219">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Payee VAT ID (BT-61) / USt-IdNr.</label>
+                  <input type="text" id="v2FactoringVat" class="v2-input" placeholder="e.g. DE129273941">
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Advanced Collapsible Section (PO, Prepaid, Payment Terms) -->
+          <!-- Advanced Collapsible Section (PO, Sales Order, Contract, Cost Center, Invoicing Period, Prepaid, Payment Terms) -->
           <div style="margin-top: 1rem; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem;">
             <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2AdvancedDocSection', 'v2AdvChevron')">
               <span id="v2AdvChevron">▼</span>
-              <span>Advanced Details (Purchase Order, Pre-paid Amount, Payment Terms) / Weitere Details</span>
+              <span>Advanced Document Details (Orders, Contract, Cost Center, Billing Period) / Zusätzliche Referenzen</span>
             </button>
             <div id="v2AdvancedDocSection" style="display: none; margin-top: 0.75rem;">
-              <div class="v2-grid-3">
+              <div class="v2-grid-4">
                 <div class="v2-field">
-                  <label class="v2-label">Purchase Order (PO) / Bestellnummer</label>
-                  <input type="text" id="v2PurchaseOrder" class="v2-input" placeholder="e.g. PO-98421">
+                  <label class="v2-label">Purchase Order (PO / BT-13)</label>
+                  <input type="text" id="v2PurchaseOrder" class="v2-input" placeholder="e.g. 11462833">
                 </div>
                 <div class="v2-field">
-                  <label class="v2-label">Buyer Reference / Leitweg-ID</label>
-                  <input type="text" id="v2BuyerRef" class="v2-input" placeholder="e.g. 04011000-12345-67">
+                  <label class="v2-label">Sales Order Ref (BT-14 / Intern)</label>
+                  <input type="text" id="v2SalesOrder" class="v2-input" placeholder="e.g. SO-2026-9041">
                 </div>
                 <div class="v2-field">
-                  <label class="v2-label">Already Paid / Gezahlter Betrag (€)</label>
+                  <label class="v2-label">Contract / Agreement (BT-12)</label>
+                  <input type="text" id="v2ContractRef" class="v2-input" placeholder="e.g. F465RG1">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Buyer Reference / Leitweg-ID (BT-10)</label>
+                  <input type="text" id="v2BuyerRef" class="v2-input" placeholder="e.g. EP53 or 04011000-12345-67">
+                </div>
+              </div>
+              <div class="v2-grid-4" style="margin-top: 0.75rem;">
+                <div class="v2-field">
+                  <label class="v2-label">Cost Center / Buyer Acct (BT-19)</label>
+                  <input type="text" id="v2CostCenter" class="v2-input" placeholder="e.g. CC-PROD-401">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Billing Period Start (BT-73)</label>
+                  <input type="date" id="v2ServiceStart" class="v2-input">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Billing Period End (BT-74)</label>
+                  <input type="date" id="v2ServiceEnd" class="v2-input">
+                </div>
+                <div class="v2-field">
+                  <label class="v2-label">Already Paid / Gezahlt (BT-113 €)</label>
                   <input type="number" step="0.01" id="v2PrepaidAmount" class="v2-input" placeholder="0.00" oninput="recalcV2Totals()">
                 </div>
               </div>
               <div class="v2-field" style="margin-top: 0.75rem;">
-                <label class="v2-label">Payment Terms Note / Zahlungsbedingungen</label>
+                <label class="v2-label">Payment Terms Note / Zahlungsbedingungen (BT-20)</label>
                 <input type="text" id="v2PayTerms" class="v2-input" placeholder="e.g. Payable within 30 days without deductions / Zahlbar innerhalb 30 Tagen">
               </div>
 
@@ -428,7 +488,7 @@
           </div>
           <div class="v2-grid-4">
             <div class="v2-field">
-              <label class="v2-label">Preceding Invoice Number / Rechnungsnummer</label>
+              <label class="v2-label">Preceding Invoice Number / Rechnungsnummer (BT-25) <span class="v2-req-star">*</span></label>
               <input type="text" id="v2PrecedingInvNumber" class="v2-input" placeholder="e.g. INV-2025-089">
             </div>
             <div class="v2-field">
@@ -510,6 +570,37 @@
                   </select>
                 </div>
               </div>
+              <!-- Seller Legal Disclosures & Peppol Address (BT-30, BT-33, BT-34) -->
+              <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2SellerLegalSec', 'v2SellerLegalChev')">
+                <span id="v2SellerLegalChev">▼</span>
+                <span>Legal Disclosures &amp; Peppol Routing (BT-30, BT-33, BT-34) / Register &amp; Geschäftsführer</span>
+              </button>
+              <div id="v2SellerLegalSec" style="display: none; background: rgba(0,0,0,0.02); padding: 0.6rem; border-radius: 6px; border: 1px dashed var(--bg-card-border);">
+                <div class="v2-grid-2">
+                  <div class="v2-field">
+                    <label class="v2-label">Commercial Register No. / Handelsregister (BT-30)</label>
+                    <input type="text" id="v2SellerRegId" class="v2-input" placeholder="e.g. HRB 736903 Stuttgart">
+                  </div>
+                  <div class="v2-field">
+                    <label class="v2-label">Peppol Endpoint ID / EAS (BT-34)</label>
+                    <div style="display: flex; gap: 0.4rem;">
+                      <select id="v2SellerEndpointScheme" class="v2-select" style="width: 5.5rem;">
+                        <option value="0088">0088 (GLN)</option>
+                        <option value="9930" selected>9930 (DE VAT)</option>
+                        <option value="9948">9948 (SI VAT)</option>
+                        <option value="0208">0208 (BE CBE)</option>
+                        <option value="0009">0009 (FR SIRET)</option>
+                      </select>
+                      <input type="text" id="v2SellerEndpointId" class="v2-input" style="flex: 1;" placeholder="e.g. DE123456789 or 4012345000009">
+                    </div>
+                  </div>
+                </div>
+                <div class="v2-field" style="margin-top: 0.5rem;">
+                  <label class="v2-label">Additional Legal Info / Geschäftsführer / Court (§ 35a GmbHG / BT-33)</label>
+                  <input type="text" id="v2SellerLegalInfo" class="v2-input" placeholder="e.g. Amtsgericht Stuttgart, Geschäftsführer: Dr. Max Mustermann, Erika Musterfrau">
+                </div>
+              </div>
+
               <!-- Contact details toggle -->
               <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2SellerContactSec', 'v2SellerContactChev')">
                 <span id="v2SellerContactChev">▼</span>
@@ -586,6 +677,27 @@
                   </select>
                 </div>
               </div>
+
+              <!-- Buyer Peppol Routing (BT-49) -->
+              <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2BuyerEndpointSec', 'v2BuyerEndpointChev')">
+                <span id="v2BuyerEndpointChev">▼</span>
+                <span>Peppol Electronic Address (BT-49 / EAS)</span>
+              </button>
+              <div id="v2BuyerEndpointSec" style="display: none; background: rgba(0,0,0,0.02); padding: 0.6rem; border-radius: 6px; border: 1px dashed var(--bg-card-border);">
+                <div class="v2-field">
+                  <label class="v2-label">Buyer Peppol Endpoint ID / Scheme (BT-49)</label>
+                  <div style="display: flex; gap: 0.4rem;">
+                    <select id="v2BuyerEndpointScheme" class="v2-select" style="width: 5.5rem;">
+                      <option value="0088">0088 (GLN)</option>
+                      <option value="9930" selected>9930 (DE VAT)</option>
+                      <option value="9948">9948 (SI VAT)</option>
+                      <option value="0208">0208 (BE CBE)</option>
+                      <option value="0009">0009 (FR SIRET)</option>
+                    </select>
+                    <input type="text" id="v2BuyerEndpointId" class="v2-input" style="flex: 1;" placeholder="e.g. DE987654321 or 4012345000009">
+                  </div>
+                </div>
+              </div>
               <!-- Buyer contact details toggle (BT-56, BT-57, BT-58) -->
               <button type="button" class="v2-accordion-btn" onclick="toggleV2Section('v2BuyerContactSec', 'v2BuyerContactChev')">
                 <span id="v2BuyerContactChev">▼</span>
@@ -627,15 +739,22 @@
                 <input type="text" id="v2DelivName" class="v2-input" placeholder="e.g. Mercedes-Benz AG Werk Sindelfingen">
               </div>
               <div class="v2-field">
-                <label class="v2-label">Ship-to Location ID / Abladestelle (GLN)</label>
-                <input type="text" id="v2DelivLocationId" class="v2-input" placeholder="e.g. Tor 3 / Abladestelle 42">
+                <label class="v2-label">Ship-to Location ID / Abladestelle (GLN / BT-71)</label>
+                <div style="display: flex; gap: 0.4rem;">
+                  <select id="v2DelivLocationScheme" class="v2-select" style="width: 5.5rem;">
+                    <option value="0088" selected>0088 (GLN)</option>
+                    <option value="0160">0160 (GTIN)</option>
+                    <option value="ZZZ">ZZZ (Mutually defined)</option>
+                  </select>
+                  <input type="text" id="v2DelivLocationId" class="v2-input" style="flex: 1;" placeholder="e.g. 4012345000009 or Tor 3">
+                </div>
               </div>
               <div class="v2-field">
-                <label class="v2-label">Actual Delivery Date / Lieferdatum</label>
+                <label class="v2-label">Actual Delivery Date / Lieferdatum (BT-72)</label>
                 <input type="date" id="v2DelivDate" class="v2-input">
               </div>
               <div class="v2-field">
-                <label class="v2-label">Despatch Advice Ref / Lieferschein-Nr.</label>
+                <label class="v2-label">Despatch Advice Ref / Lieferschein-Nr. (BT-16)</label>
                 <input type="text" id="v2DelivDespatchRef" class="v2-input" placeholder="e.g. LS-2026-9042">
               </div>
             </div>
@@ -720,10 +839,24 @@
             <!-- Dynamically rendered per tax group -->
           </div>
 
-          <div id="v2ExemptionCard" style="display: none; margin-top: 1rem; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem;">
-            <div class="v2-field">
-              <label class="v2-label">VAT Exemption Reason (Mandatory for Category E)</label>
-              <input type="text" id="v2ExemptionReason" class="v2-input" placeholder="e.g. Small business exemption under § 19 UStG">
+          <div id="v2ExemptionCard" style="display: none; margin-top: 1rem; border-top: 1px dashed var(--bg-card-border); padding-top: 0.75rem; background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px; padding: 0.75rem;">
+            <div class="v2-grid-2">
+              <div class="v2-field">
+                <label class="v2-label">VAT Exemption Reason (BT-120 / Freitext) <span class="v2-req-star">*</span></label>
+                <input type="text" id="v2ExemptionReason" class="v2-input" placeholder="e.g. Reverse charge / Steuerschuldnerschaft des Leistungsempfängers">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">VAT Exemption Reason Code (BT-121 / Code) <span class="v2-req-star">*</span></label>
+                <select id="v2ExemptionReasonCode" class="v2-select">
+                  <option value="">-- Select CEF VATEX Code --</option>
+                  <option value="VATEX-EU-AE">VATEX-EU-AE (Reverse charge / Art. 194/196)</option>
+                  <option value="VATEX-EU-E">VATEX-EU-E (Exempt under national law / Art. 132)</option>
+                  <option value="VATEX-EU-G">VATEX-EU-G (Export outside EU / Art. 146)</option>
+                  <option value="VATEX-EU-IC">VATEX-EU-IC (Intra-Community supply / Art. 138)</option>
+                  <option value="VATEX-EU-O">VATEX-EU-O (Not subject to VAT)</option>
+                  <option value="VATEX-EU-79-C">VATEX-EU-79-C (Exempt under Art. 79)</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -1546,7 +1679,7 @@
   <script src="/static/app.js?v=43"></script>
   <script src="/static/en16931_data.js?v=7"></script>
   <script src="/static/overview.js?v=7"></script>
-  <script src="/static/v2.js?v=30"></script>
+  <script src="/static/v2.js?v=32"></script>
 </body>
 
 </html>

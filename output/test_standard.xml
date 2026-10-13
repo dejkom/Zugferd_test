@@ -18,11 +18,18 @@
         <ram:LineID>1</ram:LineID>
       </ram:AssociatedDocumentLineDocument>
       <ram:SpecifiedTradeProduct>
+        <ram:GlobalID schemeID="0160">3831112233445</ram:GlobalID>
+        <ram:SellerAssignedID>SNZ-PRS-01</ram:SellerAssignedID>
+        <ram:BuyerAssignedID>OE-7E0906051</ram:BuyerAssignedID>
         <ram:Name>Senzor tlaka krmilne enote CUAA-240</ram:Name>
+        <ram:Description>Visokotlačni piezorezistivni senzor za avtomobilsko elektroniko</ram:Description>
       </ram:SpecifiedTradeProduct>
       <ram:SpecifiedLineTradeAgreement>
+        <ram:BuyerOrderReferencedDocument>
+          <ram:LineID>10</ram:LineID>
+        </ram:BuyerOrderReferencedDocument>
         <ram:NetPriceProductTradePrice>
-          <ram:ChargeAmount>120.00</ram:ChargeAmount>
+          <ram:ChargeAmount>120.0000</ram:ChargeAmount>
         </ram:NetPriceProductTradePrice>
       </ram:SpecifiedLineTradeAgreement>
       <ram:SpecifiedLineTradeDelivery>
@@ -44,11 +51,12 @@
         <ram:LineID>2</ram:LineID>
       </ram:AssociatedDocumentLineDocument>
       <ram:SpecifiedTradeProduct>
+        <ram:SellerAssignedID>OPT-MOD-FD4</ram:SellerAssignedID>
         <ram:Name>Optični modul za prenos podatkov CAN-FD</ram:Name>
       </ram:SpecifiedTradeProduct>
       <ram:SpecifiedLineTradeAgreement>
         <ram:NetPriceProductTradePrice>
-          <ram:ChargeAmount>450.00</ram:ChargeAmount>
+          <ram:ChargeAmount>450.0000</ram:ChargeAmount>
         </ram:NetPriceProductTradePrice>
       </ram:SpecifiedLineTradeAgreement>
       <ram:SpecifiedLineTradeDelivery>
@@ -60,6 +68,13 @@
           <ram:CategoryCode>S</ram:CategoryCode>
           <ram:RateApplicablePercent>22.00</ram:RateApplicablePercent>
         </ram:ApplicableTradeTax>
+        <ram:SpecifiedTradeAllowanceCharge>
+          <ram:ChargeIndicator>
+            <udt:Indicator>false</udt:Indicator>
+          </ram:ChargeIndicator>
+          <ram:ActualAmount>50.00</ram:ActualAmount>
+          <ram:Reason>Discount</ram:Reason>
+        </ram:SpecifiedTradeAllowanceCharge>
         <ram:SpecifiedTradeSettlementLineMonetarySummation>
           <ram:LineTotalAmount>850.00</ram:LineTotalAmount>
         </ram:SpecifiedTradeSettlementLineMonetarySummation>
@@ -68,7 +83,9 @@
     <ram:ApplicableHeaderTradeAgreement>
       <ram:BuyerReference>PO-2026-8812</ram:BuyerReference>
       <ram:SellerTradeParty>
-        <ram:Name>VZORČNO PODJETJE d.o.o.</ram:Name>
+        <ram:Name>VZORČNO PODJETJE d.o.o.</ram:Name>        <ram:SpecifiedLegalOrganization>
+          <ram:ID schemeID="0002">Okrožno sodišče v Celju, vložek št. 1/09876/00</ram:ID>
+        </ram:SpecifiedLegalOrganization>
         <ram:DefinedTradeContact>
           <ram:PersonName>Ana Novak</ram:PersonName>
           <ram:TelephoneUniversalCommunication>
@@ -84,8 +101,7 @@
           <ram:LineOne>Tehnološka cesta 12</ram:LineOne>
           <ram:CityName>Prebold</ram:CityName>
           <ram:CountryID>SI</ram:CountryID>
-        </ram:PostalTradeAddress>
-        <ram:SpecifiedTaxRegistration>
+        </ram:PostalTradeAddress>        <ram:SpecifiedTaxRegistration>
           <ram:ID schemeID="VA">SI12345678</ram:ID>
         </ram:SpecifiedTaxRegistration>
         <ram:SpecifiedTaxRegistration>
@@ -93,8 +109,7 @@
         </ram:SpecifiedTaxRegistration>
       </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
-        <ram:Name>AVTO-ELEKTRONIKA JARC d.o.o.</ram:Name>
-        <ram:DefinedTradeContact>
+        <ram:Name>AVTO-ELEKTRONIKA JARC d.o.o.</ram:Name>        <ram:DefinedTradeContact>
           <ram:PersonName>Marko Horvat (Nabava)</ram:PersonName>
           <ram:TelephoneUniversalCommunication>
             <ram:CompleteNumber>+386 1 588 0000</ram:CompleteNumber>
@@ -109,11 +124,13 @@
           <ram:LineOne>Industrijska ulica 88</ram:LineOne>
           <ram:CityName>Ljubljana</ram:CityName>
           <ram:CountryID>SI</ram:CountryID>
-        </ram:PostalTradeAddress>
-        <ram:SpecifiedTaxRegistration>
+        </ram:PostalTradeAddress>        <ram:SpecifiedTaxRegistration>
           <ram:ID schemeID="VA">SI87654321</ram:ID>
         </ram:SpecifiedTaxRegistration>
       </ram:BuyerTradeParty>
+      <ram:SellerOrderReferencedDocument>
+        <ram:IssuerAssignedID>SO-991204</ram:IssuerAssignedID>
+      </ram:SellerOrderReferencedDocument>
       <ram:BuyerOrderReferencedDocument>
         <ram:IssuerAssignedID>PO-2026-8812</ram:IssuerAssignedID>
       </ram:BuyerOrderReferencedDocument>
@@ -153,12 +170,13 @@
           <udt:Indicator>false</udt:Indicator>
         </ram:ChargeIndicator>
         <ram:CalculationPercent>2.50</ram:CalculationPercent>
+        <ram:BasisAmount>2050.00</ram:BasisAmount>
         <ram:ActualAmount>50.00</ram:ActualAmount>
         <ram:Reason>Loyalty rebate</ram:Reason>
         <ram:CategoryTradeTax>
           <ram:TypeCode>VAT</ram:TypeCode>
           <ram:CategoryCode>S</ram:CategoryCode>
-          <ram:RateApplicablePercent>22.00</ram:RateApplicablePercent>
+          <ram:RateApplicablePercent>19.00</ram:RateApplicablePercent>
         </ram:CategoryTradeTax>
       </ram:SpecifiedTradeAllowanceCharge>
       <ram:SpecifiedTradeAllowanceCharge>
@@ -166,16 +184,17 @@
           <udt:Indicator>true</udt:Indicator>
         </ram:ChargeIndicator>
         <ram:CalculationPercent>1.00</ram:CalculationPercent>
+        <ram:BasisAmount>2050.00</ram:BasisAmount>
         <ram:ActualAmount>20.00</ram:ActualAmount>
         <ram:Reason>Special packaging &amp; freight</ram:Reason>
         <ram:CategoryTradeTax>
           <ram:TypeCode>VAT</ram:TypeCode>
           <ram:CategoryCode>S</ram:CategoryCode>
-          <ram:RateApplicablePercent>22.00</ram:RateApplicablePercent>
+          <ram:RateApplicablePercent>19.00</ram:RateApplicablePercent>
         </ram:CategoryTradeTax>
       </ram:SpecifiedTradeAllowanceCharge>
       <ram:SpecifiedTradePaymentTerms>
-        <ram:Description>Plačilo v roku 30 dni od datuma izdaje računa brez popusta.</ram:Description>
+        <ram:Description>Plačilo v roku 30 dni od datuma izdaje računa brez popusta. [Ref: SI00 2026-00481]</ram:Description>
         <ram:DueDateDateTime>
           <udt:DateTimeString format="102">20261111</udt:DateTimeString>
         </ram:DueDateDateTime>
@@ -190,6 +209,9 @@
         <ram:GrandTotalAmount>2464.40</ram:GrandTotalAmount>
         <ram:DuePayableAmount>2464.40</ram:DuePayableAmount>
       </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+      <ram:ReceivableSpecifiedTradeAccountingAccount>
+        <ram:ID>CC-PROD-401</ram:ID>
+      </ram:ReceivableSpecifiedTradeAccountingAccount>
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>

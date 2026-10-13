@@ -60,6 +60,7 @@ class CreateFromManualRequest(BaseModel):
     generator: Optional[str] = "v1"
     source_type: Optional[str] = "manual"
     lang: Optional[str] = "sl"
+    show_bt_tags: Optional[bool] = False
 
 @app.post("/api/upload")
 async def upload_document(file: UploadFile = File(...)):
@@ -357,7 +358,8 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
         effective_layout = "layout1" if chosen_layout == "original" else chosen_layout
         logo_file = LOGO_PATH if os.path.exists(LOGO_PATH) else None
         sys_settings = load_system_settings()
-        generate_invoice_pdf_from_data(req.invoice_data, visual_pdf_path, logo_path=logo_file, layout=effective_layout, footer_config=sys_settings, lang=req.lang or "sl")
+        hide_tags = not bool(req.show_bt_tags)
+        generate_invoice_pdf_from_data(req.invoice_data, visual_pdf_path, logo_path=logo_file, layout=effective_layout, footer_config=sys_settings, lang=req.lang or "sl", hide_tags=hide_tags)
         base_pdf_path = visual_pdf_path
         is_temp_visual = True
 
@@ -418,7 +420,8 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
             xml_content=xml_content,
             is_valid=val_res.get("isValid", True),
             token_usage=req.token_usage,
-            lang=req.lang or "multi"
+            lang=req.lang or "multi",
+            show_bt_tags=bool(req.show_bt_tags)
         )
     except Exception as e:
         print("Could not record history:", e)
@@ -808,7 +811,7 @@ def save_history(history: list):
     with open(HISTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
-def record_invoice_history(invoice_data: dict, output_filename: str, source_type: str = "manual", generator: str = "v1", layout: str = "layout1", xml_content: str = "", is_valid: bool = True, token_usage: dict = None, lang: str = "multi"):
+def record_invoice_history(invoice_data: dict, output_filename: str, source_type: str = "manual", generator: str = "v1", layout: str = "layout1", xml_content: str = "", is_valid: bool = True, token_usage: dict = None, lang: str = "multi", show_bt_tags: bool = False):
     from datetime import datetime
     history = load_history()
     
@@ -840,6 +843,7 @@ def record_invoice_history(invoice_data: dict, output_filename: str, source_type
         "generator": generator,
         "layout": layout,
         "lang": lang,
+        "show_bt_tags": bool(show_bt_tags),
         "is_valid": is_valid,
         "invoice_data": invoice_data,
         "xml_content": xml_content,

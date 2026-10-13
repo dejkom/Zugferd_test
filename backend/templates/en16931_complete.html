@@ -511,7 +511,7 @@
             {% endif %}
           </td>
           <td class="num">{{ item.quantity|format_num(2) }}</td>
-          <td style="text-align: center;">{{ item.unit_code or 'C62' }}</td>
+          <td style="text-align: center;">{{ (item.unit_code or 'C62')|format_unit }}</td>
           <td class="num">{{ item.unit_price|format_price }}</td>
           <td class="num">{% if item.discount_amount and item.discount_amount > 0 %}{{ item.discount_amount|format_num(2) }}{% else %}0,00{% endif %}</td>
           <td class="num">{{ item.tax_percent|format_num(1) }}%</td>

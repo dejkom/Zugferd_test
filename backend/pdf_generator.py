@@ -6,7 +6,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from backend.models import InvoiceData
 
-def generate_invoice_pdf_from_data(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, layout: str = "layout1", footer_config: dict = None, lang: str = "sl") -> str:
+def generate_invoice_pdf_from_data(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, layout: str = "layout1", footer_config: dict = None, lang: str = "sl", hide_tags: bool = True) -> str:
     """
     Renders a print-ready PDF invoice from structured InvoiceData.
     Supports:
@@ -17,7 +17,7 @@ def generate_invoice_pdf_from_data(inv: InvoiceData, output_pdf_path: str, logo_
     os.makedirs(os.path.dirname(os.path.abspath(output_pdf_path)), exist_ok=True)
     if layout in ["layout3", "complete", "en16931"]:
         from backend.template_engine import generate_en16931_pdf
-        return generate_en16931_pdf(inv, output_pdf_path, logo_path=logo_path, hide_tags=True, footer_config=footer_config, lang=lang)
+        return generate_en16931_pdf(inv, output_pdf_path, logo_path=logo_path, hide_tags=hide_tags, footer_config=footer_config, lang=lang)
     elif layout == "layout2":
         return _generate_odelo_layout(inv, output_pdf_path, logo_path, footer_config=footer_config)
     else:
@@ -232,10 +232,16 @@ def _generate_standard_layout(inv: InvoiceData, output_pdf_path: str, logo_path:
             elif getattr(item, 'discount_percent', None):
                 disc_text = f"{item.discount_percent}%"
 
+            u_display = ""
+            raw_u = getattr(item, 'unit_code', '')
+            if raw_u:
+                from backend.template_engine import _format_unit
+                u_display = _format_unit(raw_u, lang="en")
+
             table_rows.append([
                 Paragraph(str(idx), normal_style),
                 Paragraph(item.name, normal_style),
-                Paragraph(f"{item.quantity:g} {getattr(item, 'unit_code', '')}".strip(), normal_style),
+                Paragraph(f"{item.quantity:g} {u_display}".strip(), normal_style),
                 Paragraph(f"{item.unit_price:.2f}", normal_style),
                 Paragraph(disc_text, normal_style),
                 Paragraph(f"{tax_val:.1f}%", normal_style),

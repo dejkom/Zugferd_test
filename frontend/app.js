@@ -219,9 +219,11 @@ async function loadPreferences() {
         renderSavedPartiesConfig();
         renderPromptConfigUI();
         renderSynonymsTable();
-        renderTaxRatesConfig();
         if (typeof loadV2SavedPartiesDropdowns === "function") {
           loadV2SavedPartiesDropdowns();
+        }
+        if (typeof populateV2DefaultBankAccounts === "function") {
+          populateV2DefaultBankAccounts();
         }
 
         // Auto-populate API key from server if not already stored locally on this host
@@ -352,6 +354,9 @@ async function saveConfiguration() {
   renderPromptConfigUI();
   if (typeof loadV2SavedPartiesDropdowns === "function") {
     loadV2SavedPartiesDropdowns();
+  }
+  if (typeof updateV2BankPresetDropdown === "function") {
+    updateV2BankPresetDropdown();
   }
 
   alert("Configuration saved successfully!");
