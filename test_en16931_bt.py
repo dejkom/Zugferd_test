@@ -24,7 +24,7 @@ def run_tests():
             'company_legal_form': 'HRB 736903',
             'legal_info': 'Amtsgericht Muenchen, GF: Max Mustermann',
             'endpoint_id': 'DE123456789',
-            'endpoint_scheme': '0088',
+            'endpoint_scheme': '9930',
             'street': 'Innovationsstr. 10',
             'city': 'Muenchen',
             'postcode': '80331',

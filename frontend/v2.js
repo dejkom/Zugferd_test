@@ -717,20 +717,32 @@ function getV2ConfiguredBankPresets() {
   } catch (e) {}
 
   const merged = Object.assign({}, localSettings, settings);
+
+  // Also check live DOM inputs from Configuration page if present
+  const domBank1Iban = document.getElementById("cfgBank1Iban")?.value?.trim();
+  const domBank1Name = document.getElementById("cfgBank1Name")?.value?.trim();
+  const domBank1Bic = document.getElementById("cfgBank1Bic")?.value?.trim();
+
+  const domBank2Iban = document.getElementById("cfgBank2Iban")?.value?.trim();
+  const domBank2Name = document.getElementById("cfgBank2Name")?.value?.trim();
+  const domBank2Bic = document.getElementById("cfgBank2Bic")?.value?.trim();
+
   const presets = [];
 
-  const b1Iban = (merged.seller_bank1_iban || "").trim();
-  const b1Name = (merged.seller_bank1_name || "").trim() || "Primary Bank";
-  const b1Bic = (merged.seller_bank1_bic || "").trim();
+  const b1Iban = domBank1Iban || (merged.seller_bank1_iban || "").trim();
+  const b1Name = domBank1Name || (merged.seller_bank1_name || "").trim() || "Primary Bank";
+  const b1Bic = domBank1Bic || (merged.seller_bank1_bic || "").trim();
 
-  const b2Iban = (merged.seller_bank2_iban || "").trim();
-  const b2Name = (merged.seller_bank2_name || "").trim() || "Secondary Bank";
-  const b2Bic = (merged.seller_bank2_bic || "").trim();
+  const b2Iban = domBank2Iban || (merged.seller_bank2_iban || "").trim();
+  const b2Name = domBank2Name || (merged.seller_bank2_name || "").trim() || "Secondary Bank";
+  const b2Bic = domBank2Bic || (merged.seller_bank2_bic || "").trim();
 
   if (b1Iban) {
+    const cleanDigits = b1Iban.replace(/\s+/g, "");
+    const lastDigits = cleanDigits.length >= 4 ? cleanDigits.slice(-4) : cleanDigits;
     presets.push({
       key: "primary",
-      label: `Primary Bank (${b1Name} - ...${b1Iban.replace(/\s+/g, "").slice(-4)})`,
+      label: `Primary Bank (${b1Name} - ...${lastDigits})`,
       iban: b1Iban,
       bank_name: b1Name,
       bic: b1Bic
@@ -738,9 +750,11 @@ function getV2ConfiguredBankPresets() {
   }
 
   if (b2Iban) {
+    const cleanDigits = b2Iban.replace(/\s+/g, "");
+    const lastDigits = cleanDigits.length >= 4 ? cleanDigits.slice(-4) : cleanDigits;
     presets.push({
       key: "secondary",
-      label: `Secondary Bank (${b2Name} - ...${b2Iban.replace(/\s+/g, "").slice(-4)})`,
+      label: `Secondary Bank (${b2Name} - ...${lastDigits})`,
       iban: b2Iban,
       bank_name: b2Name,
       bic: b2Bic
@@ -896,17 +910,6 @@ function renderV2DocumentDiscounts() {
     const amtBt = isCharge ? "BT-99" : "BT-92";
     const amtTitle = isCharge ? "BT-99: Zuschlagsbetrag auf Dokumentenebene (Document level charge amount)" : "BT-92: Nachlassbetrag auf Dokumentenebene (Document level allowance amount)";
 
-    card.innerHTML = `
-      <div class="v2-discount-topbar">
-        <div class="v2-discount-title" style="display: flex; align-items: center; gap: 0.5rem;">
-          <span style="${isCharge ? 'color: #10b981; font-weight: 600;' : ''}">${badgeLabel}</span>
-          <select class="v2-select" style="width: auto; padding: 0.2rem 0.5rem; font-size: 0.75rem;" onchange="updateV2DiscountField(${idx}, 'charge_indicator', this.value === 'charge')">
-            <option value="allowance" ${!isCharge ? 'selected' : ''}>Allowance / Discount (-)</option>
-            <option value="charge" ${isCharge ? 'selected' : ''}>Charge / Surcharge (+)</option>
-          </select>
-        </div>
-        <button type="button" class="v2-item-trash" onclick="removeV2DocumentDiscount(${idx})" title="Remove">🗑️</button>
-      </div>
     const catBt = isCharge ? "BT-102" : "BT-95";
     const rateBt = isCharge ? "BT-103" : "BT-96";
     const baseAmtBt = isCharge ? "BT-100" : "BT-93";

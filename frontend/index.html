@@ -370,7 +370,7 @@
                 🏦 Payment Accounts (BG-17) / Bankverbindungen (<span style="font-size: 0.75rem;">BT-84 IBAN, BT-85 Bank, BT-86 BIC</span>)
               </label>
               <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <select id="v2BankPresetSelect" class="v2-select" style="padding: 0.2rem 0.5rem; font-size: 0.74rem; max-width: 260px;" onchange="insertV2BankPreset(this.value)">
+                <select id="v2BankPresetSelect" class="v2-select" style="padding: 0.2rem 0.5rem; font-size: 0.74rem; max-width: 260px;" onfocus="updateV2BankPresetDropdown()" onpointerdown="updateV2BankPresetDropdown()" onchange="insertV2BankPreset(this.value)">
                   <option value="">-- Insert Configured Bank --</option>
                 </select>
                 <button type="button" class="btn btn-secondary" onclick="addV2BankAccount()" style="padding: 0.2rem 0.55rem; font-size: 0.74rem;">
@@ -1676,10 +1676,10 @@
   </div>
 
   <script src="/static/countries_data.js?v=2"></script>
-  <script src="/static/app.js?v=43"></script>
+  <script src="/static/app.js?v=44"></script>
   <script src="/static/en16931_data.js?v=7"></script>
   <script src="/static/overview.js?v=7"></script>
-  <script src="/static/v2.js?v=32"></script>
+  <script src="/static/v2.js?v=34"></script>
 </body>
 
 </html>

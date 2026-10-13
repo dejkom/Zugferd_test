@@ -68,7 +68,7 @@
           <ram:CityName>Muenchen</ram:CityName>
           <ram:CountryID>DE</ram:CountryID>
         </ram:PostalTradeAddress>        <ram:URIUniversalCommunication>
-          <ram:URIID schemeID="0088">DE123456789</ram:URIID>
+          <ram:URIID schemeID="9930">DE123456789</ram:URIID>
         </ram:URIUniversalCommunication>
         <ram:SpecifiedTaxRegistration>
           <ram:ID schemeID="VA">DE123456789</ram:ID>

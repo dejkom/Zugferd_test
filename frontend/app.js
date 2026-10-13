@@ -1488,6 +1488,10 @@ function executeSwitchScenario(scenario) {
   if (scenario === "v2") {
     if (typeof populateV2SellerDefaults === "function") populateV2SellerDefaults();
     if (typeof loadV2SavedPartiesDropdowns === "function") loadV2SavedPartiesDropdowns();
+    if (typeof updateV2BankPresetDropdown === "function") updateV2BankPresetDropdown();
+    if (typeof populateV2DefaultBankAccounts === "function" && (!v2BankAccounts || v2BankAccounts.length === 0 || (v2BankAccounts.length === 1 && !v2BankAccounts[0].iban))) {
+      populateV2DefaultBankAccounts();
+    }
   }
 }
 
