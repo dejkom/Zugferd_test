@@ -595,15 +595,34 @@ def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: st
     story.append(t_grand)
     story.append(Spacer(1, 14 * mm))
 
-    # 8. Tax exemption / Terms note
+    # 8. Tax exemption / Terms note / Rechnungsdatum = Leistungsdatum
     terms_txt = inv.payment.payment_terms or "Ende des Folgemonats"
     terms_line = f"<i>Zahlung: {terms_txt}</i>"
+    
+    # Check if Rechnungsdatum = Leistungsdatum notice applies
+    cfg = footer_config or {}
+    sync_delivery = cfg.get("auto_sync_delivery_date", False)
+    eff_delivery_date = inv.delivery.delivery_date if (inv.delivery and inv.delivery.delivery_date) else ""
+    
+    sync_notice = ""
+    if sync_delivery or (eff_delivery_date and inv.issue_date and eff_delivery_date == inv.issue_date):
+        sync_notice = "<br/><font size=7 color='#475569'><b>Leistungsdatum:</b> Rechnungsdatum entspricht dem Leistungsdatum (Leistungszeitpunkt).</font>"
+    elif eff_delivery_date:
+        sync_notice = f"<br/><font size=7 color='#475569'><b>Lieferdatum (BT-72):</b> {eff_delivery_date}</font>"
+
     exemption_line = "<i>The beneficiary is responsible for the taxation of this amount</i>"
     t_terms = Table([
-        [Paragraph(terms_line, small_style), Paragraph(exemption_line, ParagraphStyle("Exemp", alignment=2, fontSize=7))]
-    ], colWidths=[85 * mm, 89 * mm])
+        [Paragraph(f"{terms_line}{sync_notice}", small_style), Paragraph(exemption_line, ParagraphStyle("Exemp", alignment=2, fontSize=7))]
+    ], colWidths=[105 * mm, 69 * mm])
     story.append(t_terms)
-    story.append(Spacer(1, 12 * mm))
+    story.append(Spacer(1, 4 * mm))
+
+    # Optional GDPR / DSGVO Privacy Disclosure above the 4-column corporate footer
+    privacy_disclosure_text = cfg.get("privacy_disclosure") or "Gemäß Artikel 13 der DSGVO, teilen wir Ihnen die Informationspflichten über folgende Adresse mit: www.odelo.de unter Datenschutz."
+    if privacy_disclosure_text:
+        p_gdpr = Paragraph(f"<font size=6.5 color='#64748b'><b>Datenschutzhinweis (DSGVO):</b> {privacy_disclosure_text}</font>", ParagraphStyle("GdprDisc", alignment=0, fontSize=6.5, leading=8))
+        story.append(p_gdpr)
+        story.append(Spacer(1, 3 * mm))
 
     # 9. Multi-column corporate footer strip (as in Odelo template)
     cfg = footer_config or {}

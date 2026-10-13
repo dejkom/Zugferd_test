@@ -37,7 +37,16 @@ const configInvoiceLayout = document.getElementById("configInvoiceLayout");
 const manLayoutSelect = document.getElementById("manLayoutSelect");
 
 function getStoredApiKey() {
-  return localStorage.getItem("OPENAI_API_KEY") || "";
+  const serverKey = (window.cachedCompanySettings && window.cachedCompanySettings.openai_api_key) || "";
+  const localKey = localStorage.getItem("OPENAI_API_KEY") || "";
+  // If server has a configured key, it is the authoritative key
+  if (serverKey) {
+    if (localKey !== serverKey) {
+      localStorage.setItem("OPENAI_API_KEY", serverKey);
+    }
+    return serverKey;
+  }
+  return localKey;
 }
 
 function getStoredLayout() {
@@ -133,13 +142,19 @@ function applySellerSettingsToInputs(settings) {
     cfgBank1Iban: "seller_bank1_iban",
     cfgBank2Name: "seller_bank2_name",
     cfgBank2Bic: "seller_bank2_bic",
-    cfgBank2Iban: "seller_bank2_iban"
+    cfgBank2Iban: "seller_bank2_iban",
+    cfgPrivacyDisclosure: "privacy_disclosure"
   };
   for (const [elemId, key] of Object.entries(mapping)) {
     const el = document.getElementById(elemId);
     if (el && settings[key] !== undefined) {
       el.value = settings[key];
     }
+  }
+
+  const syncDateEl = document.getElementById("cfgAutoSyncDeliveryDate");
+  if (syncDateEl && settings.auto_sync_delivery_date !== undefined) {
+    syncDateEl.checked = Boolean(settings.auto_sync_delivery_date);
   }
 
   // If postcode is empty but city has postcode prefix (e.g. '70329 Stuttgart'), split them
@@ -226,10 +241,12 @@ async function loadPreferences() {
           populateV2DefaultBankAccounts();
         }
 
-        // Auto-populate API key from server if not already stored locally on this host
+        // Always sync the active API key from server
         const serverKey = data.openai_api_key || (data.company_settings && data.company_settings.openai_api_key) || "";
-        if (serverKey && configApiKey && !configApiKey.value.trim()) {
-          configApiKey.value = serverKey;
+        if (serverKey) {
+          if (configApiKey) {
+            configApiKey.value = serverKey;
+          }
           localStorage.setItem("OPENAI_API_KEY", serverKey);
         }
       }
@@ -239,6 +256,46 @@ async function loadPreferences() {
   }
 }
 loadPreferences();
+
+async function testOpenAiKeyConnection() {
+  const btn = document.getElementById("btnTestOpenAiKey");
+  const resEl = document.getElementById("testApiKeyResult");
+  const inputEl = document.getElementById("configApiKey");
+  const key = inputEl ? inputEl.value.trim() : "";
+
+  if (btn) btn.disabled = true;
+  if (resEl) {
+    resEl.style.display = "block";
+    resEl.style.color = "#3b82f6";
+    resEl.innerHTML = "⏳ Testing key with OpenAI API...";
+  }
+
+  try {
+    const res = await fetch("/api/config/test-openai-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: key || undefined })
+    });
+    const data = await res.json();
+    if (resEl) {
+      if (data.success) {
+        resEl.style.color = "#10b981";
+        resEl.innerHTML = `✅ <strong>Connected!</strong> ${data.message} ${data.sample_model ? `(Ready for ${data.sample_model})` : ""}`;
+      } else {
+        resEl.style.color = "#ef4444";
+        resEl.innerHTML = `❌ <strong>Failed:</strong> ${data.error || "Unknown OpenAI error."}`;
+      }
+    }
+  } catch (err) {
+    if (resEl) {
+      resEl.style.color = "#ef4444";
+      resEl.innerHTML = `❌ Network error while testing API key: ${err.message}`;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.testOpenAiKeyConnection = testOpenAiKeyConnection;
 
 function handleManualLayoutChange(val) {
   localStorage.setItem("ZUGFERD_LAYOUT", val);
@@ -251,6 +308,7 @@ async function saveConfiguration() {
   if (key) {
     localStorage.setItem("OPENAI_API_KEY", key);
   } else {
+    // If the input was left explicitly blank, only remove if user intended to wipe it
     localStorage.removeItem("OPENAI_API_KEY");
   }
 
@@ -311,6 +369,8 @@ async function saveConfiguration() {
     seller_bank2_name: document.getElementById("cfgBank2Name")?.value.trim() || "",
     seller_bank2_bic: document.getElementById("cfgBank2Bic")?.value.trim() || "",
     seller_bank2_iban: document.getElementById("cfgBank2Iban")?.value.trim() || "",
+    privacy_disclosure: document.getElementById("cfgPrivacyDisclosure")?.value.trim() || "Gemäß Artikel 13 der DSGVO, teilen wir Ihnen die Informationspflichten über folgende Adresse mit: www.odelo.de unter Datenschutz.",
+    auto_sync_delivery_date: Boolean(document.getElementById("cfgAutoSyncDeliveryDate")?.checked),
     openai_api_key: key || (window.cachedCompanySettings && window.cachedCompanySettings.openai_api_key) || "",
     saved_parties: currentParties,
     active_prompt_id: currentEditingPromptId || (window.cachedCompanySettings && window.cachedCompanySettings.active_prompt_id) || "standard_en16931",
@@ -1175,6 +1235,12 @@ function openEditPartyModal(type, id) {
   setVal("editPartyCity", party.city);
   setVal("editPartyPostcode", party.postcode);
   setVal("editPartyCountry", party.country_code || "DE");
+  setVal("editPartyBuyerRef", party.buyer_reference || "");
+
+  const buyerRefWrapper = document.getElementById("editPartyBuyerRefWrapper");
+  if (buyerRefWrapper) {
+    buyerRefWrapper.style.display = type === "buyer" ? "block" : "none";
+  }
 
   const extraSellerFields = document.getElementById("editPartySellerExtra");
   if (extraSellerFields) {
@@ -1225,7 +1291,9 @@ async function saveEditedParty() {
     country_code: document.getElementById("editPartyCountry")?.value || "DE"
   };
 
-  if (type === "seller") {
+  if (type === "buyer") {
+    updatedData.buyer_reference = document.getElementById("editPartyBuyerRef")?.value.trim() || "";
+  } else if (type === "seller") {
     updatedData.phone = document.getElementById("editPartyPhone")?.value.trim() || "";
     updatedData.email = document.getElementById("editPartyEmail")?.value.trim() || "";
     updatedData.iban = document.getElementById("editPartyIban")?.value.trim() || "";
@@ -1479,6 +1547,10 @@ function executeSwitchScenario(scenario) {
   }
   if (scenario === "config") {
     applySellerSettingsToInputs(getSellerSettings());
+    if (configApiKey && !configApiKey.value.trim()) {
+      const activeKey = getStoredApiKey() || (cachedCompanySettings && cachedCompanySettings.openai_api_key) || "";
+      if (activeKey) configApiKey.value = activeKey;
+    }
     renderSavedPartiesConfig();
     renderPromptConfigUI();
     renderSynonymsTable();

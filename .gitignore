@@ -9,19 +9,20 @@ venv/
 .venv/
 ENV/
 
-# Temporary user files and outputs
+# Environment, secrets, and local runtime storage
+.env
+*.env.local
+.env.*
 uploads/*
 !uploads/.gitkeep
 outputs/*
 !outputs/.gitkeep
-
-# Sample / test documents (not needed in git)
 documentsforconversion/
 official_examples/
-
-# Environment and secrets
-.env
-*.env.local
+system_settings.json
+*settings*.json
+*api_key*
+*.key
 
 # IDE and OS files
 .idea/
@@ -30,3 +31,4 @@ official_examples/
 *.swo
 .DS_Store
 Thumbs.db
+

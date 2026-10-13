@@ -1228,9 +1228,15 @@
 
           <div class="form-group">
             <label>OpenAI API Key</label>
-            <input type="password" id="configApiKey" placeholder="sk-...">
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input type="password" id="configApiKey" placeholder="sk-..." style="flex: 1;">
+              <button type="button" class="btn btn-secondary" id="btnTestOpenAiKey" onclick="testOpenAiKeyConnection()" style="white-space: nowrap; padding: 0.5rem 0.85rem; font-size: 0.82rem;">
+                ⚡ Test Key
+              </button>
+            </div>
             <div id="serverApiKeyStatus" style="font-size: 0.78rem; margin-top: 5px; color: #10b981; display: none;"></div>
-            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Used for AI document extraction. Leave empty to use the server environment variable.</span>
+            <div id="testApiKeyResult" style="font-size: 0.8rem; margin-top: 5px; display: none; font-weight: 500;"></div>
+            <span style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">Used for AI document extraction. Saved persistently to system settings and local storage.</span>
           </div>
 
           <div class="form-group" style="margin-top: 0.5rem;">
@@ -1526,6 +1532,22 @@
                 <input type="text" id="cfgBank2Iban" placeholder="e.g. DE30 6005 0101 7871 5056 72">
               </div>
             </div>
+
+            <!-- Layout 2 Corporate Legal & Delivery Options -->
+            <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--bg-card-border); display: flex; flex-direction: column; gap: 0.6rem;">
+              <div class="form-group">
+                <label style="font-size: 0.78rem; font-weight: 700; color: #34d399;">Privacy Disclosure (DSGVO / GDPR)</label>
+                <input type="text" id="cfgPrivacyDisclosure" placeholder="Gemäß Artikel 13 der DSGVO, teilen wir Ihnen die Informationspflichten über folgende Adresse mit: www.odelo.de unter Datenschutz.">
+                <span style="font-size: 0.73rem; color: var(--text-dim); margin-top: 3px;">Printed above the 4-column footer on Layout 2 invoices.</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.6rem; padding-top: 0.25rem;">
+                <input type="checkbox" id="cfgAutoSyncDeliveryDate" style="width: 1rem; height: 1rem; cursor: pointer;">
+                <label for="cfgAutoSyncDeliveryDate" style="margin: 0; font-size: 0.8rem; cursor: pointer; color: var(--text-main); font-weight: 600;">
+                  Auto-sync Delivery Date to Issue Date (Rechnungsdatum = Leistungsdatum)
+                </label>
+              </div>
+              <span style="font-size: 0.73rem; color: var(--text-dim); margin-left: 1.6rem;">When checked and no separate delivery date is extracted, sets delivery date to issue date and prints notice on Layout 2 PDF footer automatically.</span>
+            </div>
           </div>
 
           <!-- Company Logo Upload -->
@@ -1628,7 +1650,13 @@
 
         <div class="form-group">
           <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">Street Address</label>
-          <input type="text" id="editPartyStreet" placeholder="e.g. Bahnhofstrasse 10" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+          <input type="text" id="editPartyStreet" placeholder="e.g. Petuelring 130" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+        </div>
+
+        <div class="form-group" id="editPartyBuyerRefWrapper">
+          <label style="font-size: 0.78rem; font-weight: 700; color: #a78bfa;">Default Buyer Reference / Routing (BT-10)</label>
+          <input type="text" id="editPartyBuyerRef" placeholder="e.g. 04011000-12345-67 or Dept / Order code" style="width: 100%; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); font-size: 0.85rem;">
+          <span style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; display: block;">Auto-populates BT-10 when extracting invoices for this customer if omitted in OCR.</span>
         </div>
 
         <div class="form-row">

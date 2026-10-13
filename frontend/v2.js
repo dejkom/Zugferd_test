@@ -1424,6 +1424,10 @@ async function saveV2Party(type) {
     country_code: document.getElementById(isSeller ? "v2SellerCountry" : "v2BuyerCountry")?.value || "DE"
   };
 
+  if (!isSeller) {
+    partyData.buyer_reference = document.getElementById("v2BuyerRef")?.value.trim() || "";
+  }
+
   if (isSeller) {
     partyData.phone = document.getElementById("v2SellerPhone")?.value.trim() || "";
     partyData.email = document.getElementById("v2SellerEmail")?.value.trim() || "";
@@ -1442,6 +1446,10 @@ async function saveV2Party(type) {
   const existingIdx = settings.saved_parties[listKey].findIndex(p => p.name.toLowerCase() === name.toLowerCase());
   if (existingIdx >= 0) {
     partyData.id = settings.saved_parties[listKey][existingIdx].id;
+    // Preserve existing buyer_reference if current input was blank
+    if (!partyData.buyer_reference && settings.saved_parties[listKey][existingIdx].buyer_reference) {
+      partyData.buyer_reference = settings.saved_parties[listKey][existingIdx].buyer_reference;
+    }
     settings.saved_parties[listKey][existingIdx] = partyData;
   } else {
     settings.saved_parties[listKey].push(partyData);
@@ -1489,6 +1497,9 @@ function selectV2SavedParty(type, partyId) {
   setVal(isSeller ? "v2SellerCity" : "v2BuyerCity", party.city);
   setVal(isSeller ? "v2SellerPostcode" : "v2BuyerPostcode", party.postcode);
   setVal(isSeller ? "v2SellerCountry" : "v2BuyerCountry", party.country_code || "DE");
+  if (!isSeller && party.buyer_reference) {
+    setVal("v2BuyerRef", party.buyer_reference);
+  }
 
   if (isSeller) {
     if (party.phone) setVal("v2SellerPhone", party.phone);
@@ -1600,55 +1611,130 @@ async function handleV2PrefillUpload(file) {
       if (emailEl) emailEl.value = seller.contact_email || cfg.seller_email || "";
     }
 
-    // Payment details & IBAN (BT-84): AI extracted from document by default
+    // Payment details & IBAN (BT-84): AI extracted from document or fallback to config
     const extractedIban = inv.payment?.iban || inv.iban || "";
     const extractedBic = inv.payment?.bic || inv.bic || "";
-    if (extractedIban) {
-      document.getElementById("v2PayIban").value = extractedIban;
+    const extractedBankName = inv.payment?.bank_name || inv.bank_name || "";
+    
+    if (inv.payment?.bank_accounts && Array.isArray(inv.payment.bank_accounts) && inv.payment.bank_accounts.length > 0) {
+      v2BankAccounts = inv.payment.bank_accounts.map(acc => ({
+        iban: acc.iban || "",
+        bank_name: acc.bank_name || "",
+        bic: acc.bic || ""
+      }));
+    } else if (extractedIban) {
+      v2BankAccounts = [{
+        iban: extractedIban,
+        bank_name: extractedBankName || cfg.seller_bank1_name || "",
+        bic: extractedBic || cfg.seller_bank1_bic || ""
+      }];
     } else if (cfg.seller_bank1_iban) {
-      document.getElementById("v2PayIban").value = cfg.seller_bank1_iban;
+      v2BankAccounts = [{
+        iban: cfg.seller_bank1_iban,
+        bank_name: cfg.seller_bank1_name || "",
+        bic: cfg.seller_bank1_bic || ""
+      }];
+      if (cfg.seller_bank2_iban) {
+        v2BankAccounts.push({
+          iban: cfg.seller_bank2_iban,
+          bank_name: cfg.seller_bank2_name || "",
+          bic: cfg.seller_bank2_bic || ""
+        });
+      }
     }
+    renderV2BankAccounts();
 
-    if (extractedBic) {
-      document.getElementById("v2PayBic").value = extractedBic;
-      const bicWrapper = document.getElementById("v2BicFieldWrapper");
-      if (bicWrapper) bicWrapper.style.display = "block";
-    } else if (cfg.seller_bank1_bic) {
-      document.getElementById("v2PayBic").value = cfg.seller_bank1_bic;
-    }
-
-    // Payment terms note
+    // Payment terms note & payment reference
     if (inv.payment?.payment_terms) {
       const payTermsEl = document.getElementById("v2PayTerms");
       if (payTermsEl) payTermsEl.value = inv.payment.payment_terms;
     }
+    if (inv.payment?.payment_reference || inv.payment_reference) {
+      const payRefEl = document.getElementById("v2PayReference");
+      if (payRefEl) payRefEl.value = inv.payment?.payment_reference || inv.payment_reference;
+    }
 
-    // Buyer details: Dynamic from extraction payload
-    if (inv.buyer?.name) document.getElementById("v2BuyerName").value = inv.buyer.name;
-    if (inv.buyer?.vat_id) document.getElementById("v2BuyerVat").value = inv.buyer.vat_id;
-    if (inv.buyer?.street) document.getElementById("v2BuyerStreet").value = inv.buyer.street;
-    if (inv.buyer?.city) document.getElementById("v2BuyerCity").value = inv.buyer.city;
-    if (inv.buyer?.postcode) document.getElementById("v2BuyerPostcode").value = inv.buyer.postcode;
-    if (inv.buyer?.country_code) document.getElementById("v2BuyerCountry").value = inv.buyer.country_code;
+    // 1. Automated Customer Profile Matching (Fallback for Missing Address Data e.g. Großkunden-PLZ)
+    const savedBuyers = (cfg.saved_parties && Array.isArray(cfg.saved_parties.buyers)) ? cfg.saved_parties.buyers : [];
+    const extractedBuyerVat = (inv.buyer?.vat_id || "").trim();
+    const extractedBuyerName = (inv.buyer?.name || "").trim();
+
+    // Helper to clean party names for reliable fuzzy matching (e.g. "BMW AG", "Bayerische Motoren Werke AG", punctuation)
+    const cleanCompName = (str) => (str || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    let matchedBuyer = null;
+    if (extractedBuyerVat) {
+      const cleanVat = extractedBuyerVat.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+      matchedBuyer = savedBuyers.find(b => {
+        const bVat = (b.vat_id || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+        return bVat && bVat === cleanVat;
+      });
+    }
+
+    if (!matchedBuyer && extractedBuyerName) {
+      const targetClean = cleanCompName(extractedBuyerName);
+      matchedBuyer = savedBuyers.find(b => {
+        const bClean = cleanCompName(b.name || "");
+        return bClean && (bClean === targetClean || bClean.includes(targetClean) || targetClean.includes(bClean));
+      });
+    }
+
+    // Buyer details: Dynamic from extraction payload with graceful profile matching fallback
+    const buyerStreetVal = (inv.buyer?.street || "").trim() || (matchedBuyer?.street || "");
+    const buyerCityVal = (inv.buyer?.city || "").trim() || (matchedBuyer?.city || "");
+    const buyerPostcodeVal = (inv.buyer?.postcode || "").trim() || (matchedBuyer?.postcode || "");
+    const buyerCountryVal = (inv.buyer?.country_code || "").trim() || (matchedBuyer?.country_code || "DE");
+    const buyerVatVal = extractedBuyerVat || (matchedBuyer?.vat_id || "");
+    const buyerNameVal = extractedBuyerName || (matchedBuyer?.name || "");
+
+    if (buyerNameVal) { const el = document.getElementById("v2BuyerName"); if (el) el.value = buyerNameVal; }
+    if (buyerVatVal) { const el = document.getElementById("v2BuyerVat"); if (el) el.value = buyerVatVal; }
+    if (buyerStreetVal) { const el = document.getElementById("v2BuyerStreet"); if (el) el.value = buyerStreetVal; }
+    if (buyerCityVal) { const el = document.getElementById("v2BuyerCity"); if (el) el.value = buyerCityVal; }
+    if (buyerPostcodeVal) { const el = document.getElementById("v2BuyerPostcode"); if (el) el.value = buyerPostcodeVal; }
+    if (buyerCountryVal) { const el = document.getElementById("v2BuyerCountry"); if (el) el.value = buyerCountryVal; }
+
+    // If extracted buyer_reference (BT-10) is empty and matched buyer profile has default routing ref, fill it
+    const buyerRefEl = document.getElementById("v2BuyerRef");
+    if (buyerRefEl) {
+      if (inv.buyer_reference) {
+        buyerRefEl.value = inv.buyer_reference;
+      } else if (!buyerRefEl.value.trim() && matchedBuyer?.buyer_reference) {
+        buyerRefEl.value = matchedBuyer.buyer_reference;
+      }
+    }
 
     // Delivery & Logistics (BG-13): Auto-populate and expand section if present
-    if (inv.delivery) {
-      if (inv.delivery.recipient_name) document.getElementById("v2DelivName").value = inv.delivery.recipient_name;
+    let finalDeliveryDate = inv.delivery?.delivery_date || "";
+    // Config option: Auto-sync Delivery Date to Issue Date (Rechnungsdatum = Leistungsdatum)
+    if (!finalDeliveryDate && cfg.auto_sync_delivery_date && inv.issue_date) {
+      finalDeliveryDate = inv.issue_date;
+    }
+
+    if (inv.delivery || finalDeliveryDate) {
+      if (inv.delivery?.recipient_name) {
+        const el = document.getElementById("v2DelivName");
+        if (el) el.value = inv.delivery.recipient_name;
+      }
       
-      let locId = inv.delivery.location_id || "";
-      if (!locId && inv.delivery.recipient_name) {
+      let locId = inv.delivery?.location_id || "";
+      if (!locId && inv.delivery?.recipient_name) {
         const mLoc = inv.delivery.recipient_name.match(/Abladestelle(?:\s+Nr\.?)?\s*([A-Za-z0-9\-_]+)/i);
         if (mLoc) locId = mLoc[1];
       }
       if (locId) {
         // Strip non-identifier text if present (e.g., 'Abladestelle Nr. 960' -> '960')
         const cleanLoc = locId.replace(/^.*?(?:Abladestelle|Tor|Gate|Dock)(?:\s+Nr\.?)?\s*/i, "").trim();
-        document.getElementById("v2DelivLocationId").value = cleanLoc || locId;
+        const el = document.getElementById("v2DelivLocationId");
+        if (el) el.value = cleanLoc || locId;
       }
 
-      if (inv.delivery.delivery_date) document.getElementById("v2DelivDate").value = inv.delivery.delivery_date;
+      if (finalDeliveryDate) {
+        const el = document.getElementById("v2DelivDate");
+        if (el) el.value = finalDeliveryDate;
+      }
       
-      const rawDespatch = inv.delivery.despatch_advice_reference || inv.delivery.despatch_advice_id || "";
+      const rawDespatch = inv.delivery?.despatch_advice_reference || inv.delivery?.despatch_advice_id || "";
       const cleanedDespatch = rawDespatch.trim().replace(/^[-:\s]+/, "").trim();
       const bannedLabels = [
         "lieferdatum", "lieferschein", "lieferschein-nr", "nr", "-nr", "bestell-nr", 
@@ -1656,36 +1742,55 @@ async function handleV2PrefillUpload(file) {
       ];
       const hasDigit = /\d/.test(cleanedDespatch);
       const isBogusDespatch = bannedLabels.includes(cleanedDespatch.toLowerCase()) || !hasDigit || cleanedDespatch.length < 3;
-      if (!isBogusDespatch) {
-        document.getElementById("v2DelivDespatchRef").value = cleanedDespatch;
-      } else {
-        document.getElementById("v2DelivDespatchRef").value = "";
-      }
-
+      const finalDespatch = !isBogusDespatch ? cleanedDespatch : "";
+      const despatchEl = document.getElementById("v2DelivDespatchRef");
+      if (despatchEl) despatchEl.value = finalDespatch;
       
-      if (inv.delivery.street) document.getElementById("v2DelivStreet").value = inv.delivery.street;
-      if (inv.delivery.postcode) document.getElementById("v2DelivPostcode").value = inv.delivery.postcode;
-      if (inv.delivery.city) document.getElementById("v2DelivCity").value = inv.delivery.city;
-      if (inv.delivery.country_code) document.getElementById("v2DelivCountry").value = inv.delivery.country_code;
+      if (inv.delivery?.street) { const el = document.getElementById("v2DelivStreet"); if (el) el.value = inv.delivery.street; }
+      if (inv.delivery?.postcode) { const el = document.getElementById("v2DelivPostcode"); if (el) el.value = inv.delivery.postcode; }
+      if (inv.delivery?.city) { const el = document.getElementById("v2DelivCity"); if (el) el.value = inv.delivery.city; }
+      if (inv.delivery?.country_code) { const el = document.getElementById("v2DelivCountry"); if (el) el.value = inv.delivery.country_code; }
 
       const delivSection = document.getElementById("v2DeliverySection");
-      if (delivSection && (inv.delivery.recipient_name || inv.delivery.delivery_date || locId || despatchRef)) {
+      if (delivSection && (inv.delivery?.recipient_name || finalDeliveryDate || locId || finalDespatch)) {
         delivSection.style.display = "block";
       }
     }
 
-    // Line items
+    // 2. Line items decomposition & structured attribute binding
     if (inv.items && inv.items.length > 0) {
-      v2LineItems = inv.items.map(it => ({
-        name: it.name || "Item",
-        quantity: it.quantity || 1,
-        unit_code: it.unit_code || "C62",
-        unit_price: it.unit_price || 0,
-        tax_category_code: it.tax_category_code || "S",
-        tax_percent: it.tax_percent !== undefined ? it.tax_percent : 19.0,
-        discount_amount: it.discount_amount || 0.0,
-        discount_percent: it.discount_percent || null
-      }));
+      v2LineItems = inv.items.map(it => {
+        // Extract concise name vs extended technical description
+        let rawTitle = (it.name || it.item_name || "Item").trim();
+        let rawDesc = (it.description || "").trim();
+
+        // If rawTitle contains multi-line text, isolate first concise line as name and rest into description
+        if (rawTitle.includes("\n") && !rawDesc) {
+          const lines = rawTitle.split("\n").map(l => l.trim()).filter(Boolean);
+          rawTitle = lines[0] || "Item";
+          rawDesc = lines.slice(1).join("\n");
+        }
+
+        return {
+          name: rawTitle,
+          description: rawDesc,
+          seller_item_id: it.seller_item_id || "",
+          buyer_item_id: it.buyer_item_id || "",
+          order_line_reference: it.order_line_reference || "",
+          standard_item_id: it.standard_item_id || "",
+          standard_item_id_scheme: it.standard_item_id_scheme || "0160",
+          quantity: Number(it.quantity) || 1,
+          unit_code: it.unit_code || "C62",
+          unit_price: Number(it.unit_price) || 0,
+          price_base_quantity: Number(it.price_base_quantity) || 1,
+          price_base_unit: it.price_base_unit || "",
+          tax_category_code: it.tax_category_code || "S",
+          tax_percent: it.tax_percent !== undefined ? Number(it.tax_percent) : 19.0,
+          discount_amount: Number(it.discount_amount) || 0.0,
+          discount_percent: it.discount_percent !== null && it.discount_percent !== undefined ? Number(it.discount_percent) : null,
+          allowances_charges: Array.isArray(it.allowances_charges) ? it.allowances_charges : []
+        };
+      });
       renderV2LineItems();
     }
 

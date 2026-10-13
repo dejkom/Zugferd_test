@@ -168,6 +168,11 @@ async def extract_pdf(req: ExtractionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/prefill")
+async def prefill_invoice(req: ExtractionRequest):
+    """Direct alias for the extraction & OCR pre-fill pipeline."""
+    return await extract_pdf(req)
+
 @app.post("/api/generate-xml")
 async def generate_xml(req: GenerateXmlRequest):
     try:
@@ -487,6 +492,9 @@ DEFAULT_SETTINGS = {
     "seller_bank1_iban": "DE89370400440532013000",
     "seller_bank2_name": "Baden-Württembergische Bank",
     "seller_bank2_bic": "SOLA DEST",
+    "seller_bank2_iban": "DE30 6005 0101 7871 5056 72",
+    "privacy_disclosure": "Gemäß Artikel 13 der DSGVO, teilen wir Ihnen die Informationspflichten über folgende Adresse mit: www.odelo.de unter Datenschutz.",
+    "auto_sync_delivery_date": False,
     "saved_parties": {
         "sellers": [],
         "buyers": []
@@ -769,6 +777,34 @@ async def get_server_config():
         "openai_api_key": env_key,
         "company_settings": settings
     }
+
+class TestApiKeyRequest(BaseModel):
+    api_key: Optional[str] = None
+
+@app.post("/api/config/test-openai-key")
+async def test_openai_api_key(req: TestApiKeyRequest):
+    sys_settings = load_system_settings()
+    candidate_key = (req.api_key or "").strip() or sys_settings.get("openai_api_key", "").strip() or os.environ.get("OPENAI_API_KEY", "").strip()
+    if not candidate_key:
+        return {"success": False, "error": "No API key provided or found on server."}
+    
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=candidate_key)
+        # Fast lightweight check by listing 1 model or test
+        models_page = client.models.list()
+        first_model = None
+        for m in models_page:
+            first_model = m.id
+            break
+        return {"success": True, "message": "API Key is valid and connected to OpenAI!", "sample_model": first_model}
+    except Exception as e:
+        err_msg = str(e)
+        if "Incorrect API key provided" in err_msg or "invalid_api_key" in err_msg or "401" in err_msg:
+            return {"success": False, "error": "Authentication failed (401): The provided OpenAI API key is invalid or revoked."}
+        elif "quota" in err_msg.lower() or "insufficient_quota" in err_msg:
+            return {"success": False, "error": "Quota exceeded (429): Check your OpenAI account billing / credits."}
+        return {"success": False, "error": f"OpenAI verification failed: {err_msg}"}
 
 class SaveSettingsRequest(BaseModel):
     settings: dict
