@@ -189,10 +189,23 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
             (inv.delivery.street and inv.delivery.street != inv.buyer.street)
         )
 
+    cfg = footer_config or {}
+    sync_delivery = bool(cfg.get("auto_sync_delivery_date", False))
+
     # Effective delivery date (BT-72)
     effective_delivery_date = inv.delivery_date
     if not effective_delivery_date and inv.delivery and inv.delivery.delivery_date:
         effective_delivery_date = inv.delivery.delivery_date
+    if not effective_delivery_date and sync_delivery and inv.issue_date:
+        effective_delivery_date = inv.issue_date
+
+    # Ensure "Rechnungsdatum = Leistungsdatum" is included in inv.notes (BT-22) if auto_sync_delivery_date is True
+    if sync_delivery:
+        sync_clause = "Rechnungsdatum = Leistungsdatum"
+        current_notes = list(inv.notes or [])
+        if not any(sync_clause.lower() in str(n).lower() for n in current_notes):
+            current_notes.append(sync_clause)
+            inv.notes = current_notes
 
     # References matrix (BT-10, BT-13, BT-29, BT-12, BT-16, BT-19, BT-14, BT-11)
     references = []
@@ -269,6 +282,52 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
     if not exemption_text and has_exemption:
         exemption_text = t_func("reverse_charge_clause")
 
+    # Fallbacks from configuration (footer_config)
+    seller_court_cfg = (cfg.get("seller_court") or "").strip()
+    seller_hrb_cfg = (cfg.get("seller_hrb") or "").strip()
+    combined_court_hrb = " | ".join(filter(None, [seller_court_cfg, seller_hrb_cfg]))
+
+    raw_seller_court = (inv.seller.court_registry or inv.seller.company_legal_form or "").strip()
+    if not raw_seller_court:
+        effective_seller_court = combined_court_hrb
+    elif seller_hrb_cfg and seller_hrb_cfg.lower() not in raw_seller_court.lower():
+        effective_seller_court = f"{raw_seller_court} | {seller_hrb_cfg}" if raw_seller_court else combined_court_hrb
+    else:
+        effective_seller_court = raw_seller_court
+
+    effective_seller_tax_number = (
+        (getattr(inv.seller, "tax_number", None) or inv.seller.tax_registration_id or "").strip()
+        or (cfg.get("seller_tax_number") or "").strip()
+    )
+
+    effective_seller_legal_info = (
+        (getattr(inv.seller, "legal_info", None) or "").strip()
+        or (cfg.get("seller_managing_directors") or "").strip()
+    )
+
+    effective_seller_phone = (
+        (inv.seller.contact_phone or "").strip()
+        or (cfg.get("seller_phone") or "").strip()
+    )
+
+    # Effective bank accounts list for Block 6
+    effective_bank_accounts = []
+    if getattr(inv.payment, "bank_accounts", None) and len(inv.payment.bank_accounts) > 0:
+        effective_bank_accounts = inv.payment.bank_accounts
+    else:
+        # Fallback to configured bank accounts
+        b1_iban = (cfg.get("seller_bank1_iban") or inv.payment.iban or "").strip()
+        b1_name = (cfg.get("seller_bank1_name") or inv.payment.bank_name or "Primary Bank").strip()
+        b1_bic = (cfg.get("seller_bank1_bic") or inv.payment.bic or "").strip()
+        if b1_iban:
+            effective_bank_accounts.append({"bank_name": b1_name, "iban": b1_iban, "bic": b1_bic})
+
+        b2_iban = (cfg.get("seller_bank2_iban") or "").strip()
+        b2_name = (cfg.get("seller_bank2_name") or "Secondary Bank").strip()
+        b2_bic = (cfg.get("seller_bank2_bic") or "").strip()
+        if b2_iban:
+            effective_bank_accounts.append({"bank_name": b2_name, "iban": b2_iban, "bic": b2_bic})
+
     html_rendered = template.render(
         inv=inv,
         t=t_func,
@@ -290,7 +349,12 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
         vat_breakdown_list=vat_breakdown_list,
         has_exemption=has_exemption,
         exemption_text=exemption_text,
-        footer_config=footer_config or {}
+        footer_config=footer_config or {},
+        effective_seller_court=effective_seller_court,
+        effective_seller_tax_number=effective_seller_tax_number,
+        effective_seller_legal_info=effective_seller_legal_info,
+        effective_seller_phone=effective_seller_phone,
+        effective_bank_accounts=effective_bank_accounts
     )
     return html_rendered
 

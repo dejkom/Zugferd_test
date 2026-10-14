@@ -38,6 +38,34 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
         guideline_id = "urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended"
     else:
         guideline_id = "urn:factur-x.eu:1p0:basic"
+    # Load system settings for fallbacks if available
+    cfg_data = {}
+    try:
+        from backend.app import UPLOAD_DIR
+        import json
+        cfg_path = os.path.join(UPLOAD_DIR, "system_settings.json")
+        if os.path.exists(cfg_path):
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg_data = json.load(f)
+    except Exception:
+        pass
+
+    sync_delivery = bool(cfg_data.get("auto_sync_delivery_date", False))
+    if sync_delivery:
+        # If delivery object is absent, create minimal delivery with issue_date
+        if not inv.delivery:
+            from backend.models import DeliveryDetails
+            inv.delivery = DeliveryDetails(delivery_date=inv.issue_date)
+        elif not inv.delivery.delivery_date and inv.issue_date:
+            inv.delivery.delivery_date = inv.issue_date
+        
+        # Ensure "Rechnungsdatum = Leistungsdatum" in inv.notes
+        sync_clause = "Rechnungsdatum = Leistungsdatum"
+        current_notes = list(inv.notes or [])
+        if not any(sync_clause.lower() in str(n).lower() for n in current_notes):
+            current_notes.append(sync_clause)
+            inv.notes = current_notes
+
     issue_date_formatted = clean_date(inv.issue_date)
     due_date_formatted = clean_date(inv.due_date) if inv.due_date else None
 
@@ -297,16 +325,7 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
     # Local Tax Number / Steuernummer (FC)
     s_tax_number = (getattr(inv.seller, "tax_number", None) or inv.seller.tax_registration_id or "").strip()
     if not s_tax_number:
-        try:
-            from backend.app import UPLOAD_DIR
-            import json
-            cfg_path = os.path.join(UPLOAD_DIR, "system_settings.json")
-            if os.path.exists(cfg_path):
-                with open(cfg_path, "r", encoding="utf-8") as f:
-                    cfg_data = json.load(f)
-                    s_tax_number = (cfg_data.get("seller_tax_number") or "").strip()
-        except Exception:
-            pass
+        s_tax_number = (cfg_data.get("seller_tax_number") or "").strip()
 
     if s_tax_number:
         seller_tax_xml += f"""        <ram:SpecifiedTaxRegistration>
@@ -315,11 +334,44 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
 
     # Seller Legal Organization (BT-30: Legal Registration & BT-33: Additional Legal Information)
     seller_legal_org_xml = ""
-    s_reg_id = (getattr(inv.seller, "company_legal_form", None) or inv.seller.company_id or inv.seller.court_registry or "").strip()
+    raw_s_reg = (getattr(inv.seller, "company_legal_form", None) or inv.seller.company_id or inv.seller.court_registry or "").strip()
+    s_court_cfg = (cfg_data.get("seller_court") or "").strip()
+    s_hrb_cfg = (cfg_data.get("seller_hrb") or "").strip()
+
+    # Separate registry number (BT-30 ID) and court name
+    reg_num = s_hrb_cfg
+    court_name = s_court_cfg
+
+    if raw_s_reg:
+        m = re.search(r"^(.*?)(?:,\s*|\s*\|\s*|\s+)(HRB\s*\d+|HRA\s*\d+|\d+.*)$", raw_s_reg, flags=re.IGNORECASE)
+        if m:
+            court_candidate = m.group(1).strip()
+            num_candidate = m.group(2).strip()
+            if not reg_num:
+                reg_num = num_candidate
+            if not court_name:
+                court_name = court_candidate
+        elif not reg_num:
+            if re.match(r"^(HRB|HRA|\d)", raw_s_reg, flags=re.IGNORECASE):
+                reg_num = raw_s_reg
+            elif not court_name:
+                court_name = raw_s_reg
+
     s_legal_info = (getattr(inv.seller, "legal_info", None) or "").strip()
-    if s_reg_id or s_legal_info:
-        reg_id_elem = f'\n          <ram:ID schemeID="0002">{escape(s_reg_id)}</ram:ID>' if s_reg_id else ""
-        legal_info_elem = f'\n          <ram:TradingBusinessName>{escape(s_legal_info)}</ram:TradingBusinessName>' if s_legal_info else ""
+    if not s_legal_info:
+        s_legal_info = (cfg_data.get("seller_managing_directors") or "").strip()
+
+    # If court name is present, place court name alongside managing directors / legal text in TradingBusinessName
+    legal_name_parts = []
+    if court_name and court_name.lower() not in (s_legal_info or "").lower():
+        legal_name_parts.append(court_name)
+    if s_legal_info:
+        legal_name_parts.append(s_legal_info)
+    combined_legal_text = ", ".join(legal_name_parts)
+
+    if reg_num or combined_legal_text:
+        reg_id_elem = f'\n          <ram:ID schemeID="0002">{escape(reg_num)}</ram:ID>' if reg_num else ""
+        legal_info_elem = f'\n          <ram:TradingBusinessName>{escape(combined_legal_text)}</ram:TradingBusinessName>' if combined_legal_text else ""
         seller_legal_org_xml = f"""        <ram:SpecifiedLegalOrganization>{reg_id_elem}{legal_info_elem}
         </ram:SpecifiedLegalOrganization>\n"""
 
@@ -370,11 +422,12 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
 
     # Seller contact (BG-6 / BT-41, BT-42, BT-43)
     seller_contact_xml = ""
-    if inv.seller.contact_name or inv.seller.contact_phone or inv.seller.contact_email:
+    s_contact_phone = (inv.seller.contact_phone or "").strip() or (cfg_data.get("seller_phone") or "").strip()
+    if inv.seller.contact_name or s_contact_phone or inv.seller.contact_email:
         name_x = f"<ram:PersonName>{escape(inv.seller.contact_name)}</ram:PersonName>\n          " if inv.seller.contact_name else ""
         phone_x = f"""<ram:TelephoneUniversalCommunication>
-            <ram:CompleteNumber>{escape(inv.seller.contact_phone)}</ram:CompleteNumber>
-          </ram:TelephoneUniversalCommunication>\n          """ if inv.seller.contact_phone else ""
+            <ram:CompleteNumber>{escape(s_contact_phone)}</ram:CompleteNumber>
+          </ram:TelephoneUniversalCommunication>\n          """ if s_contact_phone else ""
         email_x = f"""<ram:EmailURIUniversalCommunication>
             <ram:URIID>{escape(inv.seller.contact_email)}</ram:URIID>
           </ram:EmailURIUniversalCommunication>\n          """ if inv.seller.contact_email else ""

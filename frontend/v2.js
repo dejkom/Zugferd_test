@@ -139,9 +139,14 @@ function populateV2SellerDefaults(force = false) {
     }
   }
 
+  const courtHrb = [settings.seller_court, settings.seller_hrb].filter(Boolean).join(" | ");
+  const legalInfoStr = settings.seller_managing_directors ? ("Geschäftsführer: " + settings.seller_managing_directors) : "";
+
   setVal("v2SellerName", settings.seller_name || "");
   setVal("v2SellerVat", settings.seller_vat || "");
   setVal("v2SellerTaxNumber", settings.seller_tax_number || "");
+  setVal("v2SellerRegId", courtHrb);
+  setVal("v2SellerLegalInfo", legalInfoStr);
   setVal("v2SellerIdentifier", settings.seller_identifier || "");
   setVal("v2SellerStreet", settings.seller_street || "");
   setVal("v2SellerCity", cityStr);
@@ -245,9 +250,20 @@ function renderV2LineItems() {
     const itemNetSub = (item.quantity * item.unit_price) / (baseQty > 0 ? baseQty : 1.0);
     const lineTotal = Math.max(0, itemNetSub - lineAllowances + lineCharges);
 
+    const lineIdVal = (item.line_id !== undefined && item.line_id !== null && String(item.line_id).trim() !== "")
+      ? String(item.line_id).trim()
+      : String(idx + 1);
+
     card.innerHTML = `
-      <div class="v2-item-topbar">
-        <span class="v2-item-number">Line #${idx + 1}</span>
+      <div class="v2-item-topbar" style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span class="v2-item-number">#${idx + 1}</span>
+          <label style="font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.25rem; margin: 0;">
+            <span class="v2-bt-badge" data-bt="BT-126" style="margin: 0;">BT-126</span>
+            Pos:
+            <input type="text" class="v2-input" style="width: 4rem; height: 1.6rem; padding: 0.1rem 0.35rem; font-size: 0.75rem; font-weight: 700; text-align: center;" value="${escapeHtml(lineIdVal)}" oninput="updateV2ItemField(${idx}, 'line_id', this.value)" placeholder="e.g. 10">
+          </label>
+        </div>
         <button type="button" class="v2-item-trash" onclick="removeV2LineItem(${idx})" title="Remove Line">🗑️</button>
       </div>
       <div style="display: flex; flex-direction: column; gap: 0.75rem;">
@@ -600,7 +616,9 @@ function updateV2ItemAllowanceCharge(itemIdx, acIdx, field, val) {
 window.updateV2ItemAllowanceCharge = updateV2ItemAllowanceCharge;
 
 function addV2LineItem() {
+  const nextPos = (v2LineItems.length + 1) * 10;
   v2LineItems.push({
+    line_id: String(nextPos),
     name: "New Line Item",
     quantity: 1,
     unit_code: "C62",
@@ -829,10 +847,25 @@ function populateV2DefaultBankAccounts() {
     }));
   } else {
     // Fallback if no corporate banks are configured yet
-    const primaryIban = document.getElementById("v2PayIban")?.value || "";
-    const primaryBic = document.getElementById("v2PayBic")?.value || "";
-    v2BankAccounts = [
-      { iban: primaryIban || "DE89370400440532013000", bank_name: "Primary Bank", bic: primaryBic || "DBBADEFFXXX" }
+    const settings = window.cachedCompanySettings || {};
+    const b1Iban = (settings.seller_bank1_iban || document.getElementById("v2PayIban")?.value || "").trim();
+    const b1Bic = (settings.seller_bank1_bic || document.getElementById("v2PayBic")?.value || "").trim();
+    const b1Name = (settings.seller_bank1_name || "Commerzbank AG").trim();
+
+    const b2Iban = (settings.seller_bank2_iban || "").trim();
+    const b2Bic = (settings.seller_bank2_bic || "").trim();
+    const b2Name = (settings.seller_bank2_name || "Baden-Württembergische Bank").trim();
+
+    const initial = [];
+    if (b1Iban) {
+      initial.push({ iban: b1Iban, bank_name: b1Name, bic: b1Bic });
+    }
+    if (b2Iban) {
+      initial.push({ iban: b2Iban, bank_name: b2Name, bic: b2Bic });
+    }
+
+    v2BankAccounts = initial.length > 0 ? initial : [
+      { iban: "DE89370400440532013000", bank_name: "Primary Bank", bic: "DBBADEFFXXX" }
     ];
   }
   renderV2BankAccounts();
@@ -1848,6 +1881,7 @@ async function handleV2PrefillUpload(file) {
         }
 
         return {
+          line_id: it.line_id ? String(it.line_id).trim() : "",
           name: rawTitle,
           description: rawDesc,
           seller_item_id: it.seller_item_id || "",
@@ -1963,7 +1997,9 @@ function harvestV2InvoiceData() {
     taxBreakdownMap[rateKey].basis_amount += lineNet;
 
     return {
-      line_id: String(idx + 1),
+      line_id: (it.line_id !== undefined && it.line_id !== null && String(it.line_id).trim() !== "")
+        ? String(it.line_id).trim()
+        : String(idx + 1),
       name: it.name,
       description: it.description || null,
       seller_item_id: it.seller_item_id || null,
@@ -2089,8 +2125,12 @@ function harvestV2InvoiceData() {
     cost_center: document.getElementById("v2CostCenter")?.value.trim() || null,
     preceding_invoice_number: document.getElementById("v2PrecedingInvNumber")?.value.trim() || null,
     preceding_invoice_date: document.getElementById("v2PrecedingInvDate")?.value || null,
-    service_period_start: document.getElementById("v2ServiceStart")?.value || null,
-    service_period_end: document.getElementById("v2ServiceEnd")?.value || null,
+    service_period_start: (docType === "381" || docType === "384")
+      ? (document.getElementById("v2CnServiceStart")?.value || document.getElementById("v2ServiceStart")?.value || null)
+      : (document.getElementById("v2ServiceStart")?.value || null),
+    service_period_end: (docType === "381" || docType === "384")
+      ? (document.getElementById("v2CnServiceEnd")?.value || document.getElementById("v2ServiceEnd")?.value || null)
+      : (document.getElementById("v2ServiceEnd")?.value || null),
     prepaid_amount: prepaidAmount,
     discounts: docDiscounts,
     vat_exemption_reason: document.getElementById("v2ExemptionReason")?.value || null,
@@ -2375,6 +2415,8 @@ function populateV2FromHistory(inv, layout, lang) {
   setVal("v2PrecedingInvDate", inv.preceding_invoice_date);
   setVal("v2ServiceStart", inv.service_period_start);
   setVal("v2ServiceEnd", inv.service_period_end);
+  setVal("v2CnServiceStart", inv.service_period_start);
+  setVal("v2CnServiceEnd", inv.service_period_end);
   setVal("v2PrepaidAmount", inv.prepaid_amount || 0);
 
   setVal("v2SalesOrder", inv.sales_order_number);
@@ -2489,6 +2531,7 @@ function populateV2FromHistory(inv, layout, lang) {
   const items = inv.items || inv.line_items || [];
   if (items.length > 0) {
     v2LineItems = items.map(it => ({
+      line_id: it.line_id ? String(it.line_id).trim() : "",
       name: it.name || it.item_name || "Item",
       description: it.description || "",
       seller_item_id: it.seller_item_id || "",

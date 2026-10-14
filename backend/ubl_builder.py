@@ -39,6 +39,32 @@ def generate_ubl_xml(inv: InvoiceData, profile: str = "PEPPOL") -> str:
         customization_id = "urn:cen.eu:en16931:2017"
         profile_id = "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0"
 
+    # Load system settings for fallbacks if available
+    cfg_data = {}
+    try:
+        from backend.app import UPLOAD_DIR
+        import json
+        cfg_path = os.path.join(UPLOAD_DIR, "system_settings.json")
+        if os.path.exists(cfg_path):
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg_data = json.load(f)
+    except Exception:
+        pass
+
+    sync_delivery = bool(cfg_data.get("auto_sync_delivery_date", False))
+    if sync_delivery:
+        if not inv.delivery:
+            from backend.models import DeliveryDetails
+            inv.delivery = DeliveryDetails(delivery_date=inv.issue_date)
+        elif not inv.delivery.delivery_date and inv.issue_date:
+            inv.delivery.delivery_date = inv.issue_date
+
+        sync_clause = "Rechnungsdatum = Leistungsdatum"
+        current_notes = list(inv.notes or [])
+        if not any(sync_clause.lower() in str(n).lower() for n in current_notes):
+            current_notes.append(sync_clause)
+            inv.notes = current_notes
+
     inv_number = escape(inv.invoice_number or "")
     issue_date = clean_ubl_date(inv.issue_date)
     due_date = clean_ubl_date(inv.due_date) if inv.due_date else ""
@@ -50,6 +76,8 @@ def generate_ubl_xml(inv: InvoiceData, profile: str = "PEPPOL") -> str:
     s_vat = inv.seller.vat_id.replace(" ", "").upper() if inv.seller.vat_id else ""
     b_vat = inv.buyer.vat_id.replace(" ", "").upper() if inv.buyer.vat_id else ""
     s_tax_number = (getattr(inv.seller, "tax_number", None) or inv.seller.tax_registration_id or "").strip()
+    if not s_tax_number:
+        s_tax_number = (cfg_data.get("seller_tax_number") or "").strip()
     s_iban = inv.payment.iban.replace(" ", "").upper() if inv.payment.iban else ""
     s_bic = inv.payment.bic.replace(" ", "").upper() if inv.payment.bic else ""
 
@@ -127,12 +155,13 @@ def generate_ubl_xml(inv: InvoiceData, profile: str = "PEPPOL") -> str:
 
     # Seller Contact (BG-6 / BT-41..43)
     s_contact_xml = ""
-    if inv.seller.contact_name or inv.seller.contact_phone or inv.seller.contact_email:
+    s_contact_phone = (inv.seller.contact_phone or "").strip() or (cfg_data.get("seller_phone") or "").strip()
+    if inv.seller.contact_name or s_contact_phone or inv.seller.contact_email:
         s_contact_xml = "      <cac:Contact>\n"
         if inv.seller.contact_name:
             s_contact_xml += f"        <cbc:Name>{escape(inv.seller.contact_name)}</cbc:Name>\n"
-        if inv.seller.contact_phone:
-            s_contact_xml += f"        <cbc:Telephone>{escape(inv.seller.contact_phone)}</cbc:Telephone>\n"
+        if s_contact_phone:
+            s_contact_xml += f"        <cbc:Telephone>{escape(s_contact_phone)}</cbc:Telephone>\n"
         if inv.seller.contact_email:
             s_contact_xml += f"        <cbc:ElectronicMail>{escape(inv.seller.contact_email)}</cbc:ElectronicMail>\n"
         s_contact_xml += "      </cac:Contact>\n"
@@ -173,11 +202,43 @@ def generate_ubl_xml(inv: InvoiceData, profile: str = "PEPPOL") -> str:
 
     # Seller Legal Entity (BT-27, BT-30, BT-33)
     s_legal_id_attr = ""
-    s_reg_id = (getattr(inv.seller, "company_legal_form", None) or inv.seller.company_id or inv.seller.court_registry or "").strip()
-    if s_reg_id:
-        s_legal_id_attr = f'\n        <cbc:CompanyID schemeID="0002">{escape(s_reg_id)}</cbc:CompanyID>'
+    raw_s_reg = (getattr(inv.seller, "company_legal_form", None) or inv.seller.company_id or inv.seller.court_registry or "").strip()
+    s_court_cfg = (cfg_data.get("seller_court") or "").strip()
+    s_hrb_cfg = (cfg_data.get("seller_hrb") or "").strip()
+
+    reg_num = s_hrb_cfg
+    court_name = s_court_cfg
+
+    if raw_s_reg:
+        m = re.search(r"^(.*?)(?:,\s*|\s*\|\s*|\s+)(HRB\s*\d+|HRA\s*\d+|\d+.*)$", raw_s_reg, flags=re.IGNORECASE)
+        if m:
+            court_candidate = m.group(1).strip()
+            num_candidate = m.group(2).strip()
+            if not reg_num:
+                reg_num = num_candidate
+            if not court_name:
+                court_name = court_candidate
+        elif not reg_num:
+            if re.match(r"^(HRB|HRA|\d)", raw_s_reg, flags=re.IGNORECASE):
+                reg_num = raw_s_reg
+            elif not court_name:
+                court_name = raw_s_reg
+
+    if reg_num:
+        s_legal_id_attr = f'\n        <cbc:CompanyID schemeID="0002">{escape(reg_num)}</cbc:CompanyID>'
+
     s_legal_info = (getattr(inv.seller, "legal_info", None) or "").strip()
-    s_legal_info_tag = f"\n        <cbc:CompanyLegalForm>{escape(s_legal_info)}</cbc:CompanyLegalForm>" if s_legal_info else ""
+    if not s_legal_info:
+        s_legal_info = (cfg_data.get("seller_managing_directors") or "").strip()
+
+    legal_name_parts = []
+    if court_name and court_name.lower() not in (s_legal_info or "").lower():
+        legal_name_parts.append(court_name)
+    if s_legal_info:
+        legal_name_parts.append(s_legal_info)
+    combined_legal_text = ", ".join(legal_name_parts)
+
+    s_legal_info_tag = f"\n        <cbc:CompanyLegalForm>{escape(combined_legal_text)}</cbc:CompanyLegalForm>" if combined_legal_text else ""
     seller_legal_entity_xml = f"""      <cac:PartyLegalEntity>
         <cbc:RegistrationName>{escape(inv.seller.name)}</cbc:RegistrationName>{s_legal_id_attr}{s_legal_info_tag}
       </cac:PartyLegalEntity>\n"""
