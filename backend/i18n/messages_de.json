@@ -52,7 +52,7 @@
   "vat_cat_k": "Innergemeinschaftlich (K)",
   "reverse_charge_clause": "Steuerschuldnerschaft des Leistungsempfängers (Reverse Charge gemäß EU-Mehrwertsteuersystemrichtlinie).",
   "terms_label": "Zahlungsbedingungen",
-  "terms_text": "Zahlbar innerhalb von 30 Tagen rein netto ohne Abzug.",
+  "terms_text": "30 Tage rein netto ohne Abzug.",
   "notes_label": "Bemerkungen",
   "tot_line_net": "Summe der Zeilennennbeträge",
   "tot_allowance": "Dokumentenrabatt",

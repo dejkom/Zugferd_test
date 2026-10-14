@@ -200,6 +200,39 @@ function handleV2DocTypeChange(docType) {
 }
 window.handleV2DocTypeChange = handleV2DocTypeChange;
 
+function translatePaymentTermsText(text, lang) {
+  if (!text) return "";
+  const tClean = text.trim();
+  const l = (lang || "sl").toLowerCase();
+
+  const daysMatch = tClean.match(/\b(\d{1,3})\s*(?:days?|tage?|dni|dneh)\b/i);
+  const days = daysMatch ? daysMatch[1] : "30";
+
+  const isStandardNet = /(?:within\s+\d+\s+days\s+due\s+net|30\s*days\s*due\s*net|payable\s+within|30\s*tage\s*netto|innerhalb\s+von\s+\d+\s+tagen|v\s+roku\s+\d+\s+dni)/i.test(tClean);
+
+  if (isStandardNet) {
+    if (l === "de") {
+      return `${days} Tage rein netto ohne Abzug.`;
+    } else if (l === "sl") {
+      return `Plačilo v roku ${days} dni od datuma izdaje računa brez popusta.`;
+    } else if (l === "multi") {
+      return `Plačilo v ${days} dneh / Payment within ${days} days net / ${days} Tage netto`;
+    } else {
+      return `Payment due within ${days} days of invoice date net without deduction.`;
+    }
+  }
+  return text;
+}
+window.translatePaymentTermsText = translatePaymentTermsText;
+
+function handleV2LangChange(lang) {
+  const payTermsEl = document.getElementById("v2PayTerms");
+  if (payTermsEl && payTermsEl.value) {
+    payTermsEl.value = translatePaymentTermsText(payTermsEl.value, lang);
+  }
+}
+window.handleV2LangChange = handleV2LangChange;
+
 function updateV2DocumentTypeFields() {
   const sel = document.getElementById("v2DocTypeSelect");
   if (sel) handleV2DocTypeChange(sel.value);

@@ -129,6 +129,36 @@ def _format_unit(code: str, lang: str = "sl") -> str:
         return mapping.get(lang, mapping.get("en", c))
     return code
 
+def translate_payment_terms(terms: str, lang: str = "sl") -> str:
+    """
+    Translates standard payment terms expressions (e.g. 'within 30 days due net')
+    into the selected export language.
+    Preserves custom terms or references that do not match standard patterns.
+    """
+    if not terms:
+        return ""
+    t_clean = terms.strip()
+    l = (lang or "sl").lower()
+
+    # Detect day count if present, default 30
+    days_match = re.search(r"\b(\d{1,3})\s*(?:days?|tage?|dni|dneh)\b", t_clean, re.IGNORECASE)
+    days = days_match.group(1) if days_match else "30"
+
+    # Check if text corresponds to standard net payment terms
+    is_standard_net = bool(re.search(r"(?:within\s+\d+\s+days\s+due\s+net|30\s*days\s*due\s*net|payable\s+within|30\s*tage\s*netto|innerhalb\s+von\s+\d+\s+tagen|v\s+roku\s+\d+\s+dni)", t_clean, re.IGNORECASE))
+    
+    if is_standard_net:
+        if l in ["de", "ger", "german"]:
+            return f"{days} Tage rein netto ohne Abzug."
+        elif l in ["sl", "slovenian"]:
+            return f"Plačilo v roku {days} dni od datuma izdaje računa brez popusta."
+        elif l in ["multi", "multilingual"]:
+            return f"Plačilo v {days} dneh / Payment within {days} days net / {days} Tage netto"
+        else: # en
+            return f"Payment due within {days} days of invoice date net without deduction."
+
+    return terms
+
 def get_chrome_executable() -> str:
     candidates = [
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -328,11 +358,16 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
         if b2_iban:
             effective_bank_accounts.append({"bank_name": b2_name, "iban": b2_iban, "bic": b2_bic})
 
+    # Localize payment terms according to selected export language
+    raw_payment_terms = (getattr(inv.payment, "payment_terms", None) or "").strip()
+    effective_payment_terms = translate_payment_terms(raw_payment_terms, lang=lang) if raw_payment_terms else t_func("terms_text", "")
+
     html_rendered = template.render(
         inv=inv,
         t=t_func,
         lang_code=lang,
         doc_type_title=doc_type_title,
+        effective_payment_terms=effective_payment_terms,
         is_credit_note=is_credit_note,
         logo_base64=logo_b64,
         hide_tags=hide_tags,

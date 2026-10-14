@@ -661,11 +661,11 @@
         </div>
         {% endif %}
 
-        {% if inv.payment.payment_terms or inv.notes %}
+        {% if effective_payment_terms or inv.notes %}
         <div style="margin-top: 10px; font-size: 7.8pt; color: #475569;">
-          {% if inv.payment.payment_terms %}
+          {% if effective_payment_terms %}
           <strong><span class="tag">BT-20</span><span data-i18n="terms_label">{{ t('terms_label') }}</span>:</strong>
-          <span data-i18n="terms_text">{{ inv.payment.payment_terms }}</span><br />
+          <span data-i18n="terms_text">{{ effective_payment_terms }}</span><br />
           {% endif %}
           {% if inv.notes %}
           <div style="margin-top: 4px;">
