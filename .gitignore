@@ -24,6 +24,10 @@ system_settings.json
 *api_key*
 *.key
 
+# Executable and binary files
+Mustang-CLI.jar
+*.jar
+
 # IDE and OS files
 .idea/
 .vscode/

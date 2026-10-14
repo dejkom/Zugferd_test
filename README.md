@@ -32,7 +32,13 @@ A modern web application and backend pipeline to transform arbitrary, non-compli
 
 ## 🚀 How to Run
 
-### 1. Start the Application
+### 1. Prerequisites & Download Mustang-CLI.jar
+The application requires Java 17+ and `Mustang-CLI.jar` (v2.26.0) in the project root:
+```powershell
+# Prenos Mustang-CLI.jar (če še ni prenesen):
+curl.exe -fSL -o Mustang-CLI.jar https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar
+```
+*(Pri poganjanju prek Dockerja se datoteka samodejno prenese med gradnjo vsebnika).*
 
 The web server runs locally with:
 ```powershell

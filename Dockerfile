@@ -15,10 +15,19 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Kopiranje kode aplikacije in datotek
+# Namestitev orodij za prenos (curl)
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Kopiranje kode aplikacije
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
-COPY Mustang-CLI.jar .
+
+# Kopiranje Mustang-CLI.jar če obstaja lokalno ali prenos uradne izdaje
+COPY Mustang-CLI.ja[r] .
+RUN if [ ! -f Mustang-CLI.jar ]; then \
+        curl -fSL -o Mustang-CLI.jar https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar; \
+    fi
 
 # Ustvarjanje map za shrambo
 RUN mkdir -p uploads outputs
