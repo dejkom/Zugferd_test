@@ -17,6 +17,8 @@ uploads/*
 !uploads/.gitkeep
 outputs/*
 !outputs/.gitkeep
+output/*
+!output/.gitkeep
 documentsforconversion/
 official_examples/
 system_settings.json
@@ -27,6 +29,7 @@ system_settings.json
 # Executable and binary files
 Mustang-CLI.jar
 *.jar
+*.pdf
 
 # IDE and OS files
 .idea/
