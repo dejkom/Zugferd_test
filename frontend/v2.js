@@ -2333,7 +2333,8 @@ async function handleV2GenerateSubmit() {
     let apiProfile = "EN16931";
     if (invData.document_format === "orderx") apiProfile = "BASIC";
     else if (typeof v2ActiveTargetFormat !== "undefined") {
-      if (v2ActiveTargetFormat === "eslog") apiProfile = "ESLOG2";
+      if (v2ActiveTargetFormat === "eslog_bizbox") apiProfile = "ESLOG_BIZBOX";
+      else if (v2ActiveTargetFormat === "eslog") apiProfile = "ESLOG2";
       else if (v2ActiveTargetFormat === "ubl") apiProfile = "UBL";
       else if (v2ActiveTargetFormat === "peppol") apiProfile = "PEPPOL";
     }
@@ -2643,7 +2644,10 @@ async function updateV2LiveXml() {
       apiProfile = "BASIC";
       badgeText = "Order-X BASIC";
     } else if (typeof v2ActiveTargetFormat !== "undefined") {
-      if (v2ActiveTargetFormat === "eslog") {
+      if (v2ActiveTargetFormat === "eslog_bizbox") {
+        apiProfile = "ESLOG_BIZBOX";
+        badgeText = "🇸🇮 e-SLOG 2.0 (BizBox)";
+      } else if (v2ActiveTargetFormat === "eslog") {
         apiProfile = "ESLOG2";
         badgeText = "🇸🇮 e-SLOG 2.0 (CII)";
       } else if (v2ActiveTargetFormat === "ubl") {
@@ -2705,7 +2709,8 @@ async function downloadV2RawXml() {
     if (isOrderX) {
       apiProfile = "BASIC";
     } else if (typeof v2ActiveTargetFormat !== "undefined") {
-      if (v2ActiveTargetFormat === "eslog") apiProfile = "ESLOG2";
+      if (v2ActiveTargetFormat === "eslog_bizbox") apiProfile = "ESLOG_BIZBOX";
+      else if (v2ActiveTargetFormat === "eslog") apiProfile = "ESLOG2";
       else if (v2ActiveTargetFormat === "ubl") apiProfile = "UBL";
       else if (v2ActiveTargetFormat === "peppol") apiProfile = "PEPPOL";
       else if (v2ActiveTargetFormat === "xrechnung") apiProfile = "EN16931";

@@ -3855,7 +3855,7 @@ function handleV2FormatChange(format) {
   v2ActiveTargetFormat = format || "zugferd";
 
   // Update tabs active state
-  ["zugferd", "xrechnung", "peppol", "eslog", "ubl"].forEach(f => {
+  ["zugferd", "xrechnung", "peppol", "eslog", "eslog_bizbox", "ubl"].forEach(f => {
     const btn = document.getElementById(`v2FmtBtn-${f}`);
     if (btn) {
       if (f === v2ActiveTargetFormat) btn.classList.add("active");

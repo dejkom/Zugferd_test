@@ -13,6 +13,7 @@ from backend.models import InvoiceData
 from backend.extractor import extract_invoice_data, extract_raw_text_from_doc
 from backend.xml_builder import generate_facturx_xml, generate_orderx_xml
 from backend.ubl_builder import generate_ubl_xml
+from backend.eslog_builder import generate_eslog_bizbox_xml
 from backend.pdf_embedder import build_pdfa3_zugferd
 from backend.pdf_generator import generate_invoice_pdf_from_data
 from backend.mustang_wrapper import validate_zugferd_pdf
@@ -181,9 +182,11 @@ async def generate_xml(req: GenerateXmlRequest):
 
         if is_orderx:
             xml_content = generate_orderx_xml(req.invoice_data, profile=req.profile or "BASIC")
+        elif "BIZBOX" in profile_key:
+            xml_content = generate_eslog_bizbox_xml(req.invoice_data)
         elif "UBL" in profile_key or profile_key in ["PEPPOL", "PEPPOL_UBL"]:
             xml_content = generate_ubl_xml(req.invoice_data, profile=profile_key)
-        elif profile_key in ["ESLOG2", "ESLOG_2_0", "ESLOG"]:
+        elif profile_key in ["ESLOG2", "ESLOG_2_0", "ESLOG", "ESLOG_CII"]:
             xml_content = generate_facturx_xml(req.invoice_data, profile="ESLOG2")
         else:
             xml_content = generate_facturx_xml(req.invoice_data, profile=req.profile or "EN16931")
@@ -201,10 +204,13 @@ async def export_xml_file(req: GenerateXmlRequest):
         if is_orderx:
             xml_content = generate_orderx_xml(req.invoice_data, profile=req.profile or "BASIC")
             prefix = "orderx"
+        elif "BIZBOX" in profile_key:
+            xml_content = generate_eslog_bizbox_xml(req.invoice_data)
+            prefix = "eslog2_bizbox"
         elif "UBL" in profile_key or profile_key in ["PEPPOL", "PEPPOL_UBL"]:
             xml_content = generate_ubl_xml(req.invoice_data, profile=profile_key)
             prefix = "ubl"
-        elif profile_key in ["ESLOG2", "ESLOG_2_0", "ESLOG"]:
+        elif profile_key in ["ESLOG2", "ESLOG_2_0", "ESLOG", "ESLOG_CII"]:
             xml_content = generate_facturx_xml(req.invoice_data, profile="ESLOG2")
             prefix = "eslog2"
         else:
@@ -375,10 +381,13 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
     if is_orderx:
         xml_content = generate_orderx_xml(req.invoice_data, profile=req.profile or "BASIC")
         attachment_name = "order-x.xml"
+    elif "BIZBOX" in profile_key:
+        xml_content = generate_eslog_bizbox_xml(req.invoice_data)
+        attachment_name = "e-slog-bizbox.xml"
     elif "UBL" in profile_key or profile_key in ["PEPPOL", "PEPPOL_UBL"]:
         xml_content = generate_ubl_xml(req.invoice_data, profile=profile_key)
         attachment_name = "invoice.xml"
-    elif profile_key in ["ESLOG2", "ESLOG_2_0", "ESLOG"]:
+    elif profile_key in ["ESLOG2", "ESLOG_2_0", "ESLOG", "ESLOG_CII"]:
         xml_content = generate_facturx_xml(req.invoice_data, profile="ESLOG2")
         attachment_name = "e-slog.xml"
     else:

@@ -287,6 +287,15 @@
               </label>
 
               <label class="v2-format-option" style="cursor: pointer; margin: 0;">
+                <input type="radio" name="v2TargetFormat" value="eslog_bizbox" onchange="handleV2FormatChange(this.value)"
+                  style="display: none;">
+                <span class="v2-format-btn" id="v2FmtBtn-eslog_bizbox"
+                  style="display: flex; align-items: center; gap: 6px; padding: 0.45rem 0.85rem; border-radius: 8px; font-size: 0.82rem; font-weight: 700; transition: all 0.2s;">
+                  <span>🇸🇮 e-SLOG 2.0 (BizBox)</span>
+                </span>
+              </label>
+
+              <label class="v2-format-option" style="cursor: pointer; margin: 0;">
                 <input type="radio" name="v2TargetFormat" value="ubl" onchange="handleV2FormatChange(this.value)"
                   style="display: none;">
                 <span class="v2-format-btn" id="v2FmtBtn-ubl"
