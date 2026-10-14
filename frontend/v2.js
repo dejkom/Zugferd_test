@@ -424,7 +424,8 @@ function renderV2LineItems() {
                     <span class="v2-bt-badge" data-bt="BT-155">BT-155</span>
                   </span>
                 </label>
-                <input type="text" class="v2-input" value="${escapeHtml(item.seller_item_id || '')}" placeholder="e.g. 930000006" oninput="updateV2ItemField(${idx}, 'seller_item_id', this.value)">
+                <input type="text" id="v2ItemSellerId_${idx}" class="v2-input" value="${escapeHtml(item.seller_item_id || '')}" placeholder="e.g. 930000006" oninput="updateV2ItemField(${idx}, 'seller_item_id', this.value)">
+                <div id="v2ItemWarn_seller_item_id_${idx}"></div>
               </div>
               <div class="v2-field">
                 <label class="v2-label">
@@ -433,7 +434,8 @@ function renderV2LineItems() {
                     <span class="v2-bt-badge" data-bt="BT-156">BT-156</span>
                   </span>
                 </label>
-                <input type="text" class="v2-input" value="${escapeHtml(item.buyer_item_id || '')}" placeholder="e.g. ACK688 FATEV G45" oninput="updateV2ItemField(${idx}, 'buyer_item_id', this.value)">
+                <input type="text" id="v2ItemBuyerId_${idx}" class="v2-input" value="${escapeHtml(item.buyer_item_id || '')}" placeholder="e.g. ACK688 FATEV G45" oninput="updateV2ItemField(${idx}, 'buyer_item_id', this.value)">
+                <div id="v2ItemWarn_buyer_item_id_${idx}"></div>
               </div>
               <div class="v2-field">
                 <label class="v2-label">
@@ -444,8 +446,9 @@ function renderV2LineItems() {
                 </label>
                 <div style="display: flex; gap: 0.25rem;">
                   <input type="text" style="width: 4rem;" class="v2-input" value="${escapeHtml(item.standard_item_id_scheme || '0160')}" title="Scheme ID (BT-157-1, default 0160 for GTIN)" placeholder="0160" oninput="updateV2ItemField(${idx}, 'standard_item_id_scheme', this.value)">
-                  <input type="text" style="flex: 1;" class="v2-input" value="${escapeHtml(item.standard_item_id || '')}" placeholder="e.g. 4012345678901" oninput="updateV2ItemField(${idx}, 'standard_item_id', this.value)">
+                  <input type="text" id="v2ItemStandardId_${idx}" style="flex: 1;" class="v2-input" value="${escapeHtml(item.standard_item_id || '')}" placeholder="e.g. 4012345678901" oninput="updateV2ItemField(${idx}, 'standard_item_id', this.value)">
                 </div>
+                <div id="v2ItemWarn_standard_item_id_${idx}"></div>
               </div>
               <div class="v2-field">
                 <label class="v2-label">
@@ -523,6 +526,9 @@ function renderV2LineItems() {
   });
 
   recalcV2Totals();
+  if (typeof checkV2FormatFieldConstraints === "function") {
+    checkV2FormatFieldConstraints();
+  }
 }
 
 function renderV2ItemAllowancesChargesHtml(item, itemIdx) {
@@ -688,9 +694,66 @@ function updateV2ItemField(idx, field, value) {
   if (v2LineItems[idx]) {
     v2LineItems[idx][field] = value;
     recalcV2Totals();
+    if (["buyer_item_id", "seller_item_id", "standard_item_id"].includes(field)) {
+      if (typeof checkV2FormatFieldConstraints === "function") {
+        checkV2FormatFieldConstraints();
+      }
+    }
   }
 }
 window.updateV2ItemField = updateV2ItemField;
+
+function truncateV2ItemField(idx, field) {
+  if (v2LineItems[idx] && typeof v2LineItems[idx][field] === "string") {
+    v2LineItems[idx][field] = v2LineItems[idx][field].substring(0, 35);
+    let inputEl = null;
+    if (field === "buyer_item_id") inputEl = document.getElementById(`v2ItemBuyerId_${idx}`);
+    else if (field === "seller_item_id") inputEl = document.getElementById(`v2ItemSellerId_${idx}`);
+    else if (field === "standard_item_id") inputEl = document.getElementById(`v2ItemStandardId_${idx}`);
+    if (inputEl) inputEl.value = v2LineItems[idx][field];
+    checkV2FormatFieldConstraints();
+    if (typeof updateV2LiveXml === "function") {
+      updateV2LiveXml();
+    }
+  }
+}
+window.truncateV2ItemField = truncateV2ItemField;
+
+function checkV2FormatFieldConstraints() {
+  const isEslogBizbox = (typeof v2ActiveTargetFormat !== "undefined" && v2ActiveTargetFormat === "eslog_bizbox");
+  const fieldsToCheck = [
+    { key: "buyer_item_id", prefix: "v2ItemBuyerId_", label: "Kupčeva šifra" },
+    { key: "seller_item_id", prefix: "v2ItemSellerId_", label: "Prodajalčeva šifra" },
+    { key: "standard_item_id", prefix: "v2ItemStandardId_", label: "Standardna koda" }
+  ];
+
+  v2LineItems.forEach((item, idx) => {
+    fieldsToCheck.forEach(f => {
+      const inputEl = document.getElementById(`${f.prefix}${idx}`);
+      const warnEl = document.getElementById(`v2ItemWarn_${f.key}_${idx}`);
+      if (!inputEl) return;
+      const val = String(item[f.key] || "").trim();
+
+      if (isEslogBizbox && val.length > 35) {
+        inputEl.style.border = "1px solid #f59e0b";
+        inputEl.style.backgroundColor = "rgba(245, 158, 11, 0.08)";
+        if (warnEl) {
+          warnEl.innerHTML = `
+            <div style="font-size: 0.72rem; color: #d97706; margin-top: 3px; display: flex; align-items: center; justify-content: space-between; background: rgba(245, 158, 11, 0.12); padding: 2px 6px; border-radius: 4px;">
+              <span>⚠️ <strong>e-SLOG BizBox limit:</strong> max 35 znakov (${val.length}/35)</span>
+              <button type="button" class="btn" style="padding: 1px 6px; font-size: 0.68rem; border: 1px solid #d97706; color: #d97706; background: transparent; cursor: pointer; border-radius: 3px;" onclick="truncateV2ItemField(${idx}, '${f.key}')" title="Skrajšaj na točno 35 znakov za e-SLOG skladnost">✂️ Skrajšaj na 35</button>
+            </div>
+          `;
+        }
+      } else {
+        inputEl.style.border = "";
+        inputEl.style.backgroundColor = "";
+        if (warnEl) warnEl.innerHTML = "";
+      }
+    });
+  });
+}
+window.checkV2FormatFieldConstraints = checkV2FormatFieldConstraints;
 
 function handleV2ItemTaxChange(idx, valStr) {
   if (valStr === "CUSTOM") {
@@ -2292,6 +2355,27 @@ async function validateV2Invoice() {
     if (!invData.vat_exemption_reason_code || !invData.vat_exemption_reason_code.trim()) {
       errors.push("VAT Exemption Reason Code (BT-121) is required for 0% / reverse charge / exempt lines (e.g. 'VATEX-EU-AE').");
     }
+  }
+
+  // e-SLOG 2.0 (BizBox) max length constraints (D_7140 <= 35 characters)
+  if (typeof v2ActiveTargetFormat !== "undefined" && v2ActiveTargetFormat === "eslog_bizbox") {
+    invData.items.forEach((it, idx) => {
+      [
+        { key: "buyer_item_id", val: it.buyer_item_id, name: "Buyer's Part No. (BT-156)" },
+        { key: "seller_item_id", val: it.seller_item_id, name: "Seller's Item ID (BT-155)" },
+        { key: "standard_item_id", val: it.standard_item_id, name: "Standard ID (BT-157)" }
+      ].forEach(field => {
+        if (field.val && String(field.val).trim().length > 35) {
+          errors.push(`Postavka #${idx + 1}: ${field.name} '${String(field.val).trim()}' ima ${String(field.val).trim().length} znakov. e-SLOG BizBox specifikacija (D_7140) dovoljuje največ 35 znakov. Kliknite '✂️ Skrajšaj na 35' pri postavki.`);
+          const advSec = document.getElementById(`v2ItemAdv_${idx}`);
+          if (advSec && advSec.style.display === "none") {
+            advSec.style.display = "flex";
+            const chev = document.getElementById(`v2ItemAdvChev_${idx}`);
+            if (chev) chev.textContent = "▲";
+          }
+        }
+      });
+    });
   }
 
   if (errors.length > 0) {

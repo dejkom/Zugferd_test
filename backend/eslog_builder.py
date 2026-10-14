@@ -37,6 +37,18 @@ def _fmt_num(val, decimals: int = 2) -> str:
     except (ValueError, TypeError):
         return f"0.{'0'*decimals}"
 
+# ISO 6523 ICD code list for organization/party identifiers (BR-CL-10)
+ISO_6523_ICD_SCHEMES = {
+    "0002", "0007", "0009", "0037", "0060", "0088", "0096", "0097", "0106", "0130", "0135", "0142",
+    "0151", "0160", "0177", "0183", "0184", "0190", "0191", "0192", "0193", "0195", "0196", "0198",
+    "0199", "0200", "0201", "0202", "0204", "0208", "0209", "0210", "0211", "0212", "0213"
+}
+
+def _get_valid_icd_scheme(scheme_str: str) -> str:
+    """Return valid ISO 6523 ICD scheme if matching, otherwise empty string."""
+    s = str(scheme_str or "").strip()
+    return s if s in ISO_6523_ICD_SCHEMES else ""
+
 def generate_eslog_bizbox_xml(inv: InvoiceData) -> str:
     """
     Generate national Slovenian e-SLOG 2.0 (urn:eslog:2.00) XML.
@@ -116,6 +128,17 @@ def generate_eslog_bizbox_xml(inv: InvoiceData) -> str:
         lines.append(f'        <D_2380>{srv_end}</D_2380>')
         lines.append('      </C_C507>')
         lines.append('    </S_DTM>')
+
+    # Specification identifier (BT-24) - Mandatory for e-SLOG 2.0 / EN 16931
+    lines.append('    <S_FTX>')
+    lines.append('      <D_4451>DOC</D_4451>')
+    lines.append('      <C_C107>')
+    lines.append('        <D_4441>P1</D_4441>')
+    lines.append('      </C_C107>')
+    lines.append('      <C_C108>')
+    lines.append('        <D_4440>urn:cen.eu:en16931:2017</D_4440>')
+    lines.append('      </C_C108>')
+    lines.append('    </S_FTX>')
 
     # Free text notes & payment terms (S_FTX)
     # Payment terms text (AAB)
@@ -259,10 +282,11 @@ def generate_eslog_bizbox_xml(inv: InvoiceData) -> str:
     lines.append('      <S_NAD>')
     lines.append('        <D_3035>BY</D_3035>')
     b_endpoint = (buyer.endpoint_id or "").strip()
-    if b_endpoint:
+    b_scheme = _get_valid_icd_scheme(buyer.endpoint_scheme)
+    if b_endpoint and b_scheme:
         lines.append('        <C_C082>')
         lines.append(f'          <D_3039>{escape(b_endpoint)}</D_3039>')
-        lines.append(f'          <D_1131>{escape(buyer.endpoint_scheme or "0088")}</D_1131>')
+        lines.append(f'          <D_1131>{escape(b_scheme)}</D_1131>')
         lines.append('        </C_C082>')
     lines.append('        <C_C080>')
     lines.append(f'          <D_3036>{escape(buyer.name or "Kupac")}</D_3036>')
@@ -343,10 +367,11 @@ def generate_eslog_bizbox_xml(inv: InvoiceData) -> str:
     lines.append('      <S_NAD>')
     lines.append('        <D_3035>SE</D_3035>')
     s_ident = (seller.seller_identifier or seller.endpoint_id or "").strip()
-    if s_ident:
+    s_scheme = _get_valid_icd_scheme(seller.endpoint_scheme)
+    if s_ident and s_scheme:
         lines.append('        <C_C082>')
         lines.append(f'          <D_3039>{escape(s_ident)}</D_3039>')
-        lines.append(f'          <D_1131>{escape(seller.endpoint_scheme or "0088")}</D_1131>')
+        lines.append(f'          <D_1131>{escape(s_scheme)}</D_1131>')
         lines.append('        </C_C082>')
     lines.append('        <C_C080>')
     lines.append(f'          <D_3036>{escape(seller.name or "Prodajalec")}</D_3036>')
@@ -562,17 +587,17 @@ def generate_eslog_bizbox_xml(inv: InvoiceData) -> str:
         lines.append(f'        <D_1082>{line_id}</D_1082>')
         if item.standard_item_id:
             lines.append('        <C_C212>')
-            lines.append(f'          <D_7140>{escape(item.standard_item_id)}</D_7140>')
+            lines.append(f'          <D_7140>{escape(str(item.standard_item_id)[:35])}</D_7140>')
             lines.append(f'          <D_7143>{escape(getattr(item, "standard_item_id_scheme", "0160") or "0160")}</D_7143>')
             lines.append('        </C_C212>')
         lines.append('      </S_LIN>')
 
-        # Article IDs in S_PIA
+        # Article IDs in S_PIA (D_7140 maxLength 35 in e-SLOG XSD)
         if item.seller_item_id:
             lines.append('      <S_PIA>')
             lines.append('        <D_4347>5</D_4347>')
             lines.append('        <C_C212>')
-            lines.append(f'          <D_7140>{escape(item.seller_item_id)}</D_7140>')
+            lines.append(f'          <D_7140>{escape(str(item.seller_item_id)[:35])}</D_7140>')
             lines.append('          <D_7143>SA</D_7143>')
             lines.append('        </C_C212>')
             lines.append('      </S_PIA>')
@@ -581,7 +606,7 @@ def generate_eslog_bizbox_xml(inv: InvoiceData) -> str:
             lines.append('      <S_PIA>')
             lines.append('        <D_4347>5</D_4347>')
             lines.append('        <C_C212>')
-            lines.append(f'          <D_7140>{escape(item.buyer_item_id)}</D_7140>')
+            lines.append(f'          <D_7140>{escape(str(item.buyer_item_id)[:35])}</D_7140>')
             lines.append('          <D_7143>IN</D_7143>')
             lines.append('        </C_C212>')
             lines.append('      </S_PIA>')

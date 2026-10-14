@@ -3866,6 +3866,11 @@ function handleV2FormatChange(format) {
   // Update asterisks and tooltip badges across all form fields
   updateMandatoryAsterisks();
 
+  // Check specific format field constraints (e.g. e-SLOG 35 character limits)
+  if (typeof checkV2FormatFieldConstraints === "function") {
+    checkV2FormatFieldConstraints();
+  }
+
   // If live XML viewer is visible, automatically regenerate for the new format
   if (typeof updateV2LiveXml === "function") {
     const v2Card = document.getElementById("v2XmlCard");
