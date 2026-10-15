@@ -1593,6 +1593,7 @@ async function saveV2Party(type) {
     name: name,
     vat_id: document.getElementById(isSeller ? "v2SellerVat" : "v2BuyerVat")?.value.trim() || "",
     street: document.getElementById(isSeller ? "v2SellerStreet" : "v2BuyerStreet")?.value.trim() || "",
+    address_line_2: document.getElementById(isSeller ? "v2SellerStreet2" : "v2BuyerStreet2")?.value.trim() || "",
     city: document.getElementById(isSeller ? "v2SellerCity" : "v2BuyerCity")?.value.trim() || "",
     postcode: document.getElementById(isSeller ? "v2SellerPostcode" : "v2BuyerPostcode")?.value.trim() || "",
     country_code: document.getElementById(isSeller ? "v2SellerCountry" : "v2BuyerCountry")?.value || "DE"
@@ -1672,6 +1673,7 @@ function selectV2SavedParty(type, partyId) {
   setVal(isSeller ? "v2SellerName" : "v2BuyerName", party.name);
   setVal(isSeller ? "v2SellerVat" : "v2BuyerVat", party.vat_id);
   setVal(isSeller ? "v2SellerStreet" : "v2BuyerStreet", party.street);
+  setVal(isSeller ? "v2SellerStreet2" : "v2BuyerStreet2", party.address_line_2 || "");
   setVal(isSeller ? "v2SellerCity" : "v2BuyerCity", party.city);
   setVal(isSeller ? "v2SellerPostcode" : "v2BuyerPostcode", party.postcode);
   setVal(isSeller ? "v2SellerCountry" : "v2BuyerCountry", party.country_code || "DE");
@@ -1723,8 +1725,13 @@ async function handleV2PrefillUpload(file) {
     banner.style.borderStyle = "solid";
     banner.style.borderColor = "var(--accent)";
   }
-  if (bannerTitle) bannerTitle.textContent = `⏳ Extracting ${file.name} with AI...`;
-  if (bannerDesc) bannerDesc.textContent = "Uploading document and contacting GPT-4o parser (may take 5-10s)...";
+  const isXml = file.name.toLowerCase().endsWith(".xml");
+  if (bannerTitle) {
+    bannerTitle.textContent = isXml ? `⚡ Rendering ${file.name} to Visual PDF...` : `⏳ Extracting ${file.name} with AI...`;
+  }
+  if (bannerDesc) {
+    bannerDesc.textContent = isXml ? "Parsing standard e-invoice XML and synthesizing visual PDF layout (0 tokens)..." : "Uploading document and contacting GPT-4o parser (may take 5-10s)...";
+  }
 
   const formData = new FormData();
   formData.append("file", file);
@@ -1737,15 +1744,39 @@ async function handleV2PrefillUpload(file) {
     v2UploadedFileId = upData.file_id;
     v2UploadedFileName = file.name;
 
-    const apiKey = (typeof getStoredApiKey === "function" ? getStoredApiKey() : "") || undefined;
-    const promptId = window.cachedCompanySettings?.active_prompt_id || undefined;
-    const extRes = await fetch("/api/extract", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_id: upData.file_id, api_key: apiKey, prompt_id: promptId })
-    });
-    const extData = await extRes.json();
-    if (!extRes.ok) throw new Error(extData.detail || "Extraction failed");
+    let extData;
+    let visualPdfFilename = null;
+
+    if (isXml) {
+      // 1. Trigger /api/visualize-xml to instantly generate visual PDF without OpenAI API key
+      const chosenLayout = (typeof getStoredLayout === "function" ? getStoredLayout() : "layout3") || "layout3";
+      const effectiveLayout = chosenLayout === "original" ? "layout3" : chosenLayout;
+      
+      const visRes = await fetch("/api/visualize-xml", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: upData.file_id, layout: effectiveLayout, lang: "sl" })
+      });
+      const visData = await visRes.json();
+      if (!visRes.ok) {
+        throw new Error(visData.detail || "Neveljavna XML datoteka ali neprepoznana shema (podprti so e-SLOG 2.0, UBL 2.1 in Factur-X/CII).");
+      }
+      extData = {
+        invoice_data: visData.invoice_data,
+        usage: { model: "universal_xml_parser (0 tokens)", prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, estimated_cost_usd: 0.0, formatted_cost: "$0.0000" }
+      };
+      visualPdfFilename = visData.output_filename;
+    } else {
+      const apiKey = (typeof getStoredApiKey === "function" ? getStoredApiKey() : "") || undefined;
+      const promptId = window.cachedCompanySettings?.active_prompt_id || undefined;
+      const extRes = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: upData.file_id, api_key: apiKey, prompt_id: promptId })
+      });
+      extData = await extRes.json();
+      if (!extRes.ok) throw new Error(extData.detail || "Extraction failed");
+    }
 
     // Populate v2 form
     const inv = extData.invoice_data;
@@ -1790,6 +1821,8 @@ async function handleV2PrefillUpload(file) {
     const sellerIdentEl = document.getElementById("v2SellerIdentifier");
     if (sellerIdentEl) sellerIdentEl.value = seller.seller_identifier || cfg.seller_identifier || "";
     document.getElementById("v2SellerStreet").value = seller.street || cfg.seller_street || "";
+    const sStreet2El = document.getElementById("v2SellerStreet2");
+    if (sStreet2El) sStreet2El.value = seller.address_line_2 || cfg.seller_address_line_2 || "";
     document.getElementById("v2SellerCity").value = seller.city || cfg.seller_city || "";
     document.getElementById("v2SellerPostcode").value = seller.postcode || cfg.seller_postcode || "";
     document.getElementById("v2SellerCountry").value = seller.country_code || cfg.seller_country || "DE";
@@ -1871,6 +1904,7 @@ async function handleV2PrefillUpload(file) {
 
     // Buyer details: Dynamic from extraction payload with graceful profile matching fallback
     const buyerStreetVal = (inv.buyer?.street || "").trim() || (matchedBuyer?.street || "");
+    const buyerStreet2Val = (inv.buyer?.address_line_2 || "").trim() || (matchedBuyer?.address_line_2 || "");
     const buyerCityVal = (inv.buyer?.city || "").trim() || (matchedBuyer?.city || "");
     const buyerPostcodeVal = (inv.buyer?.postcode || "").trim() || (matchedBuyer?.postcode || "");
     const buyerCountryVal = (inv.buyer?.country_code || "").trim() || (matchedBuyer?.country_code || "DE");
@@ -1880,6 +1914,7 @@ async function handleV2PrefillUpload(file) {
     if (buyerNameVal) { const el = document.getElementById("v2BuyerName"); if (el) el.value = buyerNameVal; }
     if (buyerVatVal) { const el = document.getElementById("v2BuyerVat"); if (el) el.value = buyerVatVal; }
     if (buyerStreetVal) { const el = document.getElementById("v2BuyerStreet"); if (el) el.value = buyerStreetVal; }
+    if (buyerStreet2Val) { const el = document.getElementById("v2BuyerStreet2"); if (el) el.value = buyerStreet2Val; }
     if (buyerCityVal) { const el = document.getElementById("v2BuyerCity"); if (el) el.value = buyerCityVal; }
     if (buyerPostcodeVal) { const el = document.getElementById("v2BuyerPostcode"); if (el) el.value = buyerPostcodeVal; }
     if (buyerCountryVal) { const el = document.getElementById("v2BuyerCountry"); if (el) el.value = buyerCountryVal; }
@@ -2019,15 +2054,25 @@ async function handleV2PrefillUpload(file) {
       applyV2ConfidenceScores(inv.confidence_scores);
     }
 
-    if (bannerTitle) bannerTitle.textContent = `✅ Prefilled from ${file.name}!`;
-    if (bannerDesc) bannerDesc.textContent = "Values have been populated into the fields below with AI confidence indicators.";
+    // If this was an XML upload, automatically open the PDF preview modal with the generated visual template!
+    if (isXml && visualPdfFilename && typeof openPdfPreview === "function") {
+      openPdfPreview(visualPdfFilename, inv.invoice_number || file.name);
+    }
+
+    if (bannerTitle) bannerTitle.textContent = isXml ? `✅ Rendered & Prefilled from ${file.name}!` : `✅ Prefilled from ${file.name}!`;
+    if (bannerDesc) bannerDesc.textContent = isXml ? "Visual invoice PDF generated with 0 OpenAI tokens and fields populated into Studio v2." : "Values have been populated into the fields below with AI confidence indicators.";
 
     // If XML viewer is open or cached, update live XML
     if (typeof updateV2LiveXml === "function") {
       updateV2LiveXml();
     }
   } catch (err) {
-    alert("Prefill error: " + err.message);
+    const errorMsg = (err && err.message) ? err.message : String(err);
+    if (errorMsg.includes("XML") || isXml) {
+      alert("Neveljavna XML datoteka ali neprepoznana shema (podprti so e-SLOG 2.0, UBL 2.1 in Factur-X/CII).");
+    } else {
+      alert("Prefill error: " + errorMsg);
+    }
     if (bannerTitle) bannerTitle.textContent = "Have an existing invoice or XML document?";
     if (bannerDesc) bannerDesc.textContent = "Upload a PDF, Word, or e-SLOG XML file to prefill the form";
   } finally {
@@ -2242,6 +2287,7 @@ function harvestV2InvoiceData() {
       tax_registration_id: document.getElementById("v2SellerTaxNumber")?.value.trim() || "",
       seller_identifier: document.getElementById("v2SellerIdentifier")?.value.trim() || null,
       street: document.getElementById("v2SellerStreet")?.value.trim() || "",
+      address_line_2: document.getElementById("v2SellerStreet2")?.value.trim() || null,
       city: document.getElementById("v2SellerCity")?.value.trim() || "",
       postcode: document.getElementById("v2SellerPostcode")?.value.trim() || "",
       country_code: document.getElementById("v2SellerCountry")?.value || "DE",
@@ -2255,6 +2301,7 @@ function harvestV2InvoiceData() {
       endpoint_scheme: document.getElementById("v2BuyerEndpointScheme")?.value || "9930",
       vat_id: document.getElementById("v2BuyerVat")?.value.trim() || "",
       street: document.getElementById("v2BuyerStreet")?.value.trim() || "",
+      address_line_2: document.getElementById("v2BuyerStreet2")?.value.trim() || null,
       city: document.getElementById("v2BuyerCity")?.value.trim() || "",
       postcode: document.getElementById("v2BuyerPostcode")?.value.trim() || "",
       country_code: document.getElementById("v2BuyerCountry")?.value || "DE",
@@ -2300,27 +2347,74 @@ async function validateV2Invoice() {
   const alertEl = document.getElementById("v2AlertBanner");
   const alertMsg = document.getElementById("v2AlertMessage");
 
-  // Basic client checks
+  // Comprehensive client validation checks for all required fields
   const errors = [];
-  if (!invData.invoice_number) errors.push("Invoice / Document Number is required.");
-  if (!invData.issue_date) errors.push("Issue Date is required.");
-  if (!invData.seller.name) errors.push("Seller Company Name is required.");
-  if (!invData.buyer.name) errors.push("Buyer Company Name is required.");
-  if (invData.items.length === 0) errors.push("At least one line item is required.");
+  const invalidFieldIds = [];
+
+  const checkRequired = (val, fieldName, elementId) => {
+    if (!val || (typeof val === "string" && !val.trim())) {
+      errors.push(`<b>${fieldName}</b> je obvezno polje.`);
+      if (elementId) invalidFieldIds.push(elementId);
+      return false;
+    }
+    return true;
+  };
+
+  // 1. General Invoice Details
+  checkRequired(invData.invoice_number, "Številka računa (Invoice Number)", "v2InvNumber");
+  checkRequired(invData.issue_date, "Datum izdaje (Issue Date)", "v2IssueDate");
+  checkRequired(invData.currency, "Valuta (Currency)", "v2Currency");
+
+  // 2. Seller / Izdajatelj
+  checkRequired(invData.seller.name, "Ime prodajalca / podjetja (Seller Company Name)", "v2SellerName");
+  checkRequired(invData.seller.street, "Ulica prodajalca (Seller Street)", "v2SellerStreet");
+  checkRequired(invData.seller.city, "Mesto prodajalca (Seller City)", "v2SellerCity");
+  checkRequired(invData.seller.postcode, "Poštna številka prodajalca (Seller Postcode)", "v2SellerPostcode");
+  checkRequired(invData.seller.country_code, "Država prodajalca (Seller Country)", "v2SellerCountry");
+
+  // 3. Buyer / Kupec
+  checkRequired(invData.buyer.name, "Ime kupca (Buyer Company Name)", "v2BuyerName");
+  checkRequired(invData.buyer.street, "Ulica kupca (Buyer Street)", "v2BuyerStreet");
+  checkRequired(invData.buyer.city, "Mesto kupca (Buyer City)", "v2BuyerCity");
+  checkRequired(invData.buyer.postcode, "Poštna številka kupca (Buyer Postcode)", "v2BuyerPostcode");
+  checkRequired(invData.buyer.country_code, "Država kupca (Buyer Country)", "v2BuyerCountry");
+
+  // 4. Items check
+  if (!invData.items || invData.items.length === 0) {
+    errors.push("Obrazec mora vsebovati vsaj eno postavko (At least one line item is required).");
+  } else {
+    invData.items.forEach((it, idx) => {
+      const lineNum = idx + 1;
+      if (!it.name || !it.name.trim()) {
+        errors.push(`Postavka #${lineNum}: <b>Naziv artikla (Item Name)</b> je obvezen.`);
+        invalidFieldIds.push(`v2ItemName_${idx}`);
+      }
+      if (it.quantity === null || it.quantity === undefined || isNaN(it.quantity)) {
+        errors.push(`Postavka #${lineNum}: <b>Količina (Quantity)</b> mora biti veljavno število.`);
+        invalidFieldIds.push(`v2ItemQty_${idx}`);
+      }
+      if (it.unit_price === null || it.unit_price === undefined || isNaN(it.unit_price)) {
+        errors.push(`Postavka #${lineNum}: <b>Cena na enoto (Unit Price)</b> mora biti veljavno število.`);
+        invalidFieldIds.push(`v2ItemPrice_${idx}`);
+      }
+    });
+  }
 
   const docType = invData.invoice_type_code;
 
   // Due Date (BT-9): mandatory for 380 and 384, optional for 381 (Credit Note)
   if (docType === "380" || docType === "384") {
     if (!invData.due_date) {
-      errors.push("Payment Due Date (BT-9) is mandatory for Commercial Invoices (380) and Corrected Invoices (384).");
+      errors.push("<b>Rok plačila (Payment Due Date / BT-9)</b> je obvezen za račune (380) in popravljene račune (384).");
+      invalidFieldIds.push("v2DueDate");
     }
   }
 
   // Preceding Invoice (BG-3 / BT-25): strictly required for 381 and 384
   if (docType === "381" || docType === "384") {
     if (!invData.preceding_invoice_number) {
-      errors.push("Credit Notes (381) and Corrected Invoices (384) strictly require a Preceding Invoice Number (BT-25).");
+      errors.push("<b>Referenca na predhodni račun (Preceding Invoice Number / BT-25)</b> je obvezna za dobropise (381) in popravljene račune (384).");
+      invalidFieldIds.push("v2PrecedingInvNumber");
     }
   }
 
@@ -2328,17 +2422,17 @@ async function validateV2Invoice() {
   if (docType === "381") {
     invData.items.forEach((it, idx) => {
       if (it.quantity < 0) {
-        errors.push(`Line #${idx + 1}: Quantity must be positive on Credit Notes (381). The document type code already conveys the credit direction.`);
+        errors.push(`Postavka #${idx + 1}: Količina na dobropisu (381) mora biti pozitivna vrednost.`);
       }
       if (it.unit_price < 0) {
-        errors.push(`Line #${idx + 1}: Unit price must be positive on Credit Notes (381).`);
+        errors.push(`Postavka #${idx + 1}: Cena na enoto mora biti pozitivna vrednost.`);
       }
       if (it.line_total_amount < 0) {
-        errors.push(`Line #${idx + 1}: Line net total must be positive on Credit Notes (381).`);
+        errors.push(`Postavka #${idx + 1}: Znesek postavke mora biti pozitivna vrednost.`);
       }
     });
     if (invData.grand_total < 0) {
-      errors.push("Grand total must be positive on Credit Notes (381).");
+      errors.push("Skupni znesek računa (Grand Total) mora biti pozitiven na dobropisu (381).");
     }
   }
 
@@ -2350,10 +2444,12 @@ async function validateV2Invoice() {
   });
   if (hasExemptItem) {
     if (!invData.vat_exemption_reason || !invData.vat_exemption_reason.trim()) {
-      errors.push("VAT Exemption Reason Text (BT-120) is required for 0% / reverse charge / exempt lines (e.g. 'Reverse charge according to §13b UStG / Art. 194/196').");
+      errors.push("<b>Kavzula o oprostitvi DDV (VAT Exemption Reason / BT-120)</b> je obvezna za 0% / obrnjeno davčno breme (npr. 'Obrnjena davčna obveznost / Reverse charge').");
+      invalidFieldIds.push("v2ExemptionReason");
     }
     if (!invData.vat_exemption_reason_code || !invData.vat_exemption_reason_code.trim()) {
-      errors.push("VAT Exemption Reason Code (BT-121) is required for 0% / reverse charge / exempt lines (e.g. 'VATEX-EU-AE').");
+      errors.push("<b>Koda razloga za oprostitev (Exemption Code / BT-121)</b> je obvezna (npr. 'VATEX-EU-AE').");
+      invalidFieldIds.push("v2ExemptionReasonCode");
     }
   }
 
@@ -2366,7 +2462,7 @@ async function validateV2Invoice() {
         { key: "standard_item_id", val: it.standard_item_id, name: "Standard ID (BT-157)" }
       ].forEach(field => {
         if (field.val && String(field.val).trim().length > 35) {
-          errors.push(`Postavka #${idx + 1}: ${field.name} '${String(field.val).trim()}' ima ${String(field.val).trim().length} znakov. e-SLOG BizBox specifikacija (D_7140) dovoljuje največ 35 znakov. Kliknite '✂️ Skrajšaj na 35' pri postavki.`);
+          errors.push(`Postavka #${idx + 1}: ${field.name} '${String(field.val).trim()}' ima ${String(field.val).trim().length} znakov (največ 35).`);
           const advSec = document.getElementById(`v2ItemAdv_${idx}`);
           if (advSec && advSec.style.display === "none") {
             advSec.style.display = "flex";
@@ -2378,14 +2474,25 @@ async function validateV2Invoice() {
     });
   }
 
+  // Highlight invalid fields in UI
+  document.querySelectorAll(".v2-input-error").forEach(el => el.classList.remove("v2-input-error"));
+  invalidFieldIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.add("v2-input-error");
+      el.style.borderColor = "#ef4444";
+      el.style.backgroundColor = "#fff1f2";
+    }
+  });
+
   if (errors.length > 0) {
     if (alertEl && alertMsg) {
       alertEl.className = "v2-alert-banner";
       alertEl.style.display = "flex";
-      alertMsg.innerHTML = `<strong>Validation Issues:</strong><ul style="margin: 4px 0 0 16px;">${errors.map(e => `<li>${e}</li>`).join("")}</ul>`;
+      alertMsg.innerHTML = `<strong>⚠️ Neveljavna ali manjkajoča polja na obrazcu:</strong><ul style="margin: 6px 0 0 18px; line-height: 1.5;">${errors.map(e => `<li>${e}</li>`).join("")}</ul>`;
       alertEl.scrollIntoView({ behavior: "smooth" });
     } else {
-      alert("Validation Issues:\n" + errors.join("\n"));
+      alert("Neveljavna ali manjkajoča polja:\n\n• " + errors.map(e => e.replace(/<[^>]+>/g, '')).join("\n• "));
     }
     return false;
   }
@@ -2393,7 +2500,7 @@ async function validateV2Invoice() {
   if (alertEl && alertMsg) {
     alertEl.className = "v2-alert-banner success";
     alertEl.style.display = "flex";
-    alertMsg.innerHTML = `<strong>✅ Document Data Valid:</strong> Ready for compliant PDF/A-3 & XML generation.`;
+    alertMsg.innerHTML = `<strong>✅ Podatki računa so veljavni:</strong> Pripravljeno za skladno generiranje PDF/A-3 & XML.`;
   }
   return true;
 }
@@ -2439,8 +2546,23 @@ async function handleV2GenerateSubmit() {
       })
     });
 
-    const result = await res.json();
-    if (!result.success) throw new Error(result.error || "Generation failed");
+    let result;
+    const responseText = await res.text();
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseErr) {
+      throw new Error(`Strežnik je vrnil neveljaven odgovor (${res.status}): ${responseText.slice(0, 200)}`);
+    }
+
+    if (!res.ok || !result.success) {
+      let detailMsg = result.error || "Napaka pri generiranju računa.";
+      if (result.errors && Array.isArray(result.errors) && result.errors.length > 0) {
+        detailMsg = result.errors.join("\n• ");
+      } else if (result.error_detail) {
+        detailMsg += `\n\nPodrobnosti: ${result.error_detail}`;
+      }
+      throw new Error(detailMsg);
+    }
 
     // Populate XML viewer with the generated XML
     const xmlViewer = document.getElementById("v2XmlViewer");
@@ -2480,7 +2602,15 @@ async function handleV2GenerateSubmit() {
     // Direct download trigger
     window.location.href = `/api/download/${result.output_filename}`;
   } catch (err) {
-    alert("Generation failed: " + err.message);
+    const alertEl = document.getElementById("v2AlertBanner");
+    const alertMsg = document.getElementById("v2AlertMessage");
+    if (alertEl && alertMsg) {
+      alertEl.className = "v2-alert-banner";
+      alertEl.style.display = "flex";
+      alertMsg.innerHTML = `<strong>❌ Napaka pri generiranju računa:</strong><div style="margin-top: 6px; white-space: pre-wrap; font-family: inherit;">${escapeHtml(err.message)}</div>`;
+      alertEl.scrollIntoView({ behavior: "smooth" });
+    }
+    alert("Napaka pri generiranju računa:\n\n" + err.message);
   } finally {
     btn.disabled = false;
     btn.innerHTML = origText;
@@ -2548,6 +2678,7 @@ function populateV2FromHistory(inv, layout, lang) {
   setVal("v2SellerTaxNumber", seller.tax_number || seller.tax_registration_id);
   setVal("v2SellerIdentifier", seller.seller_identifier);
   setVal("v2SellerStreet", seller.street);
+  setVal("v2SellerStreet2", seller.address_line_2);
   setVal("v2SellerCity", seller.city);
   setVal("v2SellerPostcode", seller.postcode);
   setVal("v2SellerCountry", seller.country_code || "DE");
@@ -2563,6 +2694,7 @@ function populateV2FromHistory(inv, layout, lang) {
   setVal("v2BuyerName", buyer.name);
   setVal("v2BuyerVat", buyer.vat_id);
   setVal("v2BuyerStreet", buyer.street);
+  setVal("v2BuyerStreet2", buyer.address_line_2);
   setVal("v2BuyerCity", buyer.city);
   setVal("v2BuyerPostcode", buyer.postcode);
   setVal("v2BuyerCountry", buyer.country_code || "DE");
@@ -2810,8 +2942,23 @@ async function downloadV2RawXml() {
       })
     });
 
-    const result = await res.json();
-    if (!result.success) throw new Error(result.error || "XML export failed");
+    let result;
+    const responseText = await res.text();
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseErr) {
+      throw new Error(`Strežnik je vrnil neveljaven odgovor (${res.status}): ${responseText.slice(0, 200)}`);
+    }
+
+    if (!res.ok || !result.success) {
+      let detailMsg = result.error || "Napaka pri izvozu XML.";
+      if (result.errors && Array.isArray(result.errors) && result.errors.length > 0) {
+        detailMsg = result.errors.join("\n• ");
+      } else if (result.error_detail) {
+        detailMsg += `\n\nPodrobnosti: ${result.error_detail}`;
+      }
+      throw new Error(detailMsg);
+    }
 
     // Update XML preview viewer with raw content
     const xmlViewer = document.getElementById("v2XmlViewer");
@@ -2854,7 +3001,15 @@ async function downloadV2RawXml() {
     document.body.removeChild(dlLink);
 
   } catch (err) {
-    alert("XML export failed: " + err.message);
+    const alertEl = document.getElementById("v2AlertBanner");
+    const alertMsg = document.getElementById("v2AlertMessage");
+    if (alertEl && alertMsg) {
+      alertEl.className = "v2-alert-banner";
+      alertEl.style.display = "flex";
+      alertMsg.innerHTML = `<strong>❌ Napaka pri izvozu XML:</strong><div style="margin-top: 6px; white-space: pre-wrap; font-family: inherit;">${escapeHtml(err.message)}</div>`;
+      alertEl.scrollIntoView({ behavior: "smooth" });
+    }
+    alert("Napaka pri izvozu XML:\n\n" + err.message);
   } finally {
     if (btn) {
       btn.disabled = false;

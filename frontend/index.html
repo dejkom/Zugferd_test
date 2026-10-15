@@ -26,10 +26,14 @@
       </div>
     </div>
     <div class="header-actions">
-      <!-- Scenario Navigation Buttons in Header (V2 & Overview) -->
+      <!-- Scenario Navigation Buttons in Header (V2, XML Visualization, Overview, History, Config) -->
       <nav class="scenario-nav">
         <button class="nav-tab-btn active" id="tab-overview" onclick="switchScenario('overview')">
           <span>📖 Overview & Standards</span>
+        </button>
+        <button class="nav-tab-btn" id="tab-xml-vis" onclick="switchScenario('xml-vis')"
+          style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: #059669; font-weight: 700;">
+          <span>⚡ XML Visualization</span>
         </button>
         <button class="nav-tab-btn" id="tab-v2" onclick="switchScenario('v2')"
           style="background: rgba(37,99,235,0.1); border-color: rgba(37,99,235,0.3); color: #2563eb; font-weight: 700;">
@@ -140,6 +144,24 @@
         </div>
       </div>
 
+      <!-- Universal XML-to-Visual-PDF Dropzone Banner -->
+      <label class="v2-prefill-banner" id="ovXmlDropzone" for="ovXmlFileInput"
+        style="cursor: pointer; margin-bottom: 2rem; border: 2px dashed rgba(37, 99, 235, 0.4); background: linear-gradient(135deg, rgba(37,99,235,0.06) 0%, rgba(139,92,246,0.04) 100%);">
+        <div class="v2-prefill-icon" style="font-size: 2rem;">⚡</div>
+        <div class="v2-prefill-text">
+          <div class="v2-prefill-title" id="ovXmlDropTitle" style="font-size: 1.05rem; font-weight: 700; color: var(--text-main);">
+            Universal XML-to-Visual-PDF Rendering Engine
+          </div>
+          <div class="v2-prefill-desc" id="ovXmlDropDesc" style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+            Drop ANY standard e-invoice XML (<strong>e-SLOG 2.0</strong>, <strong>OASIS UBL 2.1 / Peppol</strong>, or <strong>UN/CEFACT CII / Factur-X / XRechnung</strong>) to instantly render onto our visual invoice template (Layout 3: EN 16931 or Layout 2: Odelo Corporate) with 0 OpenAI token costs.
+          </div>
+        </div>
+        <div class="v2-prefill-badge" style="background: rgba(37,99,235,0.15); color: #2563eb; border: 1px solid rgba(37,99,235,0.3); font-weight: 700;">
+          <span>⚡ Instant Visual PDF</span>
+        </div>
+      </label>
+      <input type="file" id="ovXmlFileInput" accept=".xml" style="display: none;" onchange="onOverviewXmlFileChanged(this)">
+
       <!-- EN 16931 Mandatory & Business Term (BT) Validator Reference Section -->
       <div class="bt-portal-card" id="en16931-validator-table">
         <div class="bt-portal-header">
@@ -218,6 +240,123 @@
         </button>
       </div>
 
+    </div>
+
+    <!-- ================= SCENARIO XML-VIS: XML VISUALIZATION SPLIT SCREEN ================= -->
+    <div id="scenario-xml-vis-container" style="display: none;">
+      <div style="max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; width: 100%;">
+        <!-- Header Strip -->
+        <div class="card" style="padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-left: 4px solid var(--emerald);">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 1.5rem;">⚡</span>
+              <h2 style="font-size: 1.25rem; margin: 0; font-weight: 700; color: var(--text-main);">XML Visualization / Vizualizacija e-Računa</h2>
+              <span class="tag" style="background: rgba(16,185,129,0.15); color: #059669; font-weight: 700;">0 TOKENS • OFFLINE</span>
+            </div>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+              Enter or paste any standard e-invoice XML (<strong>e-SLOG 2.0</strong>, <strong>OASIS UBL 2.1</strong>, or <strong>UN/CEFACT CII / Factur-X</strong>) on the left to render the visual PDF instantly on the right.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+            <select id="xmlVisLayoutSelect" class="form-control" style="font-size: 0.82rem; padding: 0.45rem 0.75rem; border-radius: 8px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main);">
+              <option value="layout3" selected>Layout 3: EN 16931 Paged Media (Recommended)</option>
+              <option value="layout2">Layout 2: Odelo Corporate</option>
+              <option value="layout1">Layout 1: Minimalist Modern</option>
+            </select>
+            <label for="xmlVisShowBtTags"
+              style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; padding: 0.42rem 0.65rem; background: var(--bg-input); border: 1px solid var(--bg-card-border); border-radius: 8px; user-select: none; white-space: nowrap; color: var(--text-main);"
+              title="Prikaži / skrij BT-X oznake (Business Terms) v generiranem PDF računu">
+              <input type="checkbox" id="xmlVisShowBtTags" style="cursor: pointer; accent-color: var(--accent-primary);" onchange="renderXmlVisualization()">
+              <span>🏷️ BT-X v PDF</span>
+            </label>
+            <label class="btn btn-secondary" style="padding: 0.45rem 0.9rem; font-size: 0.82rem; cursor: pointer; margin: 0;">
+              <span>📁 Open XML File</span>
+              <input type="file" id="xmlVisFileInput" accept=".xml" style="display: none;" onchange="onXmlVisFileInputChanged(this)">
+            </label>
+            <button type="button" class="btn btn-secondary" onclick="loadSampleXmlToVis('eslog')" style="padding: 0.45rem 0.8rem; font-size: 0.82rem;">
+              🇸🇮 e-SLOG Sample
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="loadSampleXmlToVis('ubl')" style="padding: 0.45rem 0.8rem; font-size: 0.82rem;">
+              🔵 UBL Sample
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="loadSampleXmlToVis('cii')" style="padding: 0.45rem 0.8rem; font-size: 0.82rem;">
+              🟣 CII Sample
+            </button>
+          </div>
+        </div>
+
+        <!-- Split Screen: Left (XML Editor) vs Right (Live Visual PDF) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; min-height: 720px; align-items: stretch;">
+          
+          <!-- LEFT SIDE: XML Input -->
+          <div class="card" style="display: flex; flex-direction: column; padding: 1.25rem; height: 100%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <div style="font-weight: 700; font-size: 0.92rem; display: flex; align-items: center; gap: 0.4rem;">
+                <span>📝 E-Invoice XML Input</span>
+                <span id="xmlVisDetectedBadge" class="tag" style="display: none; font-size: 0.72rem;"></span>
+              </div>
+              <div style="display: flex; gap: 0.5rem;">
+                <button type="button" class="btn btn-secondary" onclick="clearXmlVisInput()" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">
+                  Clear
+                </button>
+                <button type="button" id="btnRenderXmlVis" class="btn btn-primary" onclick="renderXmlVisualization()" style="padding: 0.35rem 1rem; font-size: 0.82rem; font-weight: 700;">
+                  <span>⚡ Render Visual PDF</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- XML Dropzone Box -->
+            <div id="xmlVisDropBox" style="border: 2px dashed var(--bg-card-border); border-radius: 8px; padding: 0.85rem; text-align: center; margin-bottom: 0.75rem; background: rgba(37,99,235,0.03); cursor: pointer; transition: all 0.2s;" onclick="document.getElementById('xmlVisFileInput').click()">
+              <div style="font-size: 0.82rem; color: var(--text-muted);">
+                <span>📥 Drag & drop an <strong>.xml</strong> file here, or click to browse</span>
+              </div>
+            </div>
+
+            <!-- Textarea for XML code -->
+            <div style="flex: 1; display: flex; flex-direction: column; position: relative;">
+              <textarea id="xmlVisTextarea" placeholder="<?xml version='1.0' encoding='UTF-8'?>&#10;<!-- Paste your e-SLOG 2.0, OASIS UBL 2.1, or UN/CEFACT CII XML here -->" spellcheck="false" style="flex: 1; width: 100%; min-height: 540px; font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; font-size: 0.82rem; line-height: 1.45; padding: 0.85rem; border-radius: 8px; border: 1px solid var(--bg-card-border); background: var(--bg-input); color: var(--text-main); resize: vertical; white-space: pre; tab-size: 2; outline: none;"></textarea>
+            </div>
+            
+            <div style="margin-top: 0.75rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: var(--text-muted);">
+              <span id="xmlVisStatusText">Ready for XML input</span>
+              <button type="button" class="btn btn-secondary" onclick="editXmlInStudioV2()" style="padding: 0.25rem 0.65rem; font-size: 0.75rem;">
+                ✏️ Edit in Studio v2
+              </button>
+            </div>
+          </div>
+
+          <!-- RIGHT SIDE: Generated PDF Visual Preview -->
+          <div class="card" style="display: flex; flex-direction: column; padding: 1.25rem; height: 100%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <div style="font-weight: 700; font-size: 0.92rem; display: flex; align-items: center; gap: 0.4rem;">
+                <span>📄 Rendered Visual Invoice PDF</span>
+                <span id="xmlVisPdfBadge" class="tag" style="background: rgba(16,185,129,0.15); color: #059669; font-size: 0.72rem; display: none;">Ready</span>
+              </div>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <a id="xmlVisDownloadPdfLink" href="#" target="_blank" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; text-decoration: none; display: none;">
+                  ⬇️ Download PDF
+                </a>
+                <button type="button" id="xmlVisExpandModalBtn" class="btn btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; display: none;" onclick="openExpandedPdfPreview()">
+                  ⛶ Expand
+                </button>
+              </div>
+            </div>
+
+            <!-- PDF Container / Placeholder -->
+            <div id="xmlVisPdfContainer" style="flex: 1; min-height: 580px; width: 100%; border-radius: 8px; overflow: hidden; background: #525659; border: 1px solid var(--bg-card-border); display: flex; align-items: center; justify-content: center; position: relative;">
+              <div id="xmlVisPlaceholder" style="text-align: center; padding: 2rem; color: #e2e8f0;">
+                <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.8;">📄</div>
+                <h4 style="margin-bottom: 0.5rem; font-size: 1.05rem; font-weight: 600;">No Visual PDF Rendered Yet</h4>
+                <p style="font-size: 0.82rem; color: #cbd5e1; max-width: 320px; line-height: 1.4; margin: 0 auto;">
+                  Paste an invoice XML on the left or click one of the sample buttons above, then press <strong>Render Visual PDF</strong>.
+                </p>
+              </div>
+              <iframe id="xmlVisIframe" src="" style="width: 100%; height: 100%; border: none; display: none;"></iframe>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
 
     <!-- ================= SCENARIO V2: GETZUGFERD GUIDED STUDIO ================= -->
@@ -633,6 +772,10 @@
                 <label class="v2-label">Street Address / Straße &amp; Hausnr.</label>
                 <input type="text" id="v2SellerStreet" class="v2-input" placeholder="e.g. Bahnhofstrasse 10">
               </div>
+              <div class="v2-field">
+                <label class="v2-label">Address Line 2 / Adresszusatz</label>
+                <input type="text" id="v2SellerStreet2" class="v2-input" placeholder="e.g. Gebäude 4, 2. Stock / Oddelek">
+              </div>
               <div class="v2-grid-3">
                 <div class="v2-field">
                   <label class="v2-label">Postcode / PLZ</label>
@@ -750,6 +893,10 @@
               <div class="v2-field">
                 <label class="v2-label">Street Address / Straße &amp; Hausnr.</label>
                 <input type="text" id="v2BuyerStreet" class="v2-input" placeholder="e.g. Market Street 42">
+              </div>
+              <div class="v2-field">
+                <label class="v2-label">Address Line 2 / Adresszusatz</label>
+                <input type="text" id="v2BuyerStreet2" class="v2-input" placeholder="e.g. Gebäude A, Tor 5 / Oddelek nabave">
               </div>
               <div class="v2-grid-3">
                 <div class="v2-field">

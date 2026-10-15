@@ -171,7 +171,7 @@ def get_chrome_executable() -> str:
             return c
     return "chrome"
 
-def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool = True, footer_config: dict = None, lang: str = "sl") -> str:
+def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool = True, footer_config: dict = None, lang: str = "sl", is_external_xml: bool = False) -> str:
     env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), autoescape=True)
     env.filters["format_date"] = _format_date
     env.filters["format_num"] = _format_num
@@ -196,7 +196,7 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
 
     # Logo base64
     logo_b64 = None
-    if logo_path and os.path.exists(logo_path):
+    if not is_external_xml and logo_path and os.path.exists(logo_path):
         try:
             with open(logo_path, "rb") as lf:
                 ext = os.path.splitext(logo_path)[1].lower().replace(".", "")
@@ -220,7 +220,7 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
         )
 
     cfg = footer_config or {}
-    sync_delivery = bool(cfg.get("auto_sync_delivery_date", False))
+    sync_delivery = bool(cfg.get("auto_sync_delivery_date", False)) if not is_external_xml else False
 
     # Effective delivery date (BT-72)
     effective_delivery_date = inv.delivery_date
@@ -247,8 +247,9 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
         references.append({"tag": "BT-29", "label": t_func("ref_supplier", "Koda dobavitelja"), "value": inv.seller.seller_identifier})
     if getattr(inv, "contract_reference", None):
         references.append({"tag": "BT-12", "label": t_func("ref_contract", "Pogodba"), "value": inv.contract_reference})
-    if inv.despatch_advice_reference:
-        references.append({"tag": "BT-16", "label": t_func("ref_delivery", "Dobavnica"), "value": inv.despatch_advice_reference})
+    despatch_ref = inv.despatch_advice_reference or (inv.delivery.despatch_advice_id if inv.delivery else None) or (inv.delivery.despatch_advice_reference if inv.delivery else None)
+    if despatch_ref:
+        references.append({"tag": "BT-16", "label": t_func("ref_delivery", "Dobavnica"), "value": despatch_ref})
     if getattr(inv, "cost_center", None):
         references.append({"tag": "BT-19", "label": t_func("ref_cost_center", "Stroškovno mesto"), "value": inv.cost_center})
     if getattr(inv, "sales_order_number", None):
@@ -312,51 +313,73 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
     if not exemption_text and has_exemption:
         exemption_text = t_func("reverse_charge_clause")
 
-    # Fallbacks from configuration (footer_config)
-    seller_court_cfg = (cfg.get("seller_court") or "").strip()
-    seller_hrb_cfg = (cfg.get("seller_hrb") or "").strip()
-    combined_court_hrb = " | ".join(filter(None, [seller_court_cfg, seller_hrb_cfg]))
+    # Legal / Registry / Footer logic
+    if is_external_xml:
+        # Strictly render ONLY what was parsed from the XML
+        effective_seller_court = (inv.seller.court_registry or inv.seller.company_legal_form or "").strip()
+        effective_seller_tax_number = (getattr(inv.seller, "tax_number", None) or inv.seller.tax_registration_id or "").strip()
+        effective_seller_legal_info = (getattr(inv.seller, "legal_info", None) or "").strip()
+        effective_seller_phone = (inv.seller.contact_phone or "").strip()
 
-    raw_seller_court = (inv.seller.court_registry or inv.seller.company_legal_form or "").strip()
-    if not raw_seller_court:
-        effective_seller_court = combined_court_hrb
-    elif seller_hrb_cfg and seller_hrb_cfg.lower() not in raw_seller_court.lower():
-        effective_seller_court = f"{raw_seller_court} | {seller_hrb_cfg}" if raw_seller_court else combined_court_hrb
+        # Effective bank accounts list for Block 6
+        effective_bank_accounts = []
+        if getattr(inv.payment, "bank_accounts", None) and len(inv.payment.bank_accounts) > 0:
+            effective_bank_accounts = inv.payment.bank_accounts
+        elif inv.payment and inv.payment.iban:
+            effective_bank_accounts.append({
+                "bank_name": inv.payment.bank_name or "Primary Bank",
+                "iban": inv.payment.iban,
+                "bic": inv.payment.bic or ""
+            })
+        # If no bank account was in the XML, show empty/no accounts (do NOT add seller_bank1_iban or seller_bank2_iban)
+        effective_footer_config = {}
     else:
-        effective_seller_court = raw_seller_court
+        # Standard Studio v2 flow: Keep existing fallback logic 100% intact!
+        seller_court_cfg = (cfg.get("seller_court") or "").strip()
+        seller_hrb_cfg = (cfg.get("seller_hrb") or "").strip()
+        combined_court_hrb = " | ".join(filter(None, [seller_court_cfg, seller_hrb_cfg]))
 
-    effective_seller_tax_number = (
-        (getattr(inv.seller, "tax_number", None) or inv.seller.tax_registration_id or "").strip()
-        or (cfg.get("seller_tax_number") or "").strip()
-    )
+        raw_seller_court = (inv.seller.court_registry or inv.seller.company_legal_form or "").strip()
+        if not raw_seller_court:
+            effective_seller_court = combined_court_hrb
+        elif seller_hrb_cfg and seller_hrb_cfg.lower() not in raw_seller_court.lower():
+            effective_seller_court = f"{raw_seller_court} | {seller_hrb_cfg}" if raw_seller_court else combined_court_hrb
+        else:
+            effective_seller_court = raw_seller_court
 
-    effective_seller_legal_info = (
-        (getattr(inv.seller, "legal_info", None) or "").strip()
-        or (cfg.get("seller_managing_directors") or "").strip()
-    )
+        effective_seller_tax_number = (
+            (getattr(inv.seller, "tax_number", None) or inv.seller.tax_registration_id or "").strip()
+            or (cfg.get("seller_tax_number") or "").strip()
+        )
 
-    effective_seller_phone = (
-        (inv.seller.contact_phone or "").strip()
-        or (cfg.get("seller_phone") or "").strip()
-    )
+        effective_seller_legal_info = (
+            (getattr(inv.seller, "legal_info", None) or "").strip()
+            or (cfg.get("seller_managing_directors") or "").strip()
+        )
 
-    # Effective bank accounts list for Block 6
-    effective_bank_accounts = []
-    if getattr(inv.payment, "bank_accounts", None) and len(inv.payment.bank_accounts) > 0:
-        effective_bank_accounts = inv.payment.bank_accounts
-    else:
-        # Fallback to configured bank accounts
-        b1_iban = (cfg.get("seller_bank1_iban") or inv.payment.iban or "").strip()
-        b1_name = (cfg.get("seller_bank1_name") or inv.payment.bank_name or "Primary Bank").strip()
-        b1_bic = (cfg.get("seller_bank1_bic") or inv.payment.bic or "").strip()
-        if b1_iban:
-            effective_bank_accounts.append({"bank_name": b1_name, "iban": b1_iban, "bic": b1_bic})
+        effective_seller_phone = (
+            (inv.seller.contact_phone or "").strip()
+            or (cfg.get("seller_phone") or "").strip()
+        )
 
-        b2_iban = (cfg.get("seller_bank2_iban") or "").strip()
-        b2_name = (cfg.get("seller_bank2_name") or "Secondary Bank").strip()
-        b2_bic = (cfg.get("seller_bank2_bic") or "").strip()
-        if b2_iban:
-            effective_bank_accounts.append({"bank_name": b2_name, "iban": b2_iban, "bic": b2_bic})
+        effective_bank_accounts = []
+        if getattr(inv.payment, "bank_accounts", None) and len(inv.payment.bank_accounts) > 0:
+            effective_bank_accounts = inv.payment.bank_accounts
+        else:
+            # Fallback to configured bank accounts
+            b1_iban = (cfg.get("seller_bank1_iban") or inv.payment.iban or "").strip()
+            b1_name = (cfg.get("seller_bank1_name") or inv.payment.bank_name or "Primary Bank").strip()
+            b1_bic = (cfg.get("seller_bank1_bic") or inv.payment.bic or "").strip()
+            if b1_iban:
+                effective_bank_accounts.append({"bank_name": b1_name, "iban": b1_iban, "bic": b1_bic})
+
+            b2_iban = (cfg.get("seller_bank2_iban") or "").strip()
+            b2_name = (cfg.get("seller_bank2_name") or "Secondary Bank").strip()
+            b2_bic = (cfg.get("seller_bank2_bic") or "").strip()
+            if b2_iban:
+                effective_bank_accounts.append({"bank_name": b2_name, "iban": b2_iban, "bic": b2_bic})
+
+        effective_footer_config = footer_config or {}
 
     # Localize payment terms according to selected export language
     raw_payment_terms = (getattr(inv.payment, "payment_terms", None) or "").strip()
@@ -384,21 +407,22 @@ def render_en16931_html(inv: InvoiceData, logo_path: str = None, hide_tags: bool
         vat_breakdown_list=vat_breakdown_list,
         has_exemption=has_exemption,
         exemption_text=exemption_text,
-        footer_config=footer_config or {},
+        footer_config=effective_footer_config,
         effective_seller_court=effective_seller_court,
         effective_seller_tax_number=effective_seller_tax_number,
         effective_seller_legal_info=effective_seller_legal_info,
         effective_seller_phone=effective_seller_phone,
-        effective_bank_accounts=effective_bank_accounts
+        effective_bank_accounts=effective_bank_accounts,
+        is_external_xml=is_external_xml
     )
     return html_rendered
 
-def generate_en16931_pdf(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, hide_tags: bool = True, footer_config: dict = None, lang: str = "sl") -> str:
+def generate_en16931_pdf(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, hide_tags: bool = True, footer_config: dict = None, lang: str = "sl", is_external_xml: bool = False) -> str:
     """
     Renders EN 16931 complete layout using headless Chrome/Edge with specific language.
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_pdf_path)), exist_ok=True)
-    html_content = render_en16931_html(inv, logo_path=logo_path, hide_tags=hide_tags, footer_config=footer_config, lang=lang)
+    html_content = render_en16931_html(inv, logo_path=logo_path, hide_tags=hide_tags, footer_config=footer_config, lang=lang, is_external_xml=is_external_xml)
     
     temp_html_path = output_pdf_path.replace(".pdf", "_temp.html")
     with open(temp_html_path, "w", encoding="utf-8") as f:

@@ -1540,7 +1540,7 @@ function switchScenario(scenario) {
 window.switchScenario = switchScenario;
 
 function executeSwitchScenario(scenario) {
-  const scenarios = ["overview", "v2", "history", "config"];
+  const scenarios = ["overview", "xml-vis", "v2", "history", "config"];
   scenarios.forEach((s) => {
     const container = document.getElementById(`scenario-${s}-container`);
     const btn = document.getElementById(`tab-${s}`);
@@ -2712,8 +2712,22 @@ if (generateManualPdfBtn) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const result = await res.json();
-      if (!result.success) throw new Error(result.error || "Manual PDF/A-3 generation failed");
+      let result;
+      const responseText = await res.text();
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseErr) {
+        throw new Error(`Strežnik je vrnil neveljaven odgovor (${res.status}): ${responseText.slice(0, 200)}`);
+      }
+      if (!res.ok || !result.success) {
+        let detailMsg = result.error || "Manual PDF/A-3 generation failed";
+        if (result.errors && Array.isArray(result.errors) && result.errors.length > 0) {
+          detailMsg = result.errors.join("\n• ");
+        } else if (result.error_detail) {
+          detailMsg += `\n\nPodrobnosti: ${result.error_detail}`;
+        }
+        throw new Error(detailMsg);
+      }
 
       if (manXmlViewer && result.xml_content) {
         manXmlViewer.textContent = result.xml_content;
@@ -3190,6 +3204,7 @@ const XML_FIELD_MAP = {
   "v2SellerIdentifier": ["<ram:SellerTradeParty>", "<ram:ID>", "<cac:AccountingSupplierParty>", "<cac:PartyIdentification>", "<cbc:ID>"],
   "v2SellerVat": ["<ram:SellerTradeParty>", "schemeID=\"VA\">", "<cac:AccountingSupplierParty>", "<cbc:CompanyID>"],
   "v2SellerStreet": ["<ram:SellerTradeParty>", "<ram:LineOne>", "<cac:AccountingSupplierParty>", "<cbc:StreetName>"],
+  "v2SellerStreet2": ["<ram:SellerTradeParty>", "<ram:LineTwo>", "<cbc:AdditionalStreetName>"],
   "v2SellerPostcode": ["<ram:SellerTradeParty>", "<ram:PostcodeCode>", "<cac:AccountingSupplierParty>", "<cbc:PostalZone>"],
   "v2SellerCity": ["<ram:SellerTradeParty>", "<ram:CityName>", "<cac:AccountingSupplierParty>", "<cbc:CityName>"],
   "v2SellerCountry": ["<ram:SellerTradeParty>", "<ram:CountryID>", "<cac:AccountingSupplierParty>", "<cbc:IdentificationCode>"],
@@ -3199,6 +3214,7 @@ const XML_FIELD_MAP = {
   "v2BuyerName": ["<ram:BuyerTradeParty>", "<ram:Name>", "<cac:AccountingCustomerParty>", "<cbc:RegistrationName>"],
   "v2BuyerVat": ["<ram:BuyerTradeParty>", "schemeID=\"VA\">", "<cac:AccountingCustomerParty>", "<cbc:CompanyID>"],
   "v2BuyerStreet": ["<ram:BuyerTradeParty>", "<ram:LineOne>", "<cac:AccountingCustomerParty>", "<cbc:StreetName>"],
+  "v2BuyerStreet2": ["<ram:BuyerTradeParty>", "<ram:LineTwo>", "<cbc:AdditionalStreetName>"],
   "v2BuyerPostcode": ["<ram:BuyerTradeParty>", "<ram:PostcodeCode>", "<cac:AccountingCustomerParty>", "<cbc:PostalZone>"],
   "v2BuyerCity": ["<ram:BuyerTradeParty>", "<ram:CityName>", "<cac:AccountingCustomerParty>", "<cbc:CityName>"],
   "v2BuyerCountry": ["<ram:BuyerTradeParty>", "<ram:CountryID>", "<cac:AccountingCustomerParty>", "<cbc:IdentificationCode>"],
@@ -3375,7 +3391,9 @@ const V2_BT_FIELD_MAP = {
     bt: "BT-3",
     name: "Invoice type code",
     name_de: "Rechnungsartcode",
-    desc: "Specifies the document type code (e.g. 380 = Commercial Invoice, 381 = Credit Note, 384 = Corrected Invoice, 220 = Order-X).",
+    desc: "Specifies document type code (380 = Commercial Invoice, 381 = Credit Note, 384 = Corrected Invoice, 220 = Order-X).",
+    sap_field: "VBRK-FKART",
+    sap_label: "Fakturaart (F2=380, G2/RE=381, S1=384)",
     xml: "rsm:ExchangedDocument/ram:TypeCode",
     req_xr: true, req_peppol: true, req_zugferd: true
   },
@@ -3384,6 +3402,8 @@ const V2_BT_FIELD_MAP = {
     name: "Invoice number",
     name_de: "Rechnungsnummer",
     desc: "Unique sequential commercial document identifier issued by the seller.",
+    sap_field: "VBRK-VBELN",
+    sap_label: "Rechnungs-Nr. / Faktura",
     xml: "rsm:ExchangedDocument/ram:ID",
     req_xr: true, req_peppol: true, req_zugferd: true
   },
@@ -3392,6 +3412,8 @@ const V2_BT_FIELD_MAP = {
     name: "Invoice issue date",
     name_de: "Rechnungsdatum",
     desc: "The date when the invoice was legally issued (YYYY-MM-DD).",
+    sap_field: "VBRK-FKDAT",
+    sap_label: "Fakturadatum / Belegdatum",
     xml: "rsm:ExchangedDocument/ram:IssueDateTime",
     req_xr: true, req_peppol: true, req_zugferd: true
   },
@@ -3400,6 +3422,8 @@ const V2_BT_FIELD_MAP = {
     name: "Invoice currency code",
     name_de: "Rechnungswährungscode",
     desc: "ISO 4217 3-letter currency code in which amounts are billed (EUR, USD, CHF, GBP).",
+    sap_field: "VBRK-WAERK",
+    sap_label: "Belegwährung",
     xml: ".../ram:InvoiceCurrencyCode",
     req_xr: true, req_peppol: true, req_zugferd: true
   },
@@ -3408,6 +3432,8 @@ const V2_BT_FIELD_MAP = {
     name: "Payment due date",
     name_de: "Fälligkeitsdatum der Zahlung",
     desc: "The date when net payment is legally due by the debtor.",
+    sap_field: "VBRK-ZTERM / BSEG-ZFBDT",
+    sap_label: "Zahlungsziel / Fälligkeit netto",
     xml: ".../ram:SpecifiedTradePaymentTerms/ram:DueDateDateTime",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3415,7 +3441,9 @@ const V2_BT_FIELD_MAP = {
     bt: "BT-81",
     name: "Payment means type code",
     name_de: "Zahlungsmittelcode",
-    desc: "Code indicating how payment should be made (58 = SEPA transfer, 30 = Credit transfer, 48 = Bank card, 10 = Cash).",
+    desc: "Code indicating how payment should be made (58 = SEPA transfer, 30 = Credit transfer, 48 = Card, 10 = Cash).",
+    sap_field: "VBRK-ZLSCH",
+    sap_label: "Zahlweg (T042Z)",
     xml: ".../ram:SpecifiedTradeSettlementPaymentMeans/ram:TypeCode",
     req_xr: true, req_peppol: true, req_zugferd: false
   },
@@ -3424,6 +3452,8 @@ const V2_BT_FIELD_MAP = {
     name: "Payment reference / Remittance info",
     name_de: "Verwendungszweck / Zahlungsreferenz",
     desc: "Structured payment reference or remittance information (BT-83/BT-84).",
+    sap_field: "VBRK-KIDNO / BKPF-XBLNR",
+    sap_label: "Referenzangabe / Sklic",
     xml: ".../ram:SpecifiedTradePaymentTerms/ram:Description | .../ram:PaymentReference",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3432,6 +3462,8 @@ const V2_BT_FIELD_MAP = {
     name: "Payment account identifier (IBAN)",
     name_de: "Zahlungskonto-Kennung (IBAN)",
     desc: "The International Bank Account Number to which the invoice amount must be transferred.",
+    sap_field: "T012K-IBAN",
+    sap_label: "Hausbank IBAN",
     xml: ".../ram:PayeePartyCreditorFinancialAccount/ram:IBANID",
     req_xr: true, req_peppol: true, req_zugferd: false
   },
@@ -3440,6 +3472,8 @@ const V2_BT_FIELD_MAP = {
     name: "Bank BIC / SWIFT code",
     name_de: "Bank-Identifikator (BIC / SWIFT)",
     desc: "BIC identifier of the payment service provider.",
+    sap_field: "BNKA-SWIFT",
+    sap_label: "Bank S.W.I.F.T. / BIC",
     xml: ".../ram:PayeeSpecifiedCreditorFinancialInstitution/ram:BICID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3448,14 +3482,18 @@ const V2_BT_FIELD_MAP = {
     name: "Purchase order reference (PO)",
     name_de: "Bestellnummer (PO)",
     desc: "Buyer-issued purchase order or contract order number.",
+    sap_field: "VBRK-BSTNK_VF / VBAK-BSTNK",
+    sap_label: "Kundenbestellnummer / Best.-Nr.",
     xml: ".../ram:BuyerOrderReferencedDocument/ram:IssuerAssignedID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
   "v2BuyerRef": {
     bt: "BT-10",
-    name: "Buyer reference (Leitweg-ID)",
+    name: "Buyer reference (Leitweg-ID / Clerk)",
     name_de: "Leitweg-ID / Käuferreferenz",
     desc: "Buyer reference identifier, internal cost center, or German public sector Leitweg-ID for B2G routing.",
+    sap_field: "VBRK-IHREZ / VBAK-IHREZ",
+    sap_label: "Ihr Zeichen / Sachbearbeiter",
     xml: ".../ram:BuyerReference",
     req_xr: true, req_peppol: true, req_zugferd: true
   },
@@ -3464,6 +3502,8 @@ const V2_BT_FIELD_MAP = {
     name: "Prepaid amount",
     name_de: "Gezahlter Betrag / Anzahlung",
     desc: "Sum of amounts already paid in advance or deducted prior to issuing the invoice.",
+    sap_field: "BSEG-WRBTR (Anzahlung)",
+    sap_label: "Verrechnete Anzahlung",
     xml: ".../ram:TotalPrepaidAmount",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3472,6 +3512,8 @@ const V2_BT_FIELD_MAP = {
     name: "Payment terms / Skonto",
     name_de: "Zahlungsbedingungen (Skonto)",
     desc: "Detailed conditions of payment, early settlement cash discounts (Skonto), and penalty interest.",
+    sap_field: "VBRK-ZTERM -> T052U-TEXT1",
+    sap_label: "Zahlungskonditionen",
     xml: ".../ram:SpecifiedTradePaymentTerms/ram:Description",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3480,6 +3522,8 @@ const V2_BT_FIELD_MAP = {
     name: "Invoicing period start date",
     name_de: "Beginn des Leistungszeitraums",
     desc: "Date when delivery or service provision began.",
+    sap_field: "VBRP-FBUDA / VBRK-FKDAT",
+    sap_label: "Leistungsdatum von",
     xml: ".../ram:BillingSpecifiedPeriod/ram:StartDateTime",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3488,6 +3532,8 @@ const V2_BT_FIELD_MAP = {
     name: "Invoicing period end date",
     name_de: "Ende des Leistungszeitraums",
     desc: "Date when delivery or service provision concluded.",
+    sap_field: "VBRP-FBUDA / VBRK-FKDAT",
+    sap_label: "Leistungsdatum bis",
     xml: ".../ram:BillingSpecifiedPeriod/ram:EndDateTime",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3496,6 +3542,8 @@ const V2_BT_FIELD_MAP = {
     name: "Preceding invoice reference",
     name_de: "Vorherige Rechnungsnummer",
     desc: "Identification number of the earlier invoice that is being credited or corrected.",
+    sap_field: "VBRK-VGBEL",
+    sap_label: "Vorgängerbeleg / Ursprungsrechnung",
     xml: ".../ram:InvoiceReferencedDocument/ram:IssuerAssignedID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3504,6 +3552,8 @@ const V2_BT_FIELD_MAP = {
     name: "Preceding invoice issue date",
     name_de: "Rechnungsdatum der vorherigen Rechnung",
     desc: "Issue date of the invoice that this credit note or correction refers to.",
+    sap_field: "VBRK-FKDAT (Vorgänger)",
+    sap_label: "Datum Ursprungsrechnung",
     xml: ".../ram:InvoiceReferencedDocument/ram:FormattedIssueDateTime",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3514,6 +3564,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller full legal name",
     name_de: "Name des Verkäufers",
     desc: "The full legal and registered commercial trade name of the selling company.",
+    sap_field: "T001-BUTXT / ADRC-NAME1",
+    sap_label: "Buchungskreis Name / Firmenname",
     xml: ".../ram:SellerTradeParty/ram:Name",
     req_xr: true, req_peppol: true, req_zugferd: true
   },
@@ -3522,6 +3574,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller identifier / Supplier code",
     name_de: "Identifikator des Verkäufers / Lieferantennummer",
     desc: "Supplier code or internal vendor identifier assigned by or identifying the seller.",
+    sap_field: "KNVP-KNREF / LFA1-LIFNR",
+    sap_label: "Lieferanten-Nr. beim Kunden",
     xml: ".../ram:SellerTradeParty/ram:ID | .../cac:PartyIdentification/cbc:ID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3529,7 +3583,9 @@ const V2_BT_FIELD_MAP = {
     bt: "BT-31",
     name: "Seller VAT identifier",
     name_de: "Umsatzsteuer-Identifikationsnummer des Verkäufers",
-    desc: "Value Added Tax identification number of the seller (e.g. DE123456789).",
+    desc: "Value Added Tax identification number of the seller (e.g. DE347120003).",
+    sap_field: "T001-STCEG",
+    sap_label: "USt-IdNr. des Buchungskreises",
     xml: ".../ram:SellerTradeParty/ram:SpecifiedTaxRegistration (VA)",
     req_xr: true, req_peppol: true, req_zugferd: true
   },
@@ -3538,6 +3594,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller tax registration ID (Steuernummer)",
     name_de: "Steuernummer des Verkäufers (FC)",
     desc: "Local tax number or commercial register court number (e.g. 99022/20844).",
+    sap_field: "T001-STEID",
+    sap_label: "Steuernummer beim Finanzamt",
     xml: ".../ram:SellerTradeParty/ram:SpecifiedTaxRegistration (FC)",
     req_xr: true, req_peppol: true, req_zugferd: true
   },
@@ -3546,7 +3604,19 @@ const V2_BT_FIELD_MAP = {
     name: "Seller address line 1",
     name_de: "Straße des Verkäufers",
     desc: "Street name and building number of the seller's registered legal seat.",
+    sap_field: "ADRC-STREET + HOUSE_NUM1",
+    sap_label: "Straße & Hausnummer",
     xml: ".../ram:SellerTradeParty/.../ram:LineOne",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2SellerStreet2": {
+    bt: "BT-36",
+    name: "Seller address line 2",
+    name_de: "Adresszusatz des Verkäufers",
+    desc: "Additional building, department, or facility address info.",
+    sap_field: "ADRC-STR_SUPPL1",
+    sap_label: "Adresszusatz / Gebäude",
+    xml: ".../ram:SellerTradeParty/.../ram:LineTwo",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
   "v2SellerPostcode": {
@@ -3554,6 +3624,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller post code",
     name_de: "Postleitzahl des Verkäufers",
     desc: "Postal zip code of the seller address.",
+    sap_field: "ADRC-POST_CODE1",
+    sap_label: "Postleitzahl (PLZ)",
     xml: ".../ram:SellerTradeParty/.../ram:PostcodeCode",
     req_xr: true, req_peppol: true, req_zugferd: false
   },
@@ -3562,6 +3634,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller city / municipality",
     name_de: "Ort des Verkäufers",
     desc: "City or town of the seller address.",
+    sap_field: "ADRC-CITY1",
+    sap_label: "Ort / Stadt",
     xml: ".../ram:SellerTradeParty/.../ram:CityName",
     req_xr: true, req_peppol: true, req_zugferd: false
   },
@@ -3570,6 +3644,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller country code",
     name_de: "Ländercode des Verkäufers",
     desc: "ISO 3166-1 2-letter country code of the seller (e.g. DE, SI, FR).",
+    sap_field: "T001-LAND1 / ADRC-COUNTRY",
+    sap_label: "Länderschlüssel",
     xml: ".../ram:SellerTradeParty/.../ram:CountryID",
     req_xr: true, req_peppol: true, req_zugferd: true
   },
@@ -3578,6 +3654,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller contact point / person",
     name_de: "Kontaktstelle / Ansprechpartner des Verkäufers",
     desc: "Name of the contact person or department at the seller.",
+    sap_field: "VBRK-ERNAM / ADRP-NAME_FIRST",
+    sap_label: "Sachbearbeiter Name",
     xml: ".../ram:DefinedTradeContact/ram:PersonName",
     req_xr: true, req_peppol: true, req_zugferd: false
   },
@@ -3586,6 +3664,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller contact telephone",
     name_de: "Telefonnummer des Verkäufers",
     desc: "Direct contact telephone number of the invoicing department.",
+    sap_field: "ADRC-TEL_NUMBER",
+    sap_label: "Telefonnummer / Fon",
     xml: ".../ram:DefinedTradeContact/ram:TelephoneUniversalCommunication/ram:CompleteNumber",
     req_xr: true, req_peppol: true, req_zugferd: false
   },
@@ -3594,6 +3674,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller contact email",
     name_de: "E-Mail-Adresse des Verkäufers",
     desc: "Billing email address for inquiries.",
+    sap_field: "ADRC-SMTP_ADDR",
+    sap_label: "E-Mail-Adresse",
     xml: ".../ram:DefinedTradeContact/ram:EmailURIUniversalCommunication/ram:URIID",
     req_xr: true, req_peppol: true, req_zugferd: false
   },
@@ -3603,7 +3685,9 @@ const V2_BT_FIELD_MAP = {
     bt: "BT-44",
     name: "Buyer full legal name",
     name_de: "Name des Erwerbers / Käufers",
-    desc: "Full legal entity name or individual name of the purchasing customer.",
+    desc: "Full legal entity name or individual name of purchasing customer.",
+    sap_field: "VBPA-KUNNR (RE/RG) -> KNA1-NAME1",
+    sap_label: "Rechnungsempfänger / Auftraggeber",
     xml: ".../ram:BuyerTradeParty/ram:Name",
     req_xr: true, req_peppol: true, req_zugferd: true
   },
@@ -3612,6 +3696,8 @@ const V2_BT_FIELD_MAP = {
     name: "Buyer VAT identifier",
     name_de: "Umsatzsteuer-Identifikationsnummer des Erwerbers",
     desc: "Customer's Value Added Tax ID (e.g. SI52093808 or DE987654321).",
+    sap_field: "KNA1-STCEG",
+    sap_label: "USt-IdNr. des Kunden",
     xml: ".../ram:BuyerTradeParty/ram:SpecifiedTaxRegistration (VA)",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3620,7 +3706,19 @@ const V2_BT_FIELD_MAP = {
     name: "Buyer address line 1",
     name_de: "Straße des Erwerbers",
     desc: "Street name and house number of the buyer.",
+    sap_field: "KNA1-STRAS",
+    sap_label: "Straße & Hausnummer",
     xml: ".../ram:BuyerTradeParty/.../ram:LineOne",
+    req_xr: false, req_peppol: false, req_zugferd: false
+  },
+  "v2BuyerStreet2": {
+    bt: "BT-51",
+    name: "Buyer address line 2",
+    name_de: "Adresszusatz des Erwerbers",
+    desc: "Additional building, department, or dock address info of buyer.",
+    sap_field: "ADRC-STR_SUPPL1",
+    sap_label: "Adresszusatz / Tor / Gebäude",
+    xml: ".../ram:BuyerTradeParty/.../ram:LineTwo",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
   "v2BuyerPostcode": {
@@ -3628,6 +3726,8 @@ const V2_BT_FIELD_MAP = {
     name: "Buyer post code",
     name_de: "Postleitzahl des Erwerbers",
     desc: "Postal zip code of the buyer's destination.",
+    sap_field: "KNA1-PSTLZ",
+    sap_label: "Postleitzahl (PLZ)",
     xml: ".../ram:BuyerTradeParty/.../ram:PostcodeCode",
     req_xr: true, req_peppol: true, req_zugferd: false
   },
@@ -3636,6 +3736,8 @@ const V2_BT_FIELD_MAP = {
     name: "Buyer city",
     name_de: "Ort des Erwerbers",
     desc: "City or town of the buyer address.",
+    sap_field: "KNA1-ORT01",
+    sap_label: "Ort / Stadt",
     xml: ".../ram:BuyerTradeParty/.../ram:CityName",
     req_xr: true, req_peppol: true, req_zugferd: false
   },
@@ -3644,6 +3746,8 @@ const V2_BT_FIELD_MAP = {
     name: "Buyer country code",
     name_de: "Ländercode des Erwerbers",
     desc: "ISO 3166-1 2-letter country code of the buyer.",
+    sap_field: "KNA1-LAND1",
+    sap_label: "Länderschlüssel",
     xml: ".../ram:BuyerTradeParty/.../ram:CountryID",
     req_xr: true, req_peppol: true, req_zugferd: true
   },
@@ -3652,6 +3756,8 @@ const V2_BT_FIELD_MAP = {
     name: "Buyer contact point / person",
     name_de: "Kontaktstelle / Ansprechpartner des Erwerbers",
     desc: "Name of the contact person or department at the buyer.",
+    sap_field: "KNVK-NAME1",
+    sap_label: "Ansprechpartner beim Kunden",
     xml: ".../ram:BuyerTradeParty/ram:DefinedTradeContact/ram:PersonName",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3660,6 +3766,8 @@ const V2_BT_FIELD_MAP = {
     name: "Buyer contact telephone number",
     name_de: "Telefonnummer des Erwerbers",
     desc: "Telephone contact number of the buyer contact point.",
+    sap_field: "KNVK-TELF1",
+    sap_label: "Telefon Ansprechpartner",
     xml: ".../ram:BuyerTradeParty/.../ram:TelephoneUniversalCommunication",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3668,6 +3776,8 @@ const V2_BT_FIELD_MAP = {
     name: "Buyer contact email address",
     name_de: "E-Mail-Adresse des Erwerbers",
     desc: "Email address of the buyer contact point.",
+    sap_field: "ADR6-SMTP_ADDR",
+    sap_label: "E-Mail Ansprechpartner",
     xml: ".../ram:BuyerTradeParty/.../ram:EmailURIUniversalCommunication",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3678,6 +3788,8 @@ const V2_BT_FIELD_MAP = {
     name: "Deliver-to party name",
     name_de: "Name des Empfängers / Lieferorts",
     desc: "Name of the actual physical recipient or site if different from buyer.",
+    sap_field: "VBPA-KUNNR (WE) -> KNA1-NAME1",
+    sap_label: "Warenempfänger Name",
     xml: ".../ram:ShipToTradeParty/ram:Name",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3685,7 +3797,9 @@ const V2_BT_FIELD_MAP = {
     bt: "BT-71",
     name: "Deliver-to location identifier (GLN)",
     name_de: "Lieferort-Kennung (Abladestelle / GLN)",
-    desc: "Global Location Number (GLN) of the destination warehouse.",
+    desc: "Global Location Number (GLN) or unloading point code (e.g. Tor 3, Werk 02).",
+    sap_field: "VBPA-ABLAD / KNVS-ABLAD",
+    sap_label: "Abladestelle / Empfangsstelle",
     xml: ".../ram:ShipToTradeParty/ram:ID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3694,6 +3808,8 @@ const V2_BT_FIELD_MAP = {
     name: "Actual delivery date",
     name_de: "Tatsächliches Lieferdatum",
     desc: "Date when goods were received or service fulfilled.",
+    sap_field: "LIKP-WADAT_IST / VBRK-FKDAT",
+    sap_label: "Warenausgangsdatum / Lieferdatum",
     xml: ".../ram:ActualDeliverySupplyChainEvent/ram:OccurrenceDateTime",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3702,6 +3818,8 @@ const V2_BT_FIELD_MAP = {
     name: "Despatch advice reference (Delivery Note #)",
     name_de: "Lieferscheinnummer (Despatch Advice)",
     desc: "Reference number of the physical delivery packing slip / Lieferschein.",
+    sap_field: "LIKP-VBELN",
+    sap_label: "Lieferscheinnummer",
     xml: ".../ram:DespatchAdviceReferencedDocument/ram:IssuerAssignedID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3710,6 +3828,8 @@ const V2_BT_FIELD_MAP = {
     name: "Deliver-to street address",
     name_de: "Straße des Lieferorts",
     desc: "Street address where goods are unloaded.",
+    sap_field: "ADRC-STREET (Partner WE)",
+    sap_label: "Lieferadresse Straße",
     xml: ".../ram:ShipToTradeParty/.../ram:LineOne",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3718,6 +3838,8 @@ const V2_BT_FIELD_MAP = {
     name: "Deliver-to post code",
     name_de: "Postleitzahl des Lieferorts",
     desc: "Zip code of the delivery location.",
+    sap_field: "ADRC-POST_CODE1 (Partner WE)",
+    sap_label: "Lieferort PLZ",
     xml: ".../ram:ShipToTradeParty/.../ram:PostcodeCode",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3726,6 +3848,8 @@ const V2_BT_FIELD_MAP = {
     name: "Deliver-to city",
     name_de: "Ort des Lieferorts",
     desc: "City of the physical unloading point.",
+    sap_field: "ADRC-CITY1 (Partner WE)",
+    sap_label: "Lieferort Stadt",
     xml: ".../ram:ShipToTradeParty/.../ram:CityName",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3734,6 +3858,8 @@ const V2_BT_FIELD_MAP = {
     name: "Deliver-to country code",
     name_de: "Ländercode des Lieferorts",
     desc: "ISO 3166-1 2-letter country code of delivery destination.",
+    sap_field: "ADRC-COUNTRY (Partner WE)",
+    sap_label: "Lieferort Land",
     xml: ".../ram:ShipToTradeParty/.../ram:CountryID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3744,6 +3870,8 @@ const V2_BT_FIELD_MAP = {
     name: "Tax exemption reason text",
     name_de: "Grund für die Steuerbefreiung",
     desc: "Legal justification text when VAT is 0% (e.g. Reverse Charge § 13b UStG, Intra-Community supply).",
+    sap_field: "T007S-TEXT / STXH (Steuertext)",
+    sap_label: "Steuerbefreiungstext",
     xml: ".../ram:ApplicableTradeTax/ram:ExemptionReason",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3752,6 +3880,8 @@ const V2_BT_FIELD_MAP = {
     name: "Tax exemption reason code",
     name_de: "Code für den Grund der Steuerbefreiung",
     desc: "CEF VATEX exemption code (e.g. VATEX-EU-AE, VATEX-EU-E, VATEX-EU-G, VATEX-EU-IC).",
+    sap_field: "VBRP-MWSKZ -> VATEX Mapping",
+    sap_label: "Steuerbefreiungscode",
     xml: ".../ram:ApplicableTradeTax/ram:ExemptionReasonCode",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3762,6 +3892,8 @@ const V2_BT_FIELD_MAP = {
     name: "Payee name (Factoring)",
     name_de: "Name des Zahlungsempfängers (Factoring)",
     desc: "Name of the third-party factor or collection payee if different from the seller.",
+    sap_field: "VBPA-KUNNR (AZ) -> KNA1-NAME1",
+    sap_label: "Abweichender Zahlungsempfänger",
     xml: ".../ram:PayeeTradeParty/ram:Name | .../cac:PayeeParty/cac:PartyName/cbc:Name",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3770,6 +3902,8 @@ const V2_BT_FIELD_MAP = {
     name: "Payee identifier",
     name_de: "Identifikator des Zahlungsempfängers",
     desc: "Identification code of the payee or factoring institution.",
+    sap_field: "VBPA-KUNNR (Partner AZ)",
+    sap_label: "Kontonummer Zahlungsempfänger",
     xml: ".../ram:PayeeTradeParty/ram:ID | .../cac:PayeeParty/cac:PartyIdentification/cbc:ID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3778,6 +3912,8 @@ const V2_BT_FIELD_MAP = {
     name: "Payee VAT identifier",
     name_de: "Umsatzsteuer-Identifikationsnummer des Zahlungsempfängers",
     desc: "Value Added Tax ID of the factoring company.",
+    sap_field: "KNA1-STCEG (Partner AZ)",
+    sap_label: "USt-IdNr. Zahlungsempfänger",
     xml: ".../ram:PayeeTradeParty/ram:SpecifiedTaxRegistration | .../cac:PayeeParty/cac:PartyTaxScheme/cbc:CompanyID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3788,6 +3924,8 @@ const V2_BT_FIELD_MAP = {
     name: "Sales order reference",
     name_de: "Auftragsbestätigungsnummer / Verkaufsauftragsreferenz",
     desc: "Seller-assigned sales order confirmation reference number.",
+    sap_field: "VBAK-VBELN",
+    sap_label: "Kundenauftragsnummer (SD)",
     xml: ".../ram:SalesOrderReferencedDocument/ram:IssuerAssignedID | .../cac:OrderReference/cbc:SalesOrderID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3796,6 +3934,8 @@ const V2_BT_FIELD_MAP = {
     name: "Contract reference",
     name_de: "Vertragsnummer",
     desc: "Framework agreement or contract reference number.",
+    sap_field: "VBAK-VGBEL / VBAP-VGBEL",
+    sap_label: "Kontraktnummer / Rahmenvertrag",
     xml: ".../ram:ContractReferencedDocument/ram:IssuerAssignedID | .../cac:ContractDocumentReference/cbc:ID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3804,6 +3944,8 @@ const V2_BT_FIELD_MAP = {
     name: "Buyer accounting reference / Cost center",
     name_de: "Käuferkonto-Referenz / Kostenstelle",
     desc: "Cost center code or accounting reference specified by the buyer.",
+    sap_field: "VBAP-KOSTL",
+    sap_label: "Kostenstelle der Position",
     xml: ".../ram:ReceivableSpecifiedTradeAccountingAccount/ram:ID | .../cbc:AccountingCost",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3814,6 +3956,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller legal registration identifier (Commercial register)",
     name_de: "Handelsregisternummer des Verkäufers",
     desc: "Registration number in the commercial register (e.g. HRB 736903).",
+    sap_field: "T001Z-CRAHO / Custom",
+    sap_label: "Handelsregister (HRB)",
     xml: ".../ram:SellerTradeParty/ram:SpecifiedLegalOrganization/ram:ID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3822,6 +3966,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller electronic address (Peppol)",
     name_de: "Elektronische Adresse des Verkäufers",
     desc: "Peppol electronic address endpoint identifier.",
+    sap_field: "ADR6-SMTP_ADDR / GLN",
+    sap_label: "Peppol Endpoint (Sender)",
     xml: ".../ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID | .../cac:AccountingSupplierParty/.../cbc:EndpointID",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3830,6 +3976,8 @@ const V2_BT_FIELD_MAP = {
     name: "Seller additional legal information",
     name_de: "Zusätzliche rechtliche Angaben zum Verkäufer",
     desc: "Court of registration, managing directors, registered capital (§ 35a GmbHG).",
+    sap_field: "T001-BUTXT Footer Text",
+    sap_label: "Pflichtangaben (§ 35a GmbHG)",
     xml: ".../ram:SellerTradeParty/ram:Description | .../cac:AccountingSupplierParty/.../cbc:CompanyLegalForm",
     req_xr: false, req_peppol: false, req_zugferd: false
   },
@@ -3838,6 +3986,8 @@ const V2_BT_FIELD_MAP = {
     name: "Buyer electronic address (Peppol)",
     name_de: "Elektronische Adresse des Erwerbers",
     desc: "Peppol electronic address endpoint identifier of the buyer.",
+    sap_field: "KNA1-PEPPOL_ID / KNA1-STCEG",
+    sap_label: "Peppol Endpoint des Kunden",
     xml: ".../ram:BuyerTradeParty/ram:URIUniversalCommunication/ram:URIID | .../cac:AccountingCustomerParty/.../cbc:EndpointID",
     req_xr: false, req_peppol: true, req_zugferd: false
   }
@@ -3970,11 +4120,18 @@ function initXmlQuestionButtons() {
       const titleDisplay = btInfo.name_de 
         ? `${btInfo.bt}: ${escapeHtml(btInfo.name_de)} (${escapeHtml(btInfo.name)})`
         : `${btInfo.bt}: ${escapeHtml(btInfo.name)}`;
+      const sapBlock = btInfo.sap_field 
+        ? `<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed rgba(255,255,255,0.25); font-size: 0.73rem; color: #67e8f9;">
+             <strong style="color: #a5f3fc;">SAP Source:</strong> <code>${escapeHtml(btInfo.sap_field)}</code> 
+             <span style="opacity: 0.85; color: #e0f2fe;">(${escapeHtml(btInfo.sap_label || '')})</span>
+           </div>` 
+        : '';
+
       tooltip.innerHTML = `
         <span class="v2-bt-tooltip-title">${titleDisplay}</span>
-        <div>${escapeHtml(btInfo.desc)}</div>
+        <div>${escapeHtml(btInfo.desc)}</div>${sapBlock}
         <span class="v2-bt-tooltip-xml">XML: ${escapeHtml(btInfo.xml)}</span>
-        <span class="v2-bt-tooltip-status ${isMand ? 'req' : 'opt'}">${isMand ? '● Mandatory Standard Field / Pflichtfeld' : 'Optional / Bedingt'}</span>
+        <span class="v2-bt-tooltip-status ${isMand ? 'req' : 'opt'}">${isMand ? '● Mandatory Standard Field' : 'Optional / Conditional'}</span>
       `;
 
       badge.appendChild(tooltip);
@@ -4011,5 +4168,448 @@ document.addEventListener("DOMContentLoaded", () => {
 // Document ready
 document.addEventListener("DOMContentLoaded", () => {
   initXmlQuestionButtons();
+  initXmlVisPage();
 });
+
+// =========================================================================
+// XML VISUALIZATION CONTROLLER (Split Screen: XML Input -> Live PDF Output)
+// =========================================================================
+let currentXmlVisFilename = null;
+let currentXmlVisInvoiceData = null;
+
+function initXmlVisPage() {
+  const dropBox = document.getElementById("xmlVisDropBox");
+  if (!dropBox) return;
+
+  dropBox.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropBox.style.borderColor = "var(--accent)";
+    dropBox.style.background = "rgba(37, 99, 235, 0.12)";
+  });
+
+  dropBox.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    dropBox.style.borderColor = "";
+    dropBox.style.background = "";
+  });
+
+  dropBox.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropBox.style.borderColor = "";
+    dropBox.style.background = "";
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      handleXmlVisFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  const textarea = document.getElementById("xmlVisTextarea");
+  if (textarea) {
+    textarea.addEventListener("input", () => {
+      detectAndShowXmlFormat(textarea.value);
+    });
+  }
+}
+window.initXmlVisPage = initXmlVisPage;
+
+function onXmlVisFileInputChanged(input) {
+  if (input && input.files && input.files.length) {
+    handleXmlVisFile(input.files[0]);
+    input.value = "";
+  }
+}
+window.onXmlVisFileInputChanged = onXmlVisFileInputChanged;
+
+function handleXmlVisFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const content = e.target.result;
+    const textarea = document.getElementById("xmlVisTextarea");
+    if (textarea) {
+      textarea.value = content;
+      detectAndShowXmlFormat(content);
+    }
+    renderXmlVisualization();
+  };
+  reader.readAsText(file, "UTF-8");
+}
+window.handleXmlVisFile = handleXmlVisFile;
+
+function clearXmlVisInput() {
+  const textarea = document.getElementById("xmlVisTextarea");
+  if (textarea) textarea.value = "";
+  const badge = document.getElementById("xmlVisDetectedBadge");
+  if (badge) badge.style.display = "none";
+  const status = document.getElementById("xmlVisStatusText");
+  if (status) status.textContent = "Ready for XML input";
+}
+window.clearXmlVisInput = clearXmlVisInput;
+
+function detectAndShowXmlFormat(xmlText) {
+  const badge = document.getElementById("xmlVisDetectedBadge");
+  const status = document.getElementById("xmlVisStatusText");
+  if (!badge) return;
+
+  const trimmed = (xmlText || "").trim();
+  if (!trimmed) {
+    badge.style.display = "none";
+    if (status) status.textContent = "Ready for XML input";
+    return;
+  }
+
+  let fmt = "XML";
+  let color = "#3b82f6";
+  let bg = "rgba(59, 130, 246, 0.15)";
+
+  if (trimmed.includes("urn:eslog") || trimmed.includes("M_INVOIC") || trimmed.includes("S_BGM")) {
+    fmt = "🇸🇮 e-SLOG 2.0 (BizBox / GZS)";
+    color = "#10b981";
+    bg = "rgba(16, 185, 129, 0.15)";
+  } else if (trimmed.includes("CrossIndustryInvoice") || trimmed.includes("uncefact")) {
+    fmt = "🟣 UN/CEFACT CII (Factur-X / ZUGFeRD 2.x)";
+    color = "#8b5cf6";
+    bg = "rgba(139, 92, 246, 0.15)";
+  } else if (trimmed.includes("ubl:schema:xsd:Invoice-2") || trimmed.includes("<Invoice") || trimmed.includes("<CreditNote")) {
+    fmt = "🔵 OASIS UBL 2.1 (Peppol BIS 3.0 / XRechnung)";
+    color = "#0284c7";
+    bg = "rgba(2, 132, 199, 0.15)";
+  }
+
+  badge.textContent = fmt;
+  badge.style.color = color;
+  badge.style.background = bg;
+  badge.style.display = "inline-block";
+  if (status) status.textContent = `Detected format: ${fmt}`;
+}
+window.detectAndShowXmlFormat = detectAndShowXmlFormat;
+
+async function renderXmlVisualization() {
+  const textarea = document.getElementById("xmlVisTextarea");
+  const xmlContent = textarea ? textarea.value.trim() : "";
+  if (!xmlContent) {
+    alert("Prosimo, vnesite ali naložite XML vsebino na levi strani.");
+    return;
+  }
+
+  const btn = document.getElementById("btnRenderXmlVis");
+  const origBtnText = btn ? btn.innerHTML : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<div class="spinner" style="width:14px; height:14px; display:inline-block; margin-right:6px;"></div> Rendering PDF...`;
+  }
+
+  const layoutSelect = document.getElementById("xmlVisLayoutSelect");
+  const chosenLayout = layoutSelect ? layoutSelect.value : "layout3";
+  const showBtTags = Boolean(document.getElementById("xmlVisShowBtTags")?.checked);
+
+  const placeholder = document.getElementById("xmlVisPlaceholder");
+  const iframe = document.getElementById("xmlVisIframe");
+  const downloadLink = document.getElementById("xmlVisDownloadPdfLink");
+  const expandBtn = document.getElementById("xmlVisExpandModalBtn");
+  const pdfBadge = document.getElementById("xmlVisPdfBadge");
+  const status = document.getElementById("xmlVisStatusText");
+
+  try {
+    const res = await fetch("/api/visualize-xml", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        xml_content: xmlContent,
+        layout: chosenLayout,
+        lang: "sl",
+        show_bt_tags: showBtTags
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || "Neveljavna XML datoteka ali neprepoznana shema (podprti so e-SLOG 2.0, UBL 2.1 in Factur-X/CII).");
+    }
+
+    currentXmlVisFilename = data.output_filename;
+    currentXmlVisInvoiceData = data.invoice_data;
+
+    // Display PDF on right side
+    if (placeholder) placeholder.style.display = "none";
+    if (iframe) {
+      iframe.src = `/api/preview/${data.output_filename}#toolbar=1&navpanes=0`;
+      iframe.style.display = "block";
+    }
+
+    if (downloadLink) {
+      downloadLink.href = `/api/download/${data.output_filename}`;
+      downloadLink.style.display = "inline-flex";
+    }
+    if (expandBtn) expandBtn.style.display = "inline-flex";
+    if (pdfBadge) {
+      const invNum = data.invoice_data?.invoice_number || "Invoice";
+      pdfBadge.textContent = `✅ ${invNum} (${chosenLayout}${showBtTags ? ' • BT-X' : ''})`;
+      pdfBadge.style.display = "inline-block";
+    }
+    if (status) status.textContent = `PDF successfully generated (${data.output_filename})`;
+  } catch (err) {
+    alert("Neveljavna XML datoteka ali neprepoznana shema (podprti so e-SLOG 2.0, UBL 2.1 in Factur-X/CII).\n\nPodrobnosti: " + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origBtnText;
+    }
+  }
+}
+window.renderXmlVisualization = renderXmlVisualization;
+
+function openExpandedPdfPreview() {
+  if (currentXmlVisFilename && typeof openPdfPreview === "function") {
+    openPdfPreview(currentXmlVisFilename, currentXmlVisInvoiceData?.invoice_number || currentXmlVisFilename);
+  }
+}
+window.openExpandedPdfPreview = openExpandedPdfPreview;
+
+function editXmlInStudioV2() {
+  const textarea = document.getElementById("xmlVisTextarea");
+  const content = textarea ? textarea.value.trim() : "";
+  if (!content) {
+    alert("Najprej vnesite XML vsebino.");
+    return;
+  }
+  // Convert text to File object and invoke handleV2PrefillUpload
+  const blob = new Blob([content], { type: "application/xml" });
+  const file = new File([blob], "invoice.xml", { type: "application/xml" });
+  if (typeof switchScenario === "function") switchScenario("v2");
+  if (typeof handleV2PrefillUpload === "function") {
+    handleV2PrefillUpload(file);
+  }
+}
+window.editXmlInStudioV2 = editXmlInStudioV2;
+
+// Built-in sample XML generators for quick testing
+function loadSampleXmlToVis(sampleType) {
+  const textarea = document.getElementById("xmlVisTextarea");
+  if (!textarea) return;
+
+  if (sampleType === "eslog") {
+    textarea.value = `<?xml version="1.0" encoding="utf-8"?>
+<I_INVOIC xmlns="urn:eslog:2.00">
+  <M_INVOIC>
+    <S_UNH><D_0062>ESLOG-SI-2026-001</D_0062></S_UNH>
+    <S_BGM>
+      <C_C002><D_1001>380</D_1001></C_C002>
+      <C_C106><D_1004>ESLOG-SI-2026-001</D_1004></C_C106>
+    </S_BGM>
+    <S_DTM><C_C507><D_2005>137</D_2005><D_2380>2026-10-15</D_2380></C_C507></S_DTM>
+    <G_SG1>
+      <S_RFF><C_C506><D_1153>ON</D_1153><D_1154>PO-ODELO-9921</D_1154></C_C506></S_RFF>
+    </G_SG1>
+    <G_SG2>
+      <S_NAD>
+        <D_3035>SE</D_3035>
+        <C_C080><D_3036>Odelo Slovenija d.o.o.</D_3036></C_C080>
+        <C_C059><D_3042>Tovarniška cesta 1</D_3042></C_C059>
+        <D_3164>Prebold</D_3164>
+        <D_3251>3312</D_3251>
+        <D_3207>SI</D_3207>
+      </S_NAD>
+      <G_SG3>
+        <S_RFF><C_C506><D_1153>VA</D_1153><D_1154>SI52093808</D_1154></C_C506></S_RFF>
+      </G_SG3>
+      <S_FII>
+        <D_3035>RB</D_3035>
+        <C_C078><D_3194>SI56020100012345678</D_3194></C_C078>
+        <C_C088><D_3433>LJBASI2X</D_3433></C_C088>
+      </S_FII>
+    </G_SG2>
+    <G_SG2>
+      <S_NAD>
+        <D_3035>BY</D_3035>
+        <C_C080><D_3036>Revoz d.d.</D_3036></C_C080>
+        <C_C059><D_3042>Belokranjska cesta 4</D_3042></C_C059>
+        <D_3164>Novo Mesto</D_3164>
+        <D_3251>8000</D_3251>
+        <D_3207>SI</D_3207>
+      </S_NAD>
+      <G_SG3>
+        <S_RFF><C_C506><D_1153>VA</D_1153><D_1154>SI13456789</D_1154></C_C506></S_RFF>
+      </G_SG3>
+    </G_SG2>
+    <G_SG25>
+      <S_LIN><D_1082>1</D_1082></S_LIN>
+      <S_IMD><C_C273><D_7008>LED Zadnja luč (Rear light assembly)</D_7008></C_C273></S_IMD>
+      <S_QTY><C_C186><D_6063>47</D_6063><D_6060>20.00</D_6060><D_6411>C62</D_6411></C_C186></S_QTY>
+      <G_SG28><S_PRI><C_C509><D_5125>AAA</D_5125><D_5118>150.00</D_5118></C_C509></S_PRI></G_SG28>
+      <G_SG33><S_TAX><D_5305>S</D_5305><C_C243><D_5278>22.00</D_5278></C_C243></S_TAX></G_SG33>
+      <S_MOA><C_C516><D_5025>203</D_5025><D_5004>3000.00</D_5004></C_C516></S_MOA>
+    </G_SG25>
+    <G_SG50>
+      <S_MOA><C_C516><D_5025>79</D_5025><D_5004>3000.00</D_5004></C_C516></S_MOA>
+      <S_MOA><C_C516><D_5025>124</D_5025><D_5004>660.00</D_5004></C_C516></S_MOA>
+      <S_MOA><C_C516><D_5025>86</D_5025><D_5004>3660.00</D_5004></C_C516></S_MOA>
+      <S_MOA><C_C516><D_5025>9</D_5025><D_5004>3660.00</D_5004></C_C516></S_MOA>
+    </G_SG50>
+    <G_SG52>
+      <S_TAX><D_5305>S</D_5305><C_C243><D_5278>22.00</D_5278></C_C243></S_TAX>
+      <S_MOA><C_C516><D_5025>125</D_5025><D_5004>3000.00</D_5004></C_C516></S_MOA>
+      <S_MOA><C_C516><D_5025>124</D_5025><D_5004>660.00</D_5004></C_C516></S_MOA>
+    </G_SG52>
+  </M_INVOIC>
+</I_INVOIC>`;
+  } else if (sampleType === "ubl") {
+    textarea.value = `<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:CustomizationID>urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0</cbc:CustomizationID>
+  <cbc:ID>PEPPOL-UBL-2026-44</cbc:ID>
+  <cbc:IssueDate>2026-10-15</cbc:IssueDate>
+  <cbc:DueDate>2026-10-30</cbc:DueDate>
+  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>EUR</cbc:DocumentCurrencyCode>
+  <cbc:BuyerReference>BMW-PLANT-01</cbc:BuyerReference>
+  <cac:OrderReference><cbc:ID>PO-8841029</cbc:ID></cac:OrderReference>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>Odelo LED Systems GmbH</cbc:Name></cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>Innovationsring 5</cbc:StreetName>
+        <cbc:CityName>Stuttgart</cbc:CityName>
+        <cbc:PostalZone>70174</cbc:PostalZone>
+        <cac:Country><cbc:IdentificationCode>DE</cbc:IdentificationCode></cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>DE814113634</cbc:CompanyID>
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+      </cac:PartyTaxScheme>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>BMW AG Werk München</cbc:Name></cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>Petuelring 130</cbc:StreetName>
+        <cbc:CityName>München</cbc:CityName>
+        <cbc:PostalZone>80788</cbc:PostalZone>
+        <cac:Country><cbc:IdentificationCode>DE</cbc:IdentificationCode></cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>DE129273398</cbc:CompanyID>
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+      </cac:PartyTaxScheme>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:PaymentMeans>
+    <cbc:PaymentMeansCode>58</cbc:PaymentMeansCode>
+    <cbc:PaymentID>RF18539007547034</cbc:PaymentID>
+    <cac:PayeeFinancialAccount>
+      <cbc:ID>DE89370400440532013000</cbc:ID>
+      <cac:FinancialInstitutionBranch><cbc:ID>COBADEFFXXX</cbc:ID></cac:FinancialInstitutionBranch>
+    </cac:PayeeFinancialAccount>
+  </cac:PaymentMeans>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="EUR">950.00</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="EUR">5000.00</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="EUR">950.00</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>19.00</cbc:Percent>
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="EUR">5000.00</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="EUR">5000.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="EUR">5950.00</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="EUR">5950.00</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="C62">10.0000</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="EUR">5000.00</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Name>Matrix LED Headlamp Assembly Right</cbc:Name>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>19.00</cbc:Percent>
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price><cbc:PriceAmount currencyID="EUR">500.0000</cbc:PriceAmount></cac:Price>
+  </cac:InvoiceLine>
+</Invoice>`;
+  } else if (sampleType === "cii") {
+    textarea.value = `<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
+  xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
+  xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+  <rsm:ExchangedDocument>
+    <ram:ID>CII-FACTURX-2026-99</ram:ID>
+    <ram:TypeCode>380</ram:TypeCode>
+    <ram:IssueDateTime><udt:DateTimeString format="102">20261015</udt:DateTimeString></ram:IssueDateTime>
+  </rsm:ExchangedDocument>
+  <rsm:SupplyChainTradeTransaction>
+    <ram:IncludedSupplyChainTradeLineItem>
+      <ram:AssociatedDocumentLineDocument><ram:LineID>1</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedTradeProduct><ram:Name>Engineering &amp; Tooling Service</ram:Name></ram:SpecifiedTradeProduct>
+      <ram:SpecifiedLineTradeAgreement>
+        <ram:NetPriceProductTradePrice><ram:ChargeAmount>2500.0000</ram:ChargeAmount></ram:NetPriceProductTradePrice>
+      </ram:SpecifiedLineTradeAgreement>
+      <ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="HUR">2.0000</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:ApplicableTradeTax><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>19.00</ram:RateApplicablePercent></ram:ApplicableTradeTax>
+        <ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>5000.00</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation>
+      </ram:SpecifiedLineTradeSettlement>
+    </ram:IncludedSupplyChainTradeLineItem>
+    <ram:ApplicableHeaderTradeAgreement>
+      <ram:SellerTradeParty>
+        <ram:Name>Odelo LED Systems GmbH</ram:Name>
+        <ram:PostalTradeAddress>
+          <ram:PostcodeCode>70174</ram:PostcodeCode>
+          <ram:LineOne>Innovationsring 5</ram:LineOne>
+          <ram:CityName>Stuttgart</ram:CityName>
+          <ram:CountryID>DE</ram:CountryID>
+        </ram:PostalTradeAddress>
+        <ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">DE814113634</ram:ID></ram:SpecifiedTaxRegistration>
+      </ram:SellerTradeParty>
+      <ram:BuyerTradeParty>
+        <ram:Name>Porsche AG</ram:Name>
+        <ram:PostalTradeAddress>
+          <ram:PostcodeCode>70435</ram:PostcodeCode>
+          <ram:LineOne>Porscheplatz 1</ram:LineOne>
+          <ram:CityName>Stuttgart</ram:CityName>
+          <ram:CountryID>DE</ram:CountryID>
+        </ram:PostalTradeAddress>
+        <ram:SpecifiedTaxRegistration><ram:ID schemeID="VA">DE147841123</ram:ID></ram:SpecifiedTaxRegistration>
+      </ram:BuyerTradeParty>
+    </ram:ApplicableHeaderTradeAgreement>
+    <ram:ApplicableHeaderTradeDelivery>
+      <ram:ActualDeliverySupplyChainEvent><ram:OccurrenceDateTime><udt:DateTimeString format="102">20261015</udt:DateTimeString></ram:OccurrenceDateTime></ram:ActualDeliverySupplyChainEvent>
+    </ram:ApplicableHeaderTradeDelivery>
+    <ram:ApplicableHeaderTradeSettlement>
+      <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
+      <ram:SpecifiedTradeSettlementPaymentMeans>
+        <ram:TypeCode>58</ram:TypeCode>
+        <ram:PayeePartyCreditorFinancialAccount><ram:IBANID>DE89370400440532013000</ram:IBANID></ram:PayeePartyCreditorFinancialAccount>
+      </ram:SpecifiedTradeSettlementPaymentMeans>
+      <ram:ApplicableTradeTax>
+        <ram:CalculatedAmount>950.00</ram:CalculatedAmount>
+        <ram:BasisAmount>5000.00</ram:BasisAmount>
+        <ram:CategoryCode>S</ram:CategoryCode>
+        <ram:RateApplicablePercent>19.00</ram:RateApplicablePercent>
+      </ram:ApplicableTradeTax>
+      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+        <ram:LineTotalAmount>5000.00</ram:LineTotalAmount>
+        <ram:TaxTotalAmount>950.00</ram:TaxTotalAmount>
+        <ram:GrandTotalAmount>5950.00</ram:GrandTotalAmount>
+        <ram:DuePayableAmount>5950.00</ram:DuePayableAmount>
+      </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+    </ram:ApplicableHeaderTradeSettlement>
+  </rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>`;
+  }
+
+  detectAndShowXmlFormat(textarea.value);
+  renderXmlVisualization();
+}
+window.loadSampleXmlToVis = loadSampleXmlToVis;
+
 

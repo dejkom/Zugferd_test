@@ -593,7 +593,8 @@ def generate_ubl_xml(inv: InvoiceData, profile: str = "PEPPOL") -> str:
         <cbc:Name>{escape(inv.seller.name)}</cbc:Name>
       </cac:PartyName>
       <cac:PostalAddress>
-        <cbc:StreetName>{escape(inv.seller.street or "")}</cbc:StreetName>
+        <cbc:StreetName>{escape(inv.seller.street or "")}</cbc:StreetName>{f"""
+        <cbc:AdditionalStreetName>{escape(inv.seller.address_line_2)}</cbc:AdditionalStreetName>""" if getattr(inv.seller, "address_line_2", None) else ""}
         <cbc:CityName>{escape(inv.seller.city or "")}</cbc:CityName>
         <cbc:PostalZone>{escape(inv.seller.postcode or "")}</cbc:PostalZone>
         <cac:Country>
@@ -608,7 +609,8 @@ def generate_ubl_xml(inv: InvoiceData, profile: str = "PEPPOL") -> str:
         <cbc:Name>{escape(inv.buyer.name)}</cbc:Name>
       </cac:PartyName>
       <cac:PostalAddress>
-        <cbc:StreetName>{escape(inv.buyer.street or "")}</cbc:StreetName>
+        <cbc:StreetName>{escape(inv.buyer.street or "")}</cbc:StreetName>{f"""
+        <cbc:AdditionalStreetName>{escape(inv.buyer.address_line_2)}</cbc:AdditionalStreetName>""" if getattr(inv.buyer, "address_line_2", None) else ""}
         <cbc:CityName>{escape(inv.buyer.city or "")}</cbc:CityName>
         <cbc:PostalZone>{escape(inv.buyer.postcode or "")}</cbc:PostalZone>
         <cac:Country>

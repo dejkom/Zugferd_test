@@ -3,7 +3,9 @@ import re
 import shutil
 import uuid
 from typing import Optional
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,8 +19,51 @@ from backend.eslog_builder import generate_eslog_bizbox_xml
 from backend.pdf_embedder import build_pdfa3_zugferd
 from backend.pdf_generator import generate_invoice_pdf_from_data
 from backend.mustang_wrapper import validate_zugferd_pdf
+from backend.xml_parser import parse_any_invoice_xml, detect_invoice_format
 
 app = FastAPI(title="ZUGFeRD & Factur-X Studio")
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    field_errors = []
+    field_names = []
+    for err in exc.errors():
+        loc = [str(x) for x in err.get("loc", []) if x not in ("body",)]
+        field_path = " -> ".join(loc) if loc else "root"
+        msg = err.get("msg", "Invalid value")
+        err_type = err.get("type", "")
+        if "missing" in err_type:
+            desc = f"Polje '{field_path}' je obvezno (Missing required field)."
+        else:
+            desc = f"Polje '{field_path}': {msg}."
+        field_errors.append(desc)
+        field_names.append(field_path)
+    
+    summary = f"Neveljavni podatki na obrazcu. Prosimo preverite naslednja polja: {', '.join(field_names)}"
+    return JSONResponse(
+        status_code=422,
+        content={
+            "success": False,
+            "error": summary,
+            "error_detail": "\n".join(field_errors),
+            "errors": field_errors,
+            "fields": field_names
+        }
+    )
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    import traceback
+    traceback.print_exc()
+    error_msg = str(exc) or "Internal server error occurred."
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "error": f"Napaka na strežniku: {error_msg}",
+            "error_detail": error_msg
+        }
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -60,6 +105,13 @@ class CreateFromManualRequest(BaseModel):
     token_usage: Optional[dict] = None
     generator: Optional[str] = "v1"
     source_type: Optional[str] = "manual"
+    lang: Optional[str] = "sl"
+    show_bt_tags: Optional[bool] = False
+
+class VisualizeXmlRequest(BaseModel):
+    xml_content: Optional[str] = None
+    file_id: Optional[str] = None
+    layout: Optional[str] = "layout3"
     lang: Optional[str] = "sl"
     show_bt_tags: Optional[bool] = False
 
@@ -131,31 +183,28 @@ async def extract_pdf(req: ExtractionRequest):
     # Resolve API key: req.api_key > sys_settings.openai_api_key > os.environ
     effective_api_key = req.api_key or sys_settings.get("openai_api_key") or os.environ.get("OPENAI_API_KEY")
 
-    # If the file is an XML (e-SLOG 2.0 or UBL or Factur-X), parse directly without OpenAI token costs!
+    # If the file is an XML (e-SLOG 2.0, OASIS UBL 2.1, or Factur-X / CII), parse directly without OpenAI token costs!
     if target_path.lower().endswith(".xml"):
         try:
             with open(target_path, "r", encoding="utf-8", errors="ignore") as f:
                 raw_xml = f.read()
 
-            # Check if eSLOG 2.0
-            if "urn:eslog" in raw_xml or "M_INVOIC" in raw_xml:
-                from backend.eslog_parser import parse_eslog2_xml
-                data = parse_eslog2_xml(raw_xml)
-                xml_content = generate_facturx_xml(data)
-                return {
-                    "invoice_data": data.model_dump(),
-                    "xml_preview": xml_content,
-                    "usage": {
-                        "model": "direct_xml_parser (e-SLOG 2.0)",
-                        "prompt_tokens": 0,
-                        "completion_tokens": 0,
-                        "total_tokens": 0,
-                        "estimated_cost_usd": 0.0,
-                        "formatted_cost": "$0.0000"
-                    }
+            detected_format = detect_invoice_format(raw_xml)
+            data = parse_any_invoice_xml(raw_xml)
+            return {
+                "invoice_data": data.model_dump(),
+                "xml_preview": raw_xml,
+                "usage": {
+                    "model": f"direct_xml_parser ({detected_format})",
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                    "estimated_cost_usd": 0.0,
+                    "formatted_cost": "$0.0000"
                 }
+            }
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"e-SLOG XML parsing error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"XML parsing error: {str(e)}")
 
     try:
         data, usage_info = extract_invoice_data(target_path, api_key=effective_api_key, system_prompt=custom_prompt)
@@ -370,7 +419,14 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
         logo_file = LOGO_PATH if os.path.exists(LOGO_PATH) else None
         sys_settings = load_system_settings()
         hide_tags = not bool(req.show_bt_tags)
-        generate_invoice_pdf_from_data(req.invoice_data, visual_pdf_path, logo_path=logo_file, layout=effective_layout, footer_config=sys_settings, lang=req.lang or "sl", hide_tags=hide_tags)
+        try:
+            generate_invoice_pdf_from_data(req.invoice_data, visual_pdf_path, logo_path=logo_file, layout=effective_layout, footer_config=sys_settings, lang=req.lang or "sl", hide_tags=hide_tags)
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Napaka pri generiranju vizualnega PDF računa: {str(e)}",
+                "report": None
+            }
         base_pdf_path = visual_pdf_path
         is_temp_visual = True
 
@@ -378,24 +434,31 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
     is_orderx = getattr(req.invoice_data, "document_format", "zugferd") == "orderx" or req.invoice_data.invoice_type_code == "220"
     profile_key = (req.profile or "EN16931").upper()
 
-    if is_orderx:
-        xml_content = generate_orderx_xml(req.invoice_data, profile=req.profile or "BASIC")
-        attachment_name = "order-x.xml"
-    elif "BIZBOX" in profile_key:
-        xml_content = generate_eslog_bizbox_xml(req.invoice_data)
-        attachment_name = "e-slog-bizbox.xml"
-    elif "UBL" in profile_key or profile_key in ["PEPPOL", "PEPPOL_UBL"]:
-        xml_content = generate_ubl_xml(req.invoice_data, profile=profile_key)
-        attachment_name = "invoice.xml"
-    elif profile_key in ["ESLOG2", "ESLOG_2_0", "ESLOG", "ESLOG_CII"]:
-        xml_content = generate_facturx_xml(req.invoice_data, profile="ESLOG2")
-        attachment_name = "e-slog.xml"
-    else:
-        xml_content = generate_facturx_xml(req.invoice_data, profile=req.profile or "EN16931")
-        attachment_name = "factur-x.xml"
+    try:
+        if is_orderx:
+            xml_content = generate_orderx_xml(req.invoice_data, profile=req.profile or "BASIC")
+            attachment_name = "order-x.xml"
+        elif "BIZBOX" in profile_key:
+            xml_content = generate_eslog_bizbox_xml(req.invoice_data)
+            attachment_name = "e-slog-bizbox.xml"
+        elif "UBL" in profile_key or profile_key in ["PEPPOL", "PEPPOL_UBL"]:
+            xml_content = generate_ubl_xml(req.invoice_data, profile=profile_key)
+            attachment_name = "invoice.xml"
+        elif profile_key in ["ESLOG2", "ESLOG_2_0", "ESLOG", "ESLOG_CII"]:
+            xml_content = generate_facturx_xml(req.invoice_data, profile="ESLOG2")
+            attachment_name = "e-slog.xml"
+        else:
+            xml_content = generate_facturx_xml(req.invoice_data, profile=req.profile or "EN16931")
+            attachment_name = "factur-x.xml"
 
-    with open(xml_path, "w", encoding="utf-8") as f:
-        f.write(xml_content)
+        with open(xml_path, "w", encoding="utf-8") as f:
+            f.write(xml_content)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Napaka pri generiranju XML strukture ({profile_key}): {str(e)}",
+            "report": None
+        }
 
     # 3. Combine into PDF/A-3
     try:
@@ -445,6 +508,60 @@ def create_invoice_pdfa3_from_manual(req: CreateFromManualRequest):
         "output_filename": final_pdf_name,
         "xml_content": xml_content,
         "validation": val_res
+    }
+
+@app.post("/api/visualize-xml")
+def visualize_xml_endpoint(req: VisualizeXmlRequest):
+    """
+    Directly render incoming e-invoice XML (e-SLOG 2.0, OASIS UBL 2.1, or Factur-X/CII)
+    onto our corporate visual invoice template (Layout 3 or Layout 2) as a PDF with 0 OpenAI token costs.
+    """
+    raw_xml = ""
+    if req.xml_content and req.xml_content.strip():
+        raw_xml = req.xml_content.strip()
+    elif req.file_id:
+        target_path = os.path.join(UPLOAD_DIR, req.file_id)
+        if not os.path.exists(target_path):
+            raise HTTPException(status_code=404, detail="Uploaded XML file not found.")
+        with open(target_path, "r", encoding="utf-8", errors="ignore") as f:
+            raw_xml = f.read()
+    else:
+        raise HTTPException(status_code=400, detail="Missing xml_content or file_id.")
+
+    try:
+        data = parse_any_invoice_xml(raw_xml)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Neveljavna XML datoteka ali neprepoznana shema: {str(e)}")
+
+    chosen_layout = req.layout or "layout3"
+    effective_layout = "layout3" if chosen_layout in ["original", "auto", None, ""] else chosen_layout
+    clean_inv = re.sub(r"[^\w\-.]", "_", data.invoice_number or "invoice")
+    work_id = uuid.uuid4().hex[:6]
+    output_filename = f"zugferd_{effective_layout}_{clean_inv}_{work_id}.pdf"
+    output_pdf_path = os.path.join(OUTPUT_DIR, output_filename)
+
+    logo_file = LOGO_PATH if os.path.exists(LOGO_PATH) else None
+    sys_settings = load_system_settings()
+    hide_tags = not bool(req.show_bt_tags)
+
+    try:
+        generate_invoice_pdf_from_data(
+            inv=data,
+            output_pdf_path=output_pdf_path,
+            logo_path=logo_file,
+            layout=effective_layout,
+            footer_config=sys_settings,
+            lang=req.lang or "sl",
+            hide_tags=hide_tags,
+            is_external_xml=True
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Napaka pri generiranju vizualnega PDF računa: {str(e)}")
+
+    return {
+        "success": True,
+        "output_filename": output_filename,
+        "invoice_data": data.model_dump()
     }
 
 @app.get("/api/download/{filename}")

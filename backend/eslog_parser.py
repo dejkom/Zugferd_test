@@ -4,7 +4,8 @@ import xml.etree.ElementTree as ET
 from typing import Optional, List, Dict, Any
 from backend.models import (
     InvoiceData, TradeParty, DeliveryDetails, PaymentDetails,
-    InvoiceLineItem, TaxSummaryItem, DocumentDiscount, FieldConfidenceScores
+    InvoiceLineItem, TaxSummaryItem, DocumentDiscount, FieldConfidenceScores,
+    BankAccount
 )
 
 def parse_eslog2_xml(xml_content_or_path: str) -> InvoiceData:
@@ -18,8 +19,10 @@ def parse_eslog2_xml(xml_content_or_path: str) -> InvoiceData:
     else:
         content = xml_content_or_path
 
-    # Strip XML namespaces for simplified XPath/tag querying
+    # Strip XML declarations / namespaces / prefixed attributes (e.g. xsi:noNamespaceSchemaLocation) for clean ET parsing
     clean_xml = re.sub(r'\sxmlns(?::\w+)?="[^"]+"', '', content, count=0)
+    clean_xml = re.sub(r'\s\w+:\w+="[^"]+"', '', clean_xml, count=0)
+    clean_xml = re.sub(r'<(/?)[\w\-]+:([\w\-]+)', r'<\1\2', clean_xml)
     root = ET.fromstring(clean_xml)
 
     # Helper: find text in child element
@@ -178,6 +181,7 @@ def parse_eslog2_xml(xml_content_or_path: str) -> InvoiceData:
         party_name = f"{name_1} {name_2}".strip()
 
         street_1 = get_text(nad, "C_C059/D_3042") or ""
+        street_2 = get_text(nad, "C_C059/D_3042_2") or ""
         city = get_text(nad, "D_3164") or ""
         postcode = get_text(nad, "D_3251") or ""
         country = get_text(nad, "D_3207") or "SI"
@@ -200,13 +204,16 @@ def parse_eslog2_xml(xml_content_or_path: str) -> InvoiceData:
         # Look for banking in S_FII
         iban = None
         bic = None
+        bank_name = None
         for fii in sg2.findall("S_FII"):
             fii_role = get_text(fii, "D_3035")
             if fii_role in ["RB", "BI", "BB"]:
                 acc = get_text(fii, "C_C078/D_3194")
                 b_code = get_text(fii, "C_C088/D_3433")
+                b_acc_name = get_text(fii, "C_C078/D_3192")
                 if acc and not iban:
                     iban = acc
+                    bank_name = b_acc_name
                 if b_code and not bic:
                     bic = b_code
 
@@ -231,6 +238,7 @@ def parse_eslog2_xml(xml_content_or_path: str) -> InvoiceData:
         if role == "SE":  # Seller
             seller_data["name"] = party_name or "Seller Company"
             seller_data["street"] = street_1
+            seller_data["address_line_2"] = street_2 or None
             seller_data["city"] = city
             seller_data["postcode"] = postcode
             seller_data["country_code"] = country
@@ -240,13 +248,21 @@ def parse_eslog2_xml(xml_content_or_path: str) -> InvoiceData:
             seller_data["contact_phone"] = contact_phone
             seller_data["contact_email"] = contact_email
             if iban:
-                payment_data["iban"] = iban
+                clean_iban = iban.replace(" ", "").upper()
+                payment_data["iban"] = clean_iban
+                clean_bic = bic.replace(" ", "").upper() if bic else None
+                payment_data["bank_accounts"] = [BankAccount(
+                    iban=clean_iban,
+                    bic=clean_bic,
+                    bank_name=bank_name
+                )]
             if bic:
-                payment_data["bic"] = bic
+                payment_data["bic"] = bic.replace(" ", "").upper()
 
         elif role == "BY":  # Buyer
             buyer_data["name"] = party_name or "Buyer Company"
             buyer_data["street"] = street_1
+            buyer_data["address_line_2"] = street_2 or None
             buyer_data["city"] = city
             buyer_data["postcode"] = postcode
             buyer_data["country_code"] = country

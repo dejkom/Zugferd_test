@@ -177,6 +177,106 @@ function jumpToV2Field(fieldId) {
 }
 window.jumpToV2Field = jumpToV2Field;
 
+// ================= UNIVERSAL XML-TO-VISUAL-PDF DROPZONE (OVERVIEW) =================
+function initOverviewXmlDropzone() {
+  const dropzone = document.getElementById("ovXmlDropzone");
+  const fileInput = document.getElementById("ovXmlFileInput");
+  if (!dropzone) return;
+
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = "var(--accent)";
+    dropzone.style.background = "rgba(37, 99, 235, 0.12)";
+  });
+
+  dropzone.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = "";
+    dropzone.style.background = "";
+  });
+
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = "";
+    dropzone.style.background = "";
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      handleOverviewXmlUpload(e.dataTransfer.files[0]);
+    }
+  });
+}
+
+function onOverviewXmlFileChanged(input) {
+  if (input && input.files && input.files.length) {
+    handleOverviewXmlUpload(input.files[0]);
+    input.value = "";
+  }
+}
+window.onOverviewXmlFileChanged = onOverviewXmlFileChanged;
+
+async function handleOverviewXmlUpload(file) {
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith(".xml")) {
+    alert("Prosimo, naložite veljavno XML datoteko (.xml).");
+    return;
+  }
+
+  const dropTitle = document.getElementById("ovXmlDropTitle");
+  const dropDesc = document.getElementById("ovXmlDropDesc");
+  const originalTitle = dropTitle ? dropTitle.textContent : "";
+  const originalDesc = dropDesc ? dropDesc.textContent : "";
+
+  if (dropTitle) dropTitle.textContent = `⚡ Rendering ${file.name} to Visual PDF...`;
+  if (dropDesc) dropDesc.textContent = "Parsing standard e-invoice XML and synthesizing visual PDF layout (0 tokens)...";
+
+  try {
+    // 1. Upload XML to backend
+    const formData = new FormData();
+    formData.append("file", file);
+    const upRes = await fetch("/api/upload", { method: "POST", body: formData });
+    const upData = await upRes.json();
+    if (!upRes.ok) throw new Error(upData.detail || "Upload failed");
+
+    // 2. Call /api/visualize-xml with layout3 (EN 16931 Paged Media) or layout2
+    const chosenLayout = (typeof getStoredLayout === "function" ? getStoredLayout() : "layout3") || "layout3";
+    const effectiveLayout = chosenLayout === "original" ? "layout3" : chosenLayout;
+
+    const visRes = await fetch("/api/visualize-xml", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_id: upData.file_id, layout: effectiveLayout, lang: "sl" })
+    });
+    const visData = await visRes.json();
+    if (!visRes.ok) {
+      throw new Error(visData.detail || "Neveljavna XML datoteka ali neprepoznana shema (podprti so e-SLOG 2.0, UBL 2.1 in Factur-X/CII).");
+    }
+
+    // 3. Open PDF preview modal immediately
+    if (typeof openPdfPreview === "function") {
+      openPdfPreview(visData.output_filename, visData.invoice_data?.invoice_number || file.name);
+    }
+
+    // 4. Switch to Studio v2 and populate the form so user can inspect or edit fields
+    if (typeof switchScenario === "function") {
+      switchScenario("v2");
+    }
+
+    // Trigger handleV2PrefillUpload to populate all Studio v2 fields
+    if (typeof handleV2PrefillUpload === "function") {
+      handleV2PrefillUpload(file);
+    }
+
+    if (dropTitle) dropTitle.textContent = `✅ Successfully rendered ${file.name}!`;
+    if (dropDesc) dropDesc.textContent = "Visual invoice PDF displayed and Studio v2 form populated with 0 tokens.";
+  } catch (err) {
+    const errorMsg = (err && err.message) ? err.message : String(err);
+    alert("Neveljavna XML datoteka ali neprepoznana shema (podprti so e-SLOG 2.0, UBL 2.1 in Factur-X/CII).");
+    if (dropTitle) dropTitle.textContent = originalTitle;
+    if (dropDesc) dropDesc.textContent = originalDesc;
+  }
+}
+window.handleOverviewXmlUpload = handleOverviewXmlUpload;
+
 document.addEventListener("DOMContentLoaded", () => {
   initOverviewPage();
+  initOverviewXmlDropzone();
 });

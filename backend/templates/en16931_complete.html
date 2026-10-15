@@ -381,7 +381,7 @@
           </div>
 
           <div style="font-size: 8.5pt; color: #475569; margin-top: 4px;">
-            <span class="tag">BT-35</span>{{ inv.seller.street or '' }},
+            <span class="tag">BT-35</span>{{ inv.seller.street or '' }}{% if inv.seller.address_line_2 %}<br><span class="tag">BT-36</span>{{ inv.seller.address_line_2 }}{% endif %}{% if inv.seller.address_line_3 %}<br><span class="tag">BT-162</span>{{ inv.seller.address_line_3 }}{% endif %}<br>
             <span class="tag">BT-38</span>{{ inv.seller.postcode or '' }} <span class="tag">BT-37</span>{{
             inv.seller.city or '' }},
             <span class="tag">BT-40</span>{{ inv.seller.country_code or 'SI' }}
@@ -468,6 +468,8 @@
         {% endif %}
         <div style="font-size: 8.5pt; color: #334155;">
           <span class="tag">BT-50</span>{{ inv.buyer.street or '' }}<br>
+          {% if inv.buyer.address_line_2 %}<span class="tag">BT-51</span>{{ inv.buyer.address_line_2 }}<br>{% endif %}
+          {% if inv.buyer.address_line_3 %}<span class="tag">BT-163</span>{{ inv.buyer.address_line_3 }}<br>{% endif %}
           <span class="tag">BT-53</span>{{ inv.buyer.postcode or '' }} <span class="tag">BT-52</span>{{ inv.buyer.city
           or '' }}, <span class="tag">BT-55</span>{{ inv.buyer.country_code or 'SI' }}
         </div>
@@ -805,7 +807,11 @@
         {% if effective_seller_court %} | <span class="tag">BT-30</span>{{ effective_seller_court }}{% endif %}
       </div>
       <div>
+        {% if is_external_xml %}
+        {{ footer_config.seller_website or '' }}{% if footer_config.seller_website and footer_config.seller_email %} | {% endif %}{{ footer_config.seller_email or '' }}
+        {% else %}
         {{ footer_config.seller_website or 'www.odelo.de' }} | {{ footer_config.seller_email or 'info@odelo.de' }}
+        {% endif %}
       </div>
       <div>
         <span data-i18n="footer_page">{{ t('footer_page') }}</span> 1 / 1

@@ -80,6 +80,8 @@ class TradeParty(BaseModel):
     tax_registration_id: Optional[str] = Field(None, description="Local tax number or commercial register (BT-32 / BT-47)")
     tax_number: Optional[str] = Field(None, description="Local tax number / Steuernummer (FC)")
     street: Optional[str] = Field(None, description="Street and building number (BT-35 / BT-50)")
+    address_line_2: Optional[str] = Field(None, description="Address line 2 / Additional address line (BT-36 / BT-51)")
+    address_line_3: Optional[str] = Field(None, description="Address line 3 (BT-162 / BT-163)")
     city: Optional[str] = Field(None, description="City (BT-37 / BT-52)")
     postcode: Optional[str] = Field(None, description="Postal code (BT-38 / BT-53)")
     country_code: str = Field(default="DE", description="ISO 3166-1 alpha-2 country code (BT-40 / BT-55)")

@@ -664,14 +664,18 @@ def generate_facturx_xml(inv: InvoiceData, profile: str = "EN16931") -> str:
       <ram:SellerTradeParty>{seller_id_xml}
         <ram:Name>{escape(inv.seller.name)}</ram:Name>{seller_legal_org_xml}{seller_contact_xml}        <ram:PostalTradeAddress>
           <ram:PostcodeCode>{escape(s_postcode)}</ram:PostcodeCode>
-          <ram:LineOne>{escape(inv.seller.street or "")}</ram:LineOne>
+          <ram:LineOne>{escape(inv.seller.street or "")}</ram:LineOne>{f"""
+          <ram:LineTwo>{escape(inv.seller.address_line_2)}</ram:LineTwo>""" if getattr(inv.seller, "address_line_2", None) else ""}{f"""
+          <ram:LineThree>{escape(inv.seller.address_line_3)}</ram:LineThree>""" if getattr(inv.seller, "address_line_3", None) else ""}
           <ram:CityName>{escape(s_city)}</ram:CityName>
           <ram:CountryID>{inv.seller.country_code or "DE"}</ram:CountryID>
         </ram:PostalTradeAddress>{seller_endpoint_xml}{seller_tax_xml}      </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
         <ram:Name>{escape(inv.buyer.name)}</ram:Name>{buyer_legal_org_xml}{buyer_contact_xml}        <ram:PostalTradeAddress>
           <ram:PostcodeCode>{escape(b_postcode)}</ram:PostcodeCode>
-          <ram:LineOne>{escape(inv.buyer.street or "")}</ram:LineOne>
+          <ram:LineOne>{escape(inv.buyer.street or "")}</ram:LineOne>{f"""
+          <ram:LineTwo>{escape(inv.buyer.address_line_2)}</ram:LineTwo>""" if getattr(inv.buyer, "address_line_2", None) else ""}{f"""
+          <ram:LineThree>{escape(inv.buyer.address_line_3)}</ram:LineThree>""" if getattr(inv.buyer, "address_line_3", None) else ""}
           <ram:CityName>{escape(b_city)}</ram:CityName>
           <ram:CountryID>{inv.buyer.country_code or "DE"}</ram:CountryID>
         </ram:PostalTradeAddress>{buyer_endpoint_xml}{buyer_tax_xml}      </ram:BuyerTradeParty>
@@ -775,7 +779,9 @@ def generate_orderx_xml(inv: InvoiceData, profile: str = "BASIC") -> str:
         <ram:Name>{escape(inv.seller.name)}</ram:Name>
         <ram:PostalTradeAddress>
           <ram:PostcodeCode>{escape(inv.seller.postcode or "")}</ram:PostcodeCode>
-          <ram:LineOne>{escape(inv.seller.street or "")}</ram:LineOne>
+          <ram:LineOne>{escape(inv.seller.street or "")}</ram:LineOne>{f"""
+          <ram:LineTwo>{escape(inv.seller.address_line_2)}</ram:LineTwo>""" if getattr(inv.seller, "address_line_2", None) else ""}{f"""
+          <ram:LineThree>{escape(inv.seller.address_line_3)}</ram:LineThree>""" if getattr(inv.seller, "address_line_3", None) else ""}
           <ram:CityName>{escape(inv.seller.city or "")}</ram:CityName>
           <ram:CountryID>{inv.seller.country_code or "DE"}</ram:CountryID>
         </ram:PostalTradeAddress>
@@ -784,7 +790,9 @@ def generate_orderx_xml(inv: InvoiceData, profile: str = "BASIC") -> str:
         <ram:Name>{escape(inv.buyer.name)}</ram:Name>
         <ram:PostalTradeAddress>
           <ram:PostcodeCode>{escape(inv.buyer.postcode or "")}</ram:PostcodeCode>
-          <ram:LineOne>{escape(inv.buyer.street or "")}</ram:LineOne>
+          <ram:LineOne>{escape(inv.buyer.street or "")}</ram:LineOne>{f"""
+          <ram:LineTwo>{escape(inv.buyer.address_line_2)}</ram:LineTwo>""" if getattr(inv.buyer, "address_line_2", None) else ""}{f"""
+          <ram:LineThree>{escape(inv.buyer.address_line_3)}</ram:LineThree>""" if getattr(inv.buyer, "address_line_3", None) else ""}
           <ram:CityName>{escape(inv.buyer.city or "")}</ram:CityName>
           <ram:CountryID>{inv.buyer.country_code or "DE"}</ram:CountryID>
         </ram:PostalTradeAddress>

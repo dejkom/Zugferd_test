@@ -6,7 +6,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from backend.models import InvoiceData
 
-def generate_invoice_pdf_from_data(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, layout: str = "layout1", footer_config: dict = None, lang: str = "sl", hide_tags: bool = True) -> str:
+def generate_invoice_pdf_from_data(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, layout: str = "layout1", footer_config: dict = None, lang: str = "sl", hide_tags: bool = True, is_external_xml: bool = False) -> str:
     """
     Renders a print-ready PDF invoice from structured InvoiceData.
     Supports:
@@ -17,9 +17,9 @@ def generate_invoice_pdf_from_data(inv: InvoiceData, output_pdf_path: str, logo_
     os.makedirs(os.path.dirname(os.path.abspath(output_pdf_path)), exist_ok=True)
     if layout in ["layout3", "complete", "en16931"]:
         from backend.template_engine import generate_en16931_pdf
-        return generate_en16931_pdf(inv, output_pdf_path, logo_path=logo_path, hide_tags=hide_tags, footer_config=footer_config, lang=lang)
+        return generate_en16931_pdf(inv, output_pdf_path, logo_path=logo_path, hide_tags=hide_tags, footer_config=footer_config, lang=lang, is_external_xml=is_external_xml)
     elif layout == "layout2":
-        return _generate_odelo_layout(inv, output_pdf_path, logo_path, footer_config=footer_config)
+        return _generate_odelo_layout(inv, output_pdf_path, logo_path, footer_config=footer_config, is_external_xml=is_external_xml)
     else:
         return _generate_standard_layout(inv, output_pdf_path, logo_path)
 
@@ -132,6 +132,9 @@ def _generate_standard_layout(inv: InvoiceData, output_pdf_path: str, logo_path:
         start_p = inv.service_period_start or ""
         end_p = inv.service_period_end or ""
         meta_lines.append(f"<b>Billing Period:</b> {start_p} &ndash; {end_p}")
+    despatch_ref_val = inv.despatch_advice_reference or (inv.delivery.despatch_advice_id if inv.delivery else None) or (inv.delivery.despatch_advice_reference if inv.delivery else None)
+    if despatch_ref_val:
+        meta_lines.append(f"<b>Despatch Advice / Delivery Note (BT-16):</b> {despatch_ref_val}")
     if inv.preceding_invoice_number:
         prec_str = f"{inv.preceding_invoice_number}"
         if inv.preceding_invoice_date:
@@ -330,7 +333,7 @@ def _generate_standard_layout(inv: InvoiceData, output_pdf_path: str, logo_path:
     return output_pdf_path
 
 
-def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, footer_config: dict = None) -> str:
+def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: str = None, footer_config: dict = None, is_external_xml: bool = False) -> str:
     """
     Option 2: Odelo Corporate Automotive Layout
     Features:
@@ -481,6 +484,9 @@ def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: st
         extra_meta_lines.append(f"<b>Lieferanten-Nr. (BT-29):</b> {inv.seller.seller_identifier}")
     if inv.buyer_reference:
         extra_meta_lines.append(f"<b>Ihre Ref / Leitweg:</b> {inv.buyer_reference}")
+    despatch_ref_val2 = inv.despatch_advice_reference or (inv.delivery.despatch_advice_id if inv.delivery else None) or (inv.delivery.despatch_advice_reference if inv.delivery else None)
+    if despatch_ref_val2:
+        extra_meta_lines.append(f"<b>Lieferschein (BT-16):</b> {despatch_ref_val2}")
     if inv.preceding_invoice_number:
         extra_meta_lines.append(f"<b>Ursprungsrechnung:</b> {inv.preceding_invoice_number}")
     if inv.service_period_start or inv.service_period_end:
@@ -629,37 +635,61 @@ def _generate_odelo_layout(inv: InvoiceData, output_pdf_path: str, logo_path: st
         story.append(Spacer(1, 3 * mm))
 
     # 9. Multi-column corporate footer strip (as in Odelo template)
-    cfg = footer_config or {}
-    s_name = inv.seller.name or cfg.get("seller_name") or "odelo GmbH"
-    s_street = inv.seller.street or cfg.get("seller_street") or "Hedelfinger Strasse 137"
-    s_city = f"{inv.seller.postcode or ''} {inv.seller.city or ''}".strip() or cfg.get("seller_city") or "70329 Stuttgart"
-    s_country = inv.seller.country_code or cfg.get("seller_country") or "Deutschland"
-    s_vat = inv.seller.vat_id or cfg.get("seller_vat") or "DE 347120003"
-    s_iban = inv.payment.iban or cfg.get("seller_bank1_iban") or "DE44 6004 0071 0556 7060 00"
-    s_bic = inv.payment.bic or cfg.get("seller_bank1_bic") or "COBADEFFXXX"
+    if is_external_xml:
+        s_name = inv.seller.name or ""
+        s_street = inv.seller.street or ""
+        s_city = f"{inv.seller.postcode or ''} {inv.seller.city or ''}".strip()
+        s_country = inv.seller.country_code or ""
+        s_vat = inv.seller.vat_id or ""
+        court = (inv.seller.court_registry or inv.seller.company_legal_form or "").strip()
+        directors = (inv.seller.legal_info or "").strip()
+        
+        bank1_iban = inv.payment.iban or ""
+        bank1_bic = inv.payment.bic or ""
+        bank1_name = inv.payment.bank_name or ("Bank" if bank1_iban else "")
+        bank2_iban = ""
+        bank2_bic = ""
+        bank2_name = ""
+        if getattr(inv.payment, "bank_accounts", None) and len(inv.payment.bank_accounts) > 1:
+            bank2_iban = inv.payment.bank_accounts[1].iban or ""
+            bank2_bic = inv.payment.bank_accounts[1].bic or ""
+            bank2_name = inv.payment.bank_accounts[1].bank_name or "Bank"
 
-    website = cfg.get("seller_website") or "www.odelo.de"
-    court = cfg.get("seller_court") or "Amtsgericht Stuttgart"
-    hrb = cfg.get("seller_hrb") or "HRB 736903"
-    ust_id_val = cfg.get("seller_ust_id") or s_vat
-    directors = cfg.get("seller_managing_directors") or "Mürsel Gülen, Sedat Kilic"
+        website = ""
+        hrb = ""
+        ust_id_val = s_vat
+    else:
+        cfg = footer_config or {}
+        s_name = inv.seller.name or cfg.get("seller_name") or "odelo GmbH"
+        s_street = inv.seller.street or cfg.get("seller_street") or "Hedelfinger Strasse 137"
+        s_city = f"{inv.seller.postcode or ''} {inv.seller.city or ''}".strip() or cfg.get("seller_city") or "70329 Stuttgart"
+        s_country = inv.seller.country_code or cfg.get("seller_country") or "Deutschland"
+        s_vat = inv.seller.vat_id or cfg.get("seller_vat") or "DE 347120003"
+        s_iban = inv.payment.iban or cfg.get("seller_bank1_iban") or "DE44 6004 0071 0556 7060 00"
+        s_bic = inv.payment.bic or cfg.get("seller_bank1_bic") or "COBADEFFXXX"
 
-    bank1_name = cfg.get("seller_bank1_name") or "Commerzbank AG"
-    bank1_bic = s_bic
-    bank1_iban = s_iban
+        website = cfg.get("seller_website") or "www.odelo.de"
+        court = cfg.get("seller_court") or "Amtsgericht Stuttgart"
+        hrb = cfg.get("seller_hrb") or "HRB 736903"
+        ust_id_val = cfg.get("seller_ust_id") or s_vat
+        directors = cfg.get("seller_managing_directors") or "Mürsel Gülen, Sedat Kilic"
 
-    bank2_name = cfg.get("seller_bank2_name") or "Baden-Württembergische Bank"
-    bank2_bic = cfg.get("seller_bank2_bic") or "SOLA DEST"
-    bank2_iban = cfg.get("seller_bank2_iban") or "DE30 6005 0101 7871 5056 72"
+        bank1_name = cfg.get("seller_bank1_name") or "Commerzbank AG"
+        bank1_bic = s_bic
+        bank1_iban = s_iban
+
+        bank2_name = cfg.get("seller_bank2_name") or "Baden-Württembergische Bank"
+        bank2_bic = cfg.get("seller_bank2_bic") or "SOLA DEST"
+        bank2_iban = cfg.get("seller_bank2_iban") or "DE30 6005 0101 7871 5056 72"
 
     # Row 1 and Row 2 matching the Odelo 4-column 2-row layout exactly
-    r1c1 = f"<b>{s_name}</b><br/>Sitz {inv.seller.city or 'Stuttgart'}<br/>{website}"
-    r1c2 = f"{court}<br/>{hrb}<br/>UST-ID-Nr.: {ust_id_val}"
-    r1c3 = f"{bank1_name}<br/>S.W.I.F.T/BIC: {bank1_bic}<br/>IBAN: {bank1_iban}"
-    r1c4 = f"{bank2_name}<br/>S.W.I.F.T/BIC: {bank2_bic}<br/>IBAN: {bank2_iban}"
+    r1c1 = f"<b>{s_name}</b><br/>{s_city}<br/>{website}" if (s_name or s_city or website) else ""
+    r1c2 = f"{court}<br/>{hrb}<br/>{('UST-ID-Nr.: ' + ust_id_val) if ust_id_val else ''}".strip("<br/>")
+    r1c3 = f"{bank1_name}<br/>S.W.I.F.T/BIC: {bank1_bic}<br/>IBAN: {bank1_iban}" if bank1_iban else ""
+    r1c4 = f"{bank2_name}<br/>S.W.I.F.T/BIC: {bank2_bic}<br/>IBAN: {bank2_iban}" if bank2_iban else ""
 
-    r2c1 = f"{s_street}<br/>{s_city}<br/>{s_country}"
-    r2c2 = f"Geschäftsführer:<br/>{directors}"
+    r2c1 = f"{s_street}<br/>{s_city}<br/>{s_country}".strip("<br/>")
+    r2c2 = f"Geschäftsführer:<br/>{directors}" if directors else ""
     r2c3 = ""
     r2c4 = ""
 
